@@ -3,7 +3,7 @@ name = "somnigraph"
 version = "0.1.0"
 description = "A research-driven memory system for Claude Code with sleep consolidation and graph-based recall."
 readme = "README.md"
-license = "Apache-2.0 WITH Commons-Clause-1.0"
+license = {text = "Apache-2.0 WITH Commons-Clause-1.0"}
 requires-python = ">=3.11"
 dependencies = [
     "sqlite-vec>=0.1.6",
