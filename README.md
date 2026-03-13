@@ -8,6 +8,12 @@ This is my personal memory system for Claude Code. I'm sharing it because the id
 
 The system gives Claude persistent memory across sessions: the ability to store, recall, forget, and consolidate memories using mechanisms inspired by biological memory systems.
 
+## Status
+
+- **Core system** (Phases 1–3): complete and functional — hybrid retrieval, scoring, graph, decay, all 11 tools
+- **Sleep consolidation** (Phase 4): not yet migrated from production
+- **Tuning tools** (Phase 5): not yet migrated from production
+
 ## What makes it different
 
 Most MCP memory servers store and retrieve. Somnigraph also **forgets, sleeps, and learns from feedback**.
@@ -15,9 +21,9 @@ Most MCP memory servers store and retrieve. Somnigraph also **forgets, sleeps, a
 - **Hybrid retrieval**: RRF fusion of FTS5 keyword search and vector similarity (sqlite-vec), with [experiments showing when each channel matters](docs/experiments.md)
 - **Biological decay**: Per-category exponential decay with configurable half-lives, dormancy detection, and a quality floor
 - **Sleep consolidation**: Offline batch processing in two phases — NREM (cluster and merge similar memories) and REM (gap analysis, question generation)
-- **Graph edges**: Typed relationships between memories with novelty-scored adjacency expansion during recall
-- **Retrieval feedback**: Explicit utility scoring that compounds into confidence, drives Hebbian co-retrieval boosting, and shapes future recall
-- **Shadow load tracking**: Memories that surface repeatedly without being useful get suppressed
+- **PPR graph expansion**: Personalized PageRank over memory edges replaces naive BFS adjacency — [+5.8pp R@10 improvement](docs/experiments.md)
+- **Retrieval feedback**: Explicit utility scoring with empirical Bayes priors, EWMA aggregation, and Hebbian co-retrieval boosting that shapes future recall
+- **Shadow load tracking**: Memories that surface repeatedly without being useful get tracked as metadata (not currently used in scoring — removed after [tuning showed marginal impact](docs/experiments.md))
 
 Every major design choice was tested against live retrieval data. See [docs/experiments.md](docs/experiments.md) for the methodology and results, including several cases where my assumptions were wrong.
 
@@ -29,7 +35,7 @@ Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), an OpenAI API key 
 git clone https://github.com/alexisolson/somnigraph.git
 cd somnigraph
 cp .env.example .env
-# Edit .env with your OpenAI API key
+# Edit .env: add your OpenAI API key, optionally set SOMNIGRAPH_DATA_DIR
 
 # Register as a Claude Code MCP server
 claude mcp add somnigraph -- uv run src/memory_server.py
@@ -38,7 +44,31 @@ claude mcp add somnigraph -- uv run src/memory_server.py
 Add the following to your `CLAUDE.md` to instruct Claude how to use the memory tools effectively:
 
 ```markdown
-<!-- TODO: CLAUDE.md snippet -->
+## Memory
+
+You have persistent memory via the somnigraph MCP server.
+
+### Session rhythm
+
+- **Session start**: Call `startup_load()` to load high-priority active memories.
+- **Mid-session**: Use `recall("topic")` when prior context would help —
+  past decisions, gotchas, or anything the user seems to reference from before.
+- **After recall**: Call `recall_feedback({id: score, ...})` to rate what was
+  useful (0.0–1.0). This is how the system learns; every score shapes future retrieval.
+- **Storing**: Use `remember()` for things a future session would need:
+  - Corrections the user gives you (highest value — prevents repeated mistakes)
+  - Verified fixes and gotchas
+  - Decisions with reasoning that would be lost without context
+  - Don't store: one-off facts, things derivable from code, unverified guesses.
+- **Session end**: Call `reflect()` to review the session for lessons learned.
+
+### Other tools
+
+- `link()` — create edges between related memories (builds the graph PPR traverses)
+- `forget()` — remove a memory that's wrong or obsolete
+- `review_pending()` — review auto-captured memories before they're committed
+- `consolidate()` — run sleep consolidation (merge similar memories, detect gaps)
+- `memory_stats()` — health metrics and storage stats
 ```
 
 ## Architecture
@@ -49,10 +79,12 @@ src/
 └── memory/
     ├── constants.py     # All tuning parameters, organized by validation tier
     ├── db.py            # SQLite connection, schema, migrations
-    ├── scoring.py       # Post-RRF scoring pipeline (feedback, adjacency, Hebbian, shadow, confidence)
+    ├── scoring.py       # Post-RRF scoring pipeline (feedback, PPR, Hebbian)
     ├── write.py         # Memory creation with deduplication and privacy stripping
-    ├── graph.py         # Edge creation, novelty-scored adjacency expansion
+    ├── graph.py         # Edge creation, PPR graph expansion
     ├── decay.py         # Per-category exponential decay, dormancy, shadow load
+    ├── events.py        # Event logging (recall, feedback, consolidation)
+    ├── session.py       # Session tracking and context
     ├── fts.py           # FTS5 indexing and query sanitization
     ├── vectors.py       # sqlite-vec operations, vector math
     ├── embeddings.py    # OpenAI embedding API, token counting, enriched text construction
@@ -69,7 +101,7 @@ src/
 
 ## Research
 
-This system was built through iterative research across 14 phases, starting with a survey of academic papers and existing implementations, and ending with empirical validation against live data.
+This system was built through iterative research across 17 phases, with 20+ tuning studies testing scoring parameters, graph expansion strategies, and retrieval quality metrics against live data.
 
 - **[docs/experiments.md](docs/experiments.md)** — Retrospective experiments testing specific hypotheses (vector vs. FTS5, decay models, Hebbian boosting, scoring calibration)
 - **[docs/architecture.md](docs/architecture.md)** — Key design decisions with reasoning

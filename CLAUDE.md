@@ -10,25 +10,26 @@ Migrating from production (`~/.claude/servers/`, `~/.claude/scripts/`) into this
 
 - [x] Phase 1: Documentation (architecture.md, experiments.md, similar-systems.md)
 - [x] Phase 2: Foundation code (db, constants, embeddings, vectors, write, privacy, themes, fts)
-- [ ] Phase 3: Scoring + tools (scoring, graph, decay, formatting, sync, stats, tools, memory_server)
+- [x] Phase 3: Scoring + tools (scoring, graph, decay, formatting, events, session, stats, tools, memory_server)
 - [ ] Phase 4: Sleep pipeline (sleep_nrem, sleep_rem, sleep_consolidate, sleep orchestrator)
 - [ ] Phase 5: Tuning tools (tune_memory, plot_tuning, probe_recall)
 - [ ] Phase 6: Ongoing tending
 
 ### Next session work
 
-Phase 3: Migrate scoring + tools modules:
-- `src/memory/scoring.py`, `src/memory/graph.py`, `src/memory/decay.py`
-- `src/memory/formatting.py`, `src/memory/sync.py`, `src/memory/stats.py`
-- `src/memory/tools.py`, `src/memory_server.py`
+Phase 4: Migrate sleep pipeline — see `prancy-questing-emerson.md` + `streamed-crunching-knuth.md` plans.
 
-### Phase 2 notes
+### Migration notes
 
 - `DATA_DIR` lives in `constants.py` (not `db.py`) to avoid circular imports (db → fts → db)
 - Configurable via `SOMNIGRAPH_DATA_DIR` env var, defaults to `~/.somnigraph/`
 - Personal data (KNOWN_PHRASES, THEME_VARIANTS, CONTENT_THEME_PHRASES) load from JSON in `DATA_DIR`, with small generic defaults
 - API key: `OPENAI_API_KEY` env var, fallback to `DATA_DIR/openai_api_key` file
 - `pyproject.toml` license field uses table format for non-SPDX identifier
+- Production `sync.py` → somnigraph `events.py` (name clarified; old JSON sync layer was removed in production 2026-03-06)
+- Production `memory_server.py` re-exports for sleep script compat stripped — somnigraph server is pure MCP wiring
+- Legacy BFS adjacency expansion (`_expand_adjacency_legacy`) preserved in scoring.py for research/tuning tool compatibility
+- `consolidate()` archive path uses `DATA_DIR` (production had hardcoded `~/.claude/data/`)
 
 ## Repo structure
 
