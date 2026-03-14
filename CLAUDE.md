@@ -10,7 +10,7 @@ Migration from production is complete (Phases 1-5). The system is live and stabl
 
 ### Next session work
 
-Snippet dogfood test: read the README snippet with fresh eyes, compare against `docs/claude-md-guide.md`, and identify gaps where a new user's Claude would make bad decisions. Pyproject packaging is verified (wheel includes memory_server.py).
+Snippet dogfood test complete (2026-03-14). Fixed `reflect()` misdescription, added category/priority/themes/dual-input recall guidance. Next: consider whether `claude-md-guide.md` should explicitly address "there is no session-end tool" (currently implied). Also: test the updated snippet by having a fresh session use only it.
 
 ### Migration notes
 

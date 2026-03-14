@@ -51,23 +51,31 @@ You have persistent memory via the somnigraph MCP server.
 - **Session start**: Call `startup_load(3000)` to load high-priority active memories.
   The budget parameter controls how many tokens of context to load — be parsimonious
   at session start when context is most valuable.
-- **Mid-session**: Use `recall("topic")` when prior context would change your response —
-  past decisions, gotchas, corrections, or anything the user seems to reference from before.
+- **Mid-session**: Use `recall("keywords", context="natural language description")`
+  when prior context would change your response — past decisions, gotchas, corrections,
+  or anything the user seems to reference from before. `query` feeds FTS5 keyword search;
+  `context` feeds vector similarity. Use both for best results.
   Don't narrate that you're checking memory; just recall and use the results naturally.
 - **After recall**: Call `recall_feedback({id: score, ...})` to rate what surfaced.
   Rate ALL memories: 1.0 = directly useful, 0.0 = surfaced but unused. Don't skip this —
-  it's the selection pressure that shapes future retrieval. Recent ratings dominate.
-- **Storing**: Use `remember()` for things a future session would need:
-  - Corrections the user gives you (highest value — prevents repeated mistakes)
-  - Verified fixes and gotchas (only after the fix is confirmed working)
-  - Decisions with reasoning that would be lost without context
-  - Don't store: one-off facts, things derivable from code, unverified guesses
-- **Session end**: Call `reflect()` to review the session for lessons learned.
+  it's the selection pressure that shapes future retrieval.
+- **Storing**: Use `remember(content, category, priority, themes)`:
+  - **Categories**: `procedural` (corrections, gotchas, how-to), `episodic` (events,
+    decisions), `semantic` (facts, reference), `reflection` (insights, patterns).
+  - **Priority** (1-10): 8-10 corrections/critical gotchas, 5-7 decisions/patterns,
+    1-4 reference material. Controls startup_load ordering.
+  - **Themes**: JSON array of keyword tags, e.g. `'["python","gotcha"]'`. Indexed
+    by FTS5 — use specific terms that future recalls would search for.
+  - What to store: corrections (highest value), verified fixes, decisions with reasoning.
+  - Don't store: one-off facts, things derivable from code, unverified guesses.
+- **Session end**: Review the session for lessons worth storing. Use `recall()` to check
+  whether insights from this session are already captured, and `remember()` to store new ones.
 
 ### Other tools
 
 - `link()` — create edges between related memories (the graph that Personalized PageRank traverses during recall)
 - `forget()` — remove a memory that's wrong or obsolete
+- `reflect(memory_id)` — reheat a memory (update last_accessed) when it's referenced but not through search
 - `review_pending()` — review auto-captured memories before they're committed
 - `consolidate()` — run offline sleep consolidation (merge similar memories, detect gaps). Heavy — not every session.
 - `memory_stats()` — health metrics and storage stats
