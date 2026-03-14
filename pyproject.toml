@@ -12,6 +12,9 @@ dependencies = [
     "mcp[cli]>=1.2.0",
 ]
 
+[project.optional-dependencies]
+tuning = ["optuna>=4.0", "numpy>=1.26", "scikit-learn>=1.0", "matplotlib>=3.8"]
+
 [project.urls]
 Repository = "https://github.com/alexisolson/somnigraph"
 
