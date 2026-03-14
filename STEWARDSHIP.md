@@ -24,7 +24,7 @@ The docs are the product. A feature without documentation is half-finished; docu
 
 ### 2. Migration completion
 
-Phases 4-6 are pending (sleep pipeline, tuning tools, scripts). The repo is incomplete without them. But migration is packaging existing working code, not building new things — it's important but not the creative frontier.
+Phase 6 is pending (ongoing tending). The repo is nearly complete. But migration is packaging existing working code, not building new things — it's important but not the creative frontier.
 
 *Move this down when*: all phases are complete. This priority self-terminates.
 
@@ -106,3 +106,5 @@ Append a changelog entry below.
 ## Changelog
 
 - 2026-03-13: Initial version. Priorities: docs > migration > honest accounting > real-data tuning.
+- 2026-03-13: Phase 5 complete. Fixed stale "Phases 4-6" in Priority 2. Migration is nearly done — Priority 2 reorder condition approaching (self-terminates when Phase 6 completes).
+- 2026-03-13: Phase 6 tending. Fixed stale README Status (still claimed Phases 4-5 unfinished). Fixed pyproject.toml packaging — memory_server.py was excluded from wheel builds (force-include, since hatchling py-modules doesn't resolve src/ layout paths). Surprise: the packaging gap was invisible from the uv run usage path and would only surface for pip installs.

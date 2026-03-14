@@ -13,13 +13,13 @@ Migrating from production (`~/.claude/servers/`, `~/.claude/scripts/`) into this
 - [x] Phase 1: Documentation (architecture.md, experiments.md, similar-systems.md)
 - [x] Phase 2: Foundation code (db, constants, embeddings, vectors, write, privacy, themes, fts)
 - [x] Phase 3: Scoring + tools (scoring, graph, decay, formatting, events, session, stats, tools, memory_server)
-- [ ] Phase 4: Sleep pipeline (sleep_nrem, sleep_rem, sleep_consolidate, sleep orchestrator)
-- [ ] Phase 5: Tuning tools (tune_memory, plot_tuning, probe_recall)
+- [x] Phase 4: Sleep pipeline (sleep_nrem, sleep_rem, sleep_consolidate, sleep orchestrator)
+- [x] Phase 5: Tuning tools (tune_memory, plot_tuning, probe_recall)
 - [ ] Phase 6: Ongoing tending
 
 ### Next session work
 
-Phase 4: Migrate sleep pipeline — see `prancy-questing-emerson.md` + `streamed-crunching-knuth.md` plans.
+Phase 6: Ongoing tending — documentation polish, README snippet testing, pyproject packaging verification.
 
 ### Migration notes
 
@@ -32,6 +32,13 @@ Phase 4: Migrate sleep pipeline — see `prancy-questing-emerson.md` + `streamed
 - Production `memory_server.py` re-exports for sleep script compat stripped — somnigraph server is pure MCP wiring
 - Legacy BFS adjacency expansion (`_expand_adjacency_legacy`) preserved in scoring.py for research/tuning tool compatibility
 - `consolidate()` archive path uses `DATA_DIR` (production had hardcoded `~/.claude/data/`)
+- Sleep scripts: import paths changed from `memory_server` → `memory` package; data paths from hardcoded `~/.claude/data/` → configurable `DATA_DIR`; personal vault paths (core.md, seed.md, fragments, journal, archive) kept as `Path.home()` references
+- REM step numbering: `4a/4b/4d/4d2/4d3/4f/4g/4h/4i/4j` → `1-10` (legacy from original multi-phase design where NREM was phases 1-3)
+- Orchestrator `memory.sync` import → `memory.events` (matching the production→somnigraph rename)
+- Tuning tools: `SERVERS_DIR` removed; `CONSTANTS_PATH` points to repo's `src/memory/constants.py`; all data paths (`tuning_studies/`, `tuning_cache/`, `tuning_plots/`) use `DATA_DIR`; API key uses `OPENAI_API_KEY` env var with `DATA_DIR/openai_api_key` fallback
+- probe_recall.py: imports `impl_recall`/`impl_recall_feedback` from `memory.tools` (not re-exported in `__init__.py`); subprocess workspace uses `DATA_DIR`
+- plot_tuning.py: `STUDY_DIR` uses `DATA_DIR / "tuning_studies"` instead of hardcoded path
+- `pyproject.toml` adds optional `[tuning]` dependency group for optuna, numpy, scikit-learn, matplotlib
 
 ## Repo structure
 
