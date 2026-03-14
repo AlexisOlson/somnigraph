@@ -10,7 +10,7 @@ Migration from production is complete (Phases 1-5). The system is live and stabl
 
 ### Next session work
 
-GT judging is in progress (~200/1047 queries judged with Sonnet, running in batches). External review complete (4 independent reviewers): PPR contradiction edge traversal bug fixed, narrative corrections applied to architecture.md and experiments.md, roadmap expanded with 8 new experiments and 4 new open questions. See `docs/roadmap.md` § External review findings for the full account. When GT completes, Tier 1 experiments are unblocked — now includes utility calibration study and counterfactual coverage check alongside the original three. The `migrate-gt-scripts` branch is ready for review and merge.
+GT judging is in progress (~500/1047 queries judged with Sonnet, running in batches). External review complete (4 independent reviewers): PPR contradiction edge traversal bug fixed, narrative corrections applied to architecture.md and experiments.md, roadmap expanded with 8 new experiments and 4 new open questions. See `docs/roadmap.md` § External review findings for the full account. When GT completes, Tier 1 experiments are unblocked — now includes utility calibration study and counterfactual coverage check alongside the original three. The `migrate-gt-scripts` branch is ready for review and merge.
 
 ### Migration notes
 

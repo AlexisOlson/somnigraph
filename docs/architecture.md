@@ -326,7 +326,7 @@ The wiring layer (`memory_server.py`) still has re-exports for backward compatib
 
 **wm19 (PPR):** Replaced one-hop BFS adjacency expansion with Personalized PageRank. The most significant architectural change since the feedback loop: `THEME_BOOST` collapsed from 0.97 to 0.19 as PPR absorbed the graph-traversal function that theme boost had been compensating for. PPR damping (0.775), boost coefficient (2.0), and minimum score (0.007) were tuned in this study.
 
-**wm24–wm34 (real data, ongoing):** First tuning on real-memory ground truth (200 judged queries from 1,047-query GT set, 5-fold cross-validation). Studies explore 3D–10D parameter spaces with graded recall and NDCG metrics. Results pending — these are the first confirmatory tests of whether LoCoMo-derived structure transfers to real data.
+**wm24–wm34 (real data, ongoing):** First tuning on real-memory ground truth (~500 judged queries from 1,047-query GT set, 5-fold cross-validation). Studies explore 3D–10D parameter spaces with graded recall and NDCG metrics. Results pending — these are the first confirmatory tests of whether LoCoMo-derived structure transfers to real data.
 
 ### What the studies taught us
 
@@ -338,7 +338,7 @@ The wiring layer (`memory_server.py`) still has re-exports for backward compatib
 
 4. **Metric choice drives parameter values.** The same system with different metrics produces wildly different "optimal" constants. This isn't a bug — different metrics ask different questions. AUC asks "how well do you rank across all thresholds?" Miss rate asks "do you find the important stuff within a budget?" The answer to each shapes the parameters differently.
 
-5. **The parameter space has structure.** Two basins, a Pareto front, stable feature importances. This isn't a random landscape — it's a system with comprehensible mechanics. Understanding the structure matters more than finding the global optimum. **Caveat:** The two-basin finding comes from ~17 LoCoMo queries. With 7 parameters, the surface is underspecified — two basins may be an artifact of the evaluation set rather than a structural property of the scoring problem. Real-data tuning (wm24–wm34, 200 judged queries with 5-fold CV) is in progress but hasn't yet confirmed or disconfirmed the basin structure. If basins don't persist on real data, the LoCoMo findings were exploratory, not confirmatory.
+5. **The parameter space has structure.** Two basins, a Pareto front, stable feature importances. This isn't a random landscape — it's a system with comprehensible mechanics. Understanding the structure matters more than finding the global optimum. **Caveat:** The two-basin finding comes from ~17 LoCoMo queries. With 7 parameters, the surface is underspecified — two basins may be an artifact of the evaluation set rather than a structural property of the scoring problem. Real-data tuning (wm24–wm34, ~500 judged queries with 5-fold CV) is in progress but hasn't yet confirmed or disconfirmed the basin structure. If basins don't persist on real data, the LoCoMo findings were exploratory, not confirmatory.
 
 ---
 

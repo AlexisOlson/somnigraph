@@ -93,7 +93,7 @@ Research-grade questions with hypotheses and proposed experiments. Ordered by in
 
 ### Do the LocoMo-tuned constants transfer to real data?
 
-**What we know:** Current constants optimized on LoCoMo (public benchmark, ~17 testable queries). Real-memory GT has 1,047 queries (200 judged so far) with different distributions (more personal, more thematic). Real-data tuning (wm24–wm34) is already underway using 200 judged queries with 5-fold cross-validation.
+**What we know:** Current constants optimized on LoCoMo (public benchmark, ~17 testable queries). Real-memory GT has 1,047 queries (~500 judged so far) with different distributions (more personal, more thematic). Real-data tuning (wm24–wm34) is already underway using ~500 judged queries with 5-fold cross-validation.
 **What we don't know:** Whether the LoCoMo-derived basin structure persists on real data. Whether constants shift significantly as more GT queries are judged (200 → 1,047).
 **Experiment:** Compare wm24+ constants against LoCoMo-era constants. Re-run when GT judging reaches 500+ queries to test stability.
 **Effort:** Ongoing (wm24–wm34 in progress).
@@ -179,7 +179,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ### Tier 1: Unblocked by GT completion (1 session each)
 
-1. **Re-tune constants on real GT.** *(In progress: wm24–wm34, 200 judged queries, 5-fold CV.)* Compare real-data constants against LoCoMo-era constants. Re-run when GT judging reaches 500+ queries to test stability. Accept if: AUC delta >2% or any constant shifts >20%.
+1. **Re-tune constants on real GT.** *(In progress: wm24–wm34, ~500 judged queries, 5-fold CV.)* Compare real-data constants against LoCoMo-era constants. Re-run when GT judging completes (1,047 queries) to test stability. Accept if: AUC delta >2% or any constant shifts >20%.
 
 2. **Feedback loop health check.** Compute correlation between historical feedback utility and GT relevance. Accept if: correlation computed, interpretation documented in `experiments.md`.
 

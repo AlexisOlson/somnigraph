@@ -22,7 +22,7 @@ The "What didn't work" sections of `docs/architecture.md` and `docs/experiments.
 
 ### 2. Retrieval quality on real data
 
-The tuning studies were done on LocoMo (a public benchmark, ~17 testable queries). Real-memory ground truth exists (`~/.claude/data/ground_truth_handoff.zip` — 1,047 queries, ~112 candidates each) and is being judged in ~200-query Sonnet batches (~200/1047 complete). This is the first experiment in the research roadmap (Tier 1).
+The tuning studies were done on LocoMo (a public benchmark, ~17 testable queries). Real-memory ground truth exists (`~/.claude/data/ground_truth_handoff.zip` — 1,047 queries, ~112 candidates each) and is being judged in ~200-query Sonnet batches (~500/1047 complete). This is the first experiment in the research roadmap (Tier 1).
 
 External reviews (4 independent reviewers, March 2026) revealed that the evaluation methodology itself has gaps beyond the LoCoMo-to-real transition: the 17-query LoCoMo set is underspecified for 7 parameters, feedback ground truth is selection-biased (only surfaced memories get labels), and the feedback loop may optimize for retrieval habits rather than retrieval needs. These concerns are documented in `docs/architecture.md` § Open problems and `docs/experiments.md` § Ground truth caveats.
 
