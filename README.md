@@ -41,33 +41,37 @@ cp .env.example .env
 claude mcp add somnigraph -- uv run src/memory_server.py
 ```
 
-Add the following to your `CLAUDE.md` to instruct Claude how to use the memory tools effectively:
+Add the following to your `CLAUDE.md` to instruct Claude how to use the memory tools effectively (see [docs/claude-md-guide.md](docs/claude-md-guide.md) for deeper guidance on budgets, categories, and common pitfalls):
 
 ```markdown
 ## Memory
 
 You have persistent memory via the somnigraph MCP server.
 
-### Session rhythm
+### Rhythm
 
-- **Session start**: Call `startup_load()` to load high-priority active memories.
-- **Mid-session**: Use `recall("topic")` when prior context would help —
-  past decisions, gotchas, or anything the user seems to reference from before.
-- **After recall**: Call `recall_feedback({id: score, ...})` to rate what was
-  useful (0.0–1.0). This is how the system learns; every score shapes future retrieval.
+- **Session start**: Call `startup_load(3000)` to load high-priority active memories.
+  The budget parameter controls how many tokens of context to load — be parsimonious
+  at session start when context is most valuable.
+- **Mid-session**: Use `recall("topic")` when prior context would change your response —
+  past decisions, gotchas, corrections, or anything the user seems to reference from before.
+  Don't narrate that you're checking memory; just recall and use the results naturally.
+- **After recall**: Call `recall_feedback({id: score, ...})` to rate what surfaced.
+  Rate ALL memories: 1.0 = directly useful, 0.0 = surfaced but unused. Don't skip this —
+  it's the selection pressure that shapes future retrieval. Recent ratings dominate.
 - **Storing**: Use `remember()` for things a future session would need:
   - Corrections the user gives you (highest value — prevents repeated mistakes)
-  - Verified fixes and gotchas
+  - Verified fixes and gotchas (only after the fix is confirmed working)
   - Decisions with reasoning that would be lost without context
-  - Don't store: one-off facts, things derivable from code, unverified guesses.
+  - Don't store: one-off facts, things derivable from code, unverified guesses
 - **Session end**: Call `reflect()` to review the session for lessons learned.
 
 ### Other tools
 
-- `link()` — create edges between related memories (builds the graph PPR traverses)
+- `link()` — create edges between related memories (the graph that Personalized PageRank traverses during recall)
 - `forget()` — remove a memory that's wrong or obsolete
 - `review_pending()` — review auto-captured memories before they're committed
-- `consolidate()` — run sleep consolidation (merge similar memories, detect gaps)
+- `consolidate()` — run offline sleep consolidation (merge similar memories, detect gaps). Heavy — not every session.
 - `memory_stats()` — health metrics and storage stats
 ```
 

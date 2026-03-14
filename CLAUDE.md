@@ -1,5 +1,7 @@
 # Somnigraph
 
+@STEWARDSHIP.md
+
 A research-driven persistent memory system for Claude Code. SQLite + sqlite-vec + FTS5, hybrid retrieval with RRF fusion, biological decay, sleep-based consolidation, retrieval feedback loop.
 
 ## Project state
@@ -43,11 +45,12 @@ scripts/        — Sleep pipeline + tuning tools (when migrated)
 
 ## Workflow
 
-1. Read this file for current state
-2. Propose 1-3 things to work on (with reasoning)
+1. Read this file and STEWARDSHIP.md for current state and priorities
+2. Propose 1-3 things to work on (with reasoning from the priority list)
 3. Get approval before starting
 4. Work on a feature branch
 5. Review diff together before merging
+6. Run the retrospective protocol in STEWARDSHIP.md before closing
 
 ## Key files
 
