@@ -315,17 +315,22 @@ def expand_via_ppr(
         return 0, 0, 0, False
     seed_set = set(seed_ids)
 
-    # 2. Query 1-hop edges from seeds
+    # 2. Query 1-hop edges from seeds (include flags to filter contradictions)
     ph = ",".join("?" * len(seed_ids))
     hop1_rows = db.execute(f"""
-        SELECT source_id, target_id, weight
+        SELECT source_id, target_id, weight, flags
         FROM memory_edges
         WHERE source_id IN ({ph}) OR target_id IN ({ph})
     """, seed_ids + seed_ids).fetchall()
 
-    # Collect hop-1 neighbor IDs
+    # Collect hop-1 neighbor IDs, skipping contradiction edges
     hop1_neighbors = set()
+    hop1_clean = []
     for edge in hop1_rows:
+        flags = edge["flags"] or ""
+        if "contradiction" in flags:
+            continue  # Contradiction edges should not propagate activation
+        hop1_clean.append(edge)
         hop1_neighbors.add(edge["source_id"])
         hop1_neighbors.add(edge["target_id"])
     hop1_neighbors -= seed_set
@@ -336,14 +341,19 @@ def expand_via_ppr(
         n_list = list(hop1_neighbors)
         n_ph = ",".join("?" * len(n_list))
         hop2_rows = db.execute(f"""
-            SELECT source_id, target_id, weight
+            SELECT source_id, target_id, weight, flags
             FROM memory_edges
             WHERE source_id IN ({n_ph}) OR target_id IN ({n_ph})
         """, n_list + n_list).fetchall()
 
     # 4. Build adjacency dict (both directions per edge)
+    # Filter contradiction edges from hop2 as well.
+    # Revision-flagged edges are kept — they connect old→new facts and help
+    # temporal queries, though this is a tradeoff worth revisiting if revision
+    # edges cause stale memories to co-surface with current ones.
+    hop2_clean = [e for e in hop2_rows if "contradiction" not in (e["flags"] or "")]
     adj: dict[str, list[tuple[str, float]]] = {}
-    for edge in list(hop1_rows) + list(hop2_rows):
+    for edge in hop1_clean + hop2_clean:
         src, tgt = edge["source_id"], edge["target_id"]
         w = edge["weight"] if edge["weight"] is not None else 1.0
         adj.setdefault(src, []).append((tgt, w))
