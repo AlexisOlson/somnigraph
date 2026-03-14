@@ -22,6 +22,16 @@ Don't recall:
 - What `startup_load` already covered (it loads the highest-priority memories)
 - To narrate that you're checking memory — just do it and use the results naturally
 
+## Session end
+
+There is no dedicated session-end tool. "Reflection" in this document refers to a time period, not a tool — the last few minutes of a session before context is discarded. The workflow uses existing tools:
+
+1. **Review** the session for lessons worth storing (corrections, verified fixes, decisions with reasoning).
+2. **Recall** to check whether those insights are already captured — avoids duplicates.
+3. **Remember** anything new that a future session would need.
+
+This is also when `recall()` budgets can be generous — context is about to be discarded anyway, so the cost of loading more memories is low.
+
 ## Feedback: the selection mechanism
 
 `recall_feedback({id: score, ...})` is how the system learns. Every score shapes what surfaces in future sessions. This is not bookkeeping — it's the selection pressure that produces curvature in retrieval over time.
@@ -66,7 +76,7 @@ Each memory has a `category` that determines its default decay rate and retrieva
 | `semantic` | Slow | Facts, reference material, domain knowledge — things you know |
 | `reflection` | Slow | Insights, patterns, lessons learned — things you've understood |
 | `meta` | None | System-level notes, questions, configuration — things about the system |
-| `entity` | None | Named entity summaries (people, projects) — retrieval hubs for PPR |
+| `entity` | None | Named entity summaries (people, projects) — retrieval hubs for PPR. *System-managed: created by sleep/consolidation, not available through `remember()`.* |
 
 When in doubt, use `episodic` for things that happened and `procedural` for things you learned.
 
