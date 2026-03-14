@@ -22,11 +22,9 @@ The docs are the product. A feature without documentation is half-finished; docu
 
 *Move this down when*: the snippet and guide are stable, tested, and the docs consistently get positive feedback. Documentation becomes maintenance, not creation.
 
-### 2. Migration completion
+### 2. ~~Migration completion~~ *Self-terminated*
 
-Phase 6 is pending (ongoing tending). The repo is nearly complete. But migration is packaging existing working code, not building new things — it's important but not the creative frontier.
-
-*Move this down when*: all phases are complete. This priority self-terminates.
+All phases complete. Packaging verified (wheel includes memory_server.py). This priority is done.
 
 ### 3. Honest accounting
 

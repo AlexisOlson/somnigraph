@@ -6,20 +6,11 @@ A research-driven persistent memory system for Claude Code. SQLite + sqlite-vec 
 
 ## Project state
 
-Migrating from production (`~/.claude/servers/`, `~/.claude/scripts/`) into this repo. The system is live and stable — this is packaging, not building.
-
-### Migration status
-
-- [x] Phase 1: Documentation (architecture.md, experiments.md, similar-systems.md)
-- [x] Phase 2: Foundation code (db, constants, embeddings, vectors, write, privacy, themes, fts)
-- [x] Phase 3: Scoring + tools (scoring, graph, decay, formatting, events, session, stats, tools, memory_server)
-- [x] Phase 4: Sleep pipeline (sleep_nrem, sleep_rem, sleep_consolidate, sleep orchestrator)
-- [x] Phase 5: Tuning tools (tune_memory, plot_tuning, probe_recall)
-- [ ] Phase 6: Ongoing tending
+Migration from production is complete (Phases 1-5). The system is live and stable.
 
 ### Next session work
 
-Phase 6: Ongoing tending — documentation polish, README snippet testing, pyproject packaging verification.
+Snippet dogfood test: read the README snippet with fresh eyes, compare against `docs/claude-md-guide.md`, and identify gaps where a new user's Claude would make bad decisions. Pyproject packaging is verified (wheel includes memory_server.py).
 
 ### Migration notes
 
@@ -47,7 +38,7 @@ docs/           — Narrative documentation (architecture, experiments, similar-
 research/       — 62 source analyses (papers, benchmarks, repos)
 src/memory/     — Server modules (16 files when complete)
 src/memory_server.py — MCP entry point
-scripts/        — Sleep pipeline + tuning tools (when migrated)
+scripts/        — Sleep pipeline + tuning tools
 ```
 
 ## Workflow
