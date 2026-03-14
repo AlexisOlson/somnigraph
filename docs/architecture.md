@@ -145,7 +145,9 @@ EWMA (exponential weighted moving average, alpha=0.3) replaced simple mean for a
 
 Multiplicative boost for memories whose themes overlap with an explicit `boost_themes` list (provided by the caller). At first glance this seems redundant — themes are already embedded in the vector. But the boost serves a different purpose: it lets the caller signal "I know I want memories about X" in a way that bypasses the fuzziness of vector similarity.
 
-`THEME_BOOST = 0.97` per overlapping theme. Tuning studies found this is the dominant parameter in 3D optimization space (67% AUC importance, 86% MRR importance), which was surprising given that it's "just" double-counting information already in the embeddings. The explanation: theme overlap is a discrete, high-confidence signal. Vector similarity is continuous and noisy. The boost amplifies the discrete signal.
+`THEME_BOOST = 0.97` per overlapping theme. Tuning studies found this is the dominant parameter in 3D optimization space (67% AUC importance, 86% MRR importance), which was surprising given that it's "just" double-counting information already in the embeddings. The original explanation: theme overlap is a discrete, high-confidence signal. Vector similarity is continuous and noisy. The boost amplifies the discrete signal.
+
+**Revision (March 2026):** The PPR study (wm19) collapsed `THEME_BOOST` from 0.97 to 0.19 — PPR graph traversal absorbed most of what theme boost was doing. Four independent external reviewers converged on the same conclusion: theme boost was compensating for missing graph traversal rather than providing a fundamentally different signal type. The "discrete signal conversion" explanation above was a post-hoc rationalization. PPR is the correct implementation of what theme boost was approximating — propagating activation through semantically-related memories via explicit edges, rather than through theme-tag overlap. The high pre-PPR importance (67% AUC) measured *compensation effect*, not intrinsic feature value.
 
 ### Stage 3: Hebbian co-retrieval
 
@@ -306,7 +308,7 @@ The wiring layer (`memory_server.py`) still has re-exports for backward compatib
 
 ## Tuning
 
-Fifteen optimization studies (wm1–wm15) over several weeks, searching a 7-dimensional parameter space. This section tells the story of what we learned, not the per-trial results (see `experiments.md` for methodology).
+34+ optimization studies (wm1–wm34) over several weeks, searching a 7–10 dimensional parameter space. Studies wm1–wm23 used LoCoMo (a public benchmark); wm24+ use real-memory ground truth. This section tells the story of what we learned, not the per-trial results (see `experiments.md` for methodology).
 
 ### The arc
 
@@ -322,17 +324,21 @@ Fifteen optimization studies (wm1–wm15) over several weeks, searching a 7-dime
 
 **wm15 (multi-objective, NSGA-II):** Dual-objective optimization: AUC vs. MRR (mean reciprocal rank). Found the Pareto front and discovered that AUC and MRR barely trade off (you can have both), but miss_rate@5k trades off harshly with MRR (r = −0.517). Selected Pareto point #4 as the production configuration.
 
+**wm19 (PPR):** Replaced one-hop BFS adjacency expansion with Personalized PageRank. The most significant architectural change since the feedback loop: `THEME_BOOST` collapsed from 0.97 to 0.19 as PPR absorbed the graph-traversal function that theme boost had been compensating for. PPR damping (0.775), boost coefficient (2.0), and minimum score (0.007) were tuned in this study.
+
+**wm24–wm34 (real data, ongoing):** First tuning on real-memory ground truth (200 judged queries from 1,047-query GT set, 5-fold cross-validation). Studies explore 3D–10D parameter spaces with graded recall and NDCG metrics. Results pending — these are the first confirmatory tests of whether LoCoMo-derived structure transfers to real data.
+
 ### What the studies taught us
 
 1. **Feedback is the system.** With a working feedback loop, the retrieval pipeline is just candidate generation. Without it (wm5), everything else scrambles to compensate.
 
-2. **Theme boost is double-counting, but the right kind.** Themes are in the embeddings, so boosting on theme overlap is redundant information. But it converts continuous similarity into discrete signal, which is more reliable for ranking. The tuning studies want it high (0.97).
+2. **Theme boost is double-counting, but the right kind.** Themes are in the embeddings, so boosting on theme overlap is redundant information. But it converts continuous similarity into discrete signal, which is more reliable for ranking. The tuning studies want it high (0.97). **Caveat:** This finding predates PPR (wm19), which collapsed theme boost from 0.97 to 0.19. The wm15 importance rankings measured compensation effects between features that were substituting for each other — not intrinsic feature value. Post-PPR importance has not been recomputed. See [Stage 2: Theme boost](#stage-2-theme-boost) for the full correction.
 
 3. **Adjacency is non-removable.** Every study that tried to zero out adjacency found worse results. Even at the current scale where expansion rarely fires, the base boost on seed neighbors matters.
 
 4. **Metric choice drives parameter values.** The same system with different metrics produces wildly different "optimal" constants. This isn't a bug — different metrics ask different questions. AUC asks "how well do you rank across all thresholds?" Miss rate asks "do you find the important stuff within a budget?" The answer to each shapes the parameters differently.
 
-5. **The parameter space has structure.** Two basins, a Pareto front, stable feature importances. This isn't a random landscape — it's a system with comprehensible mechanics. Understanding the structure matters more than finding the global optimum.
+5. **The parameter space has structure.** Two basins, a Pareto front, stable feature importances. This isn't a random landscape — it's a system with comprehensible mechanics. Understanding the structure matters more than finding the global optimum. **Caveat:** The two-basin finding comes from ~17 LoCoMo queries. With 7 parameters, the surface is underspecified — two basins may be an artifact of the evaluation set rather than a structural property of the scoring problem. Real-data tuning (wm24–wm34, 200 judged queries with 5-fold CV) is in progress but hasn't yet confirmed or disconfirmed the basin structure. If basins don't persist on real data, the LoCoMo findings were exploratory, not confirmatory.
 
 ---
 
@@ -385,9 +391,9 @@ Published benchmarks show all systems perform catastrophically on contradiction:
 
 ### Personalized PageRank for graph traversal
 
-The current adjacency expansion is one-hop: seeds expand to neighbors. HippoRAG demonstrated that Personalized PageRank (PPR) — which propagates activation through the graph until convergence — finds multi-hop connections that one-hop expansion misses.
+PPR was implemented (wm19) and replaced one-hop BFS expansion as the default graph traversal. The legacy BFS code is preserved in `scoring.py` (`_expand_adjacency_legacy()`) for research comparison.
 
-The infrastructure exists (edges with weights, query-conditioned scoring). What's missing: the PPR algorithm itself, and enough graph density for it to matter. At ~700 memories with ~1,500 edges, most memories are reachable in 2 hops anyway. PPR becomes valuable at larger scales with richer graph structure.
+Open questions remain: At ~700 memories with ~1,500 edges, most memories are reachable in 2 hops — PPR's multi-hop advantage is theoretically limited at this scale. Whether PPR becomes substantially more valuable at larger graph densities is untested. Additionally, PPR now correctly skips contradiction-flagged edges (fixed March 2026 — see § External review findings in `roadmap.md`), but revision-flagged edges still propagate activation. This is a deliberate tradeoff: revision edges help temporal queries but may cause stale memories to co-surface with current ones.
 
 ### Write-path quality
 
@@ -406,6 +412,28 @@ This is the single highest-impact schema change in the backlog. The column is tr
 No benchmark exists for evaluating whether consolidation improved or degraded the memory store. Current evaluation is manual: run sleep, inspect the results, assess whether the right things were merged/archived/preserved.
 
 Building a consolidation benchmark requires: (a) a memory store with known quality issues (redundancy, contradictions, stale information), (b) a ground-truth consolidation (what should be merged, archived, etc.), and (c) metrics that capture both compression (did it reduce redundancy?) and fidelity (did it preserve important information?). None of these exist in the published literature.
+
+### Feedback loop self-reinforcement
+
+Four independent external reviewers converged on this finding: the feedback loop may optimize for retrieval habits rather than retrieval needs. The concern has several facets:
+
+- **Selection bias.** Utility scores can only be assigned to memories that were surfaced. Memories the system never retrieves accumulate no feedback, so the prior dominates — but the prior is computed from the same biased sample. The system learns what it already retrieves, not what it should retrieve.
+- **Amplification.** Six downstream updates flow from a single retrieval event (confidence, edge weight, Hebbian co-retrieval, access count, shadow load, decay immunity). Each uses the same exposure signal, creating the appearance of independent corroboration from a single observation.
+- **Prior shape.** The global Beta prior assumes a unimodal utility distribution. If utility is actually bimodal (high-utility memories vs. noise, with little in between), a single Beta prior smooths over a real structural boundary. The posterior would consistently pull high-utility memories down and low-utility memories up.
+- **Preload contamination.** `startup_load` shapes query formation by priming the session with "important" memories. This creates a cache-vs-recall ambiguity: does the user recall a fact because it was retrieved well, or because startup_load already put it in context? Feedback attributed to recall may actually measure preload effectiveness.
+- **Channel entanglement.** Enriched embeddings concatenate content + category + themes + summary. FTS indexes summary + themes. Both retrieval channels depend on the same LLM-generated summary and sleep-enriched themes. Weight-insensitivity between vector and keyword channels (documented in tuning studies) may reflect shared dependency rather than genuine robustness — the channels may be "multiple faces of the same exposure history" rather than independent evidential sources.
+
+No fix is proposed here. The first step is measurement: the utility calibration study (see `roadmap.md`) tests whether feedback utility correlates with independently-judged relevance.
+
+### Representation bifurcation
+
+Embeddings are frozen at write time, but the metadata they were derived from evolves. Themes are enriched during sleep (content-based expansion, variant merging). Summaries are regenerated when clusters change. The FTS index reflects current summary + themes; the vector reflects the original enriched text.
+
+Over time, long-lived memories become searchable for accreted tags rather than original content. The FTS channel finds a memory because sleep added a theme; the vector channel doesn't, because the embedding predates the theme. This creates less independence between channels than the architecture assumes — both increasingly reflect sleep's editorial judgment rather than the memory's own content.
+
+The practical risk: a memory that was correctly embedded at write time drifts into a state where its FTS and vector representations disagree about what it's about. The system returns it for queries matching sleep-assigned themes but not for queries matching its actual content — or vice versa.
+
+Mitigation would require periodic re-embedding of high-drift memories (those whose current theme set diverges significantly from their embedding-time theme set). See the embedding staleness detection experiment in `roadmap.md`.
 
 ---
 

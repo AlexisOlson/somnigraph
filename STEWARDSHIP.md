@@ -14,29 +14,35 @@ This means: the docs are the product. Code is the proof that the docs aren't the
 
 Ordered. Each has a reorder condition — the list expects to change.
 
-### 1. Documentation quality
-
-The docs are the product. A feature without documentation is half-finished; documentation without code is still valuable. The README's CLAUDE.md snippet (the instructions users paste to teach Claude how to use the tools) is the single highest-impact piece of writing in the repo — it determines whether people's first experience is good.
-
-**Quality bar for the snippet**: A fresh Claude session using only the snippet should use the memory tools with reasonable judgment within 2-3 sessions. Not perfectly — that takes calibration — but reasonably. See `docs/claude-md-guide.md` for the depth behind the snippet.
-
-*Move this down when*: the snippet and guide are stable, tested, and the docs consistently get positive feedback. Documentation becomes maintenance, not creation.
-
-### 2. ~~Migration completion~~ *Self-terminated*
-
-All phases complete. Packaging verified (wheel includes memory_server.py). This priority is done.
-
-### 3. Honest accounting
+### 1. Honest accounting
 
 The "What didn't work" sections of `docs/architecture.md` and `docs/experiments.md` are the most valuable parts of the documentation. Extend this ethos everywhere: when something is removed or changed, document why. When an approach was tried and failed, say so. The negative results are what make this a research artifact rather than just another repo.
 
-*Move this down when*: never. This is closer to an invariant than a priority. But it sits at #3 because it's a quality of work, not a work item — it applies to everything above and below it.
+*Move this down when*: never. This is an invariant, not a work item — it applies to everything above and below it.
 
-### 4. Retrieval quality on real data
+### 2. Retrieval quality on real data
 
-The tuning studies were done on LocoMo (a public benchmark). Real-memory ground truth exists (`~/.claude/data/ground_truth_handoff.zip` — 1,047 queries, ~112 candidates each) but hasn't been judged. This is the next research frontier, but it's expensive (~$210, ~9h of Opus judging).
+The tuning studies were done on LocoMo (a public benchmark, ~17 testable queries). Real-memory ground truth exists (`~/.claude/data/ground_truth_handoff.zip` — 1,047 queries, ~112 candidates each) and is being judged in ~200-query Sonnet batches (~200/1047 complete). This is the first experiment in the research roadmap (Tier 1).
 
-*Move this down when*: the migration is incomplete. Can't tune what isn't in the repo yet.
+External reviews (4 independent reviewers, March 2026) revealed that the evaluation methodology itself has gaps beyond the LoCoMo-to-real transition: the 17-query LoCoMo set is underspecified for 7 parameters, feedback ground truth is selection-biased (only surfaced memories get labels), and the feedback loop may optimize for retrieval habits rather than retrieval needs. These concerns are documented in `docs/architecture.md` § Open problems and `docs/experiments.md` § Ground truth caveats.
+
+The immediate task remains re-tuning on real GT, but two new Tier 1 experiments should precede or accompany it: a utility calibration study (does feedback correlate with independently-judged relevance?) and a counterfactual coverage check (how many relevant memories does the retriever never surface?). See `docs/roadmap.md` § External review findings for the full account.
+
+*Move this down when*: GT is judged, re-tuning is done, utility calibration is computed, and findings are documented in `docs/experiments.md`.
+
+### 3. Documentation quality *(maintenance)*
+
+The docs are the product. A feature without documentation is half-finished; documentation without code is still valuable. The README's CLAUDE.md snippet is the front door — it determines whether people's first experience is good.
+
+**Quality bar for the snippet**: A fresh Claude session using only the snippet should use the memory tools with reasonable judgment within 2-3 sessions. See `docs/claude-md-guide.md` for the depth behind the snippet.
+
+This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet tested via dogfood (5 gaps, all fixed), simulation (no new gaps), and fresh-session test (correct tool usage across all workflow steps). External feedback blocked by private repo — three internal validation passes are sufficient evidence. Documentation now ships with code changes but is no longer the primary work item.
+
+*Move this back up when*: the repo goes public and real users surface snippet gaps, or a system change invalidates the current docs.
+
+### 4. ~~Migration completion~~ *Self-terminated*
+
+All phases complete. Packaging verified (wheel includes memory_server.py). This priority is done.
 
 ## Decision framework
 
@@ -107,3 +113,6 @@ Append a changelog entry below.
 - 2026-03-13: Phase 5 complete. Fixed stale "Phases 4-6" in Priority 2. Migration is nearly done — Priority 2 reorder condition approaching (self-terminates when Phase 6 completes).
 - 2026-03-13: Phase 6 tending. Fixed stale README Status (still claimed Phases 4-5 unfinished). Fixed pyproject.toml packaging — memory_server.py was excluded from wheel builds (force-include, since hatchling py-modules doesn't resolve src/ layout paths). Surprise: the packaging gap was invisible from the uv run usage path and would only surface for pip installs.
 - 2026-03-14: Snippet dogfood test. Five gaps found: reflect() misdescribed (reheat tool documented as session-end review), categories/priority/themes missing from remember() guidance, recall() dual-input (query+context) not shown. All fixed. Surprise: reflect() mismatch was invisible because the production /reflect skill does what the snippet described — only new users without that skill would hit it. No priority reorder — P1 reorder condition (stable+tested) not yet met.
+- 2026-03-14: Snippet validation. Simulated fresh Claude using only the snippet — all six workflow steps (startup, recall, feedback, store correction, store decision, session end) produce reasonable tool calls. No snippet changes needed. Guide updated: added "Session end" section (clarifies "reflection" = time period, not a tool; documents the three-step close-out workflow), annotated `entity` category row as system-managed. Surprise: the `entity` category in the guide's table was invisible as a problem until checking it against the validation set in impl_remember — a reader of the guide alone would assume they can store entity memories. P1 reorder condition closer but not triggered — the snippet is tested and the guide is now consistent, but no external feedback yet.
+- 2026-03-14: Fresh-session snippet test + P1 reorder. A genuinely fresh Claude session (no prior somnigraph context) used only the snippet for memory guidance. Result: correct tool usage for all workflow steps (startup_load, recall with dual-input, recall_feedback with ratings, session-end reasoning). Advanced params (boost_themes, cutoff_rank) were discovered via tool schema, not snippet — correctly Tier 2 material. P1 reorder triggered: three internal validation passes (dogfood, simulation, fresh-session) meet the "stable and tested" bar; "external feedback" is structurally blocked by private repo. Priorities reordered: honest accounting #1 (invariant), real-data tuning #2 (active), documentation #3 (maintenance), migration #4 (terminated).
+- 2026-03-14: External review integration. Four independent reviewers (Gemini, Sonnet, Opus, ChatGPT Pro) conducted blind reviews of architecture and experiments docs. Convergent findings: feedback self-reinforcement risk, theme boost as compensation for missing graph traversal, enriched embedding degradation, selection bias in evaluation. One confirmed bug fixed: PPR traversed contradiction-flagged edges, actively co-surfacing conflicting information (scoring.py). Narrative corrections added to architecture.md (theme boost, feature importance, two-basin caveats; two new open problems). Methodology caveats added to experiments.md (17-query limitation, selection bias). Roadmap expanded with 8 new experiments across all tiers and 4 new open questions. P2 description updated to reflect expanded evaluation scope. Surprise: the contradiction edge traversal bug was invisible to internal testing — it required an external eye reading the edge schema docs alongside the PPR code to notice the omission.

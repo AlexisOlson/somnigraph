@@ -10,7 +10,7 @@ Migration from production is complete (Phases 1-5). The system is live and stabl
 
 ### Next session work
 
-Snippet dogfood test complete (2026-03-14). Fixed `reflect()` misdescription, added category/priority/themes/dual-input recall guidance. Next: consider whether `claude-md-guide.md` should explicitly address "there is no session-end tool" (currently implied). Also: test the updated snippet by having a fresh session use only it.
+GT judging is in progress (~200/1047 queries judged with Sonnet, running in batches). External review complete (4 independent reviewers): PPR contradiction edge traversal bug fixed, narrative corrections applied to architecture.md and experiments.md, roadmap expanded with 8 new experiments and 4 new open questions. See `docs/roadmap.md` § External review findings for the full account. When GT completes, Tier 1 experiments are unblocked — now includes utility calibration study and counterfactual coverage check alongside the original three. The `migrate-gt-scripts` branch is ready for review and merge.
 
 ### Migration notes
 
@@ -30,6 +30,8 @@ Snippet dogfood test complete (2026-03-14). Fixed `reflect()` misdescription, ad
 - probe_recall.py: imports `impl_recall`/`impl_recall_feedback` from `memory.tools` (not re-exported in `__init__.py`); subprocess workspace uses `DATA_DIR`
 - plot_tuning.py: `STUDY_DIR` uses `DATA_DIR / "tuning_studies"` instead of hardcoded path
 - `pyproject.toml` adds optional `[tuning]` dependency group for optuna, numpy, scikit-learn, matplotlib
+- build_ground_truth.py: `DB_PATH`/`get_db()`/`serialize_f32()` imported from memory package (were local redefinitions); `get_embedding()` replaced by `embed_text()` from `memory.embeddings`; `OUTPUT_PATH` uses `DATA_DIR`
+- judge_ground_truth.py: kept standalone (no memory package imports) for portability; default model changed from `claude-opus-4-6` to `claude-sonnet-4-6`
 
 ## Repo structure
 
@@ -38,7 +40,7 @@ docs/           — Narrative documentation (architecture, experiments, similar-
 research/       — 62 source analyses (papers, benchmarks, repos)
 src/memory/     — Server modules (16 files when complete)
 src/memory_server.py — MCP entry point
-scripts/        — Sleep pipeline + tuning tools
+scripts/        — Sleep pipeline, tuning tools, ground truth
 ```
 
 ## Workflow
@@ -54,6 +56,7 @@ scripts/        — Sleep pipeline + tuning tools
 
 - `docs/architecture.md` — Master narrative of design decisions
 - `docs/experiments.md` — Tuning methodology
+- `docs/roadmap.md` — Research agenda: what we learned, open questions, proposed experiments
 - `docs/similar-systems.md` — Comparison with other systems
 - `research/sources/index.md` — Research source catalog
 
