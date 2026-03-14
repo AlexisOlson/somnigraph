@@ -10,9 +10,7 @@ The system gives Claude persistent memory across sessions: the ability to store,
 
 ## Status
 
-- **Core system** (Phases 1–3): complete and functional — hybrid retrieval, scoring, graph, decay, all 11 tools
-- **Sleep consolidation** (Phase 4): not yet migrated from production
-- **Tuning tools** (Phase 5): not yet migrated from production
+All core phases (1–5) are complete: hybrid retrieval, scoring, graph, decay, sleep consolidation, tuning tools, and all 11 MCP tools. Phase 6 (ongoing tending) is in progress.
 
 ## What makes it different
 
