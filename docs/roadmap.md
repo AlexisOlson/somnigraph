@@ -99,13 +99,47 @@ Research-grade questions with hypotheses and proposed experiments. Ordered by in
 **Effort:** Ongoing (wm24–wm34 in progress).
 **Hypothesis:** `RRF_K` and `FEEDBACK_COEFF` will be similar (structural). `THEME_BOOST` may shift (real queries use themes differently). Basin structure may not persist.
 
-### Is the feedback loop healthy?
+### Is the feedback loop healthy? *(Answered)*
 
-**What we know:** 12,894 feedback events, mean utility 0.244. Empirical Bayes prior fits the distribution.
-**What we don't know:** Whether feedback utility actually correlates with relevance. If feedback is noise dressed as signal, the dominant scoring component is noise-driven.
-**Experiment:** Compute correlation(feedback_utility, GT_relevance) on overlapping query-memory pairs.
-**Effort:** 1 session with GT data.
-**Hypothesis:** Moderate correlation (0.4–0.6). Feedback captures something real but is noisier than LLM-judged relevance.
+**Result:** Yes, but the answer is level-dependent. Per-query correlation is strong (Spearman r = 0.70) — feedback tracks relevance in context. Per-memory correlation is weak (r = 0.14) — aggregating across queries destroys the context-dependent signal. The empirical Bayes prior operates at the per-memory level, meaning it smooths a context-dependent signal in a context-free way. The prior still helps (it regularizes noisy raw feedback), but a context-conditioned prior could preserve more of the r = 0.70 signal. See `experiments.md` § Utility calibration study for full analysis.
+
+**Original hypothesis** (moderate correlation 0.4–0.6): partially confirmed. The per-query r = 0.70 exceeds the hypothesis; the per-memory r = 0.14 falls below it. The hypothesis didn't distinguish levels of aggregation — that distinction turned out to be the finding.
+
+### Can cutoff history calibrate the cliff detector? *(Answered: replace it)*
+
+**What we know:** The cliff detector (`CLIFF_Z_THRESHOLD = 2.0`, log-curve deviation) is far too permissive: it keeps more memories than the rater wants 96.1% of the time, by an average of 7.4 extra memories. The rater cutoff signal (846 events) is independently validated by GT — memories above cutoff have 2.2x the rate of GT-relevant results (51.8% vs 23.1%). The score gap at the rater cutoff is < 0.02 in 83.6% of cases, well below the cliff detector's sensitivity.
+
+**What we tested:** Three approaches to improving the cliff:
+
+**1. Calibrate cliff from score features: negative result.** Tested 10 list-level score features as predictors of the cutoff position. Linear regression: R² = -0.215 (worse than predicting the mean). Per-position logistic regression with 6 features: F1 = 0.721, dominated entirely by rank position (F1 = 0.720 alone). Score-based features add nothing. The cutoff is a content-level judgment that scores can't capture — 30% of relevance variance isn't in the scores (per-query feedback-GT r = 0.70, not 1.0).
+
+**2. Per-memory cutoff penalty: deferred.** Per-memory cutoff rate does correlate with GT relevance (Spearman r = -0.31 at 20+ observations, improving with more data), but current sparsity is the binding constraint (352/1120 memories never retrieved, 217 with 1–2 appearances). Revisit when memories accumulate 50+ observations.
+
+**3. Agent-specified result limit: the right approach.** Analysis of 846 cutoff events shows the cutoff is a content-aware decision that varies by query intent (mean 5.7, std 4.1, range 0–15). The agent already makes this judgment — the cliff is a score-based heuristic trying to approximate a content-level decision. The solution is to let the agent specify what it wants directly.
+
+**Design: replace cliff with `limit` + token budget.**
+
+Add a `limit` parameter to `recall()` — an integer specifying how many results to return. The agent sets it per-query based on intent. Anchors for guidance: **1, 3, 5, 8, 13** (Fibonacci-spaced to match the natural distribution of cutoff positions):
+
+| Anchor | Use case | Cutoff data coverage |
+|--------|----------|---------------------|
+| 1 | Quick fact lookup | 14.8% of cutoffs fall at 0–1 |
+| 3 | Focused retrieval | 38.3% at 0–3 |
+| 5 | Standard recall (default) | 56.5% at 0–5 |
+| 8 | Moderate exploration | 75.2% at 0–8 |
+| 13 | Broad survey | 95.2% at 0–13 |
+
+With oracle anchor selection, MAE = 0.71 (vs 3.46 baseline). Free-form integer is even better — the anchors calibrate judgment, they don't constrain choice.
+
+The scoring pipeline simplifies: score and rank all candidates → take top `limit` → truncate to fit token `budget`. No cliff detection, no Z threshold, no log-curve fitting. Two parameters the agent understands instead of one hidden heuristic it can't influence.
+
+The cliff detector (`apply_quality_floor` in `scoring.py`) becomes dead code. `CLIFF_Z_THRESHOLD` and `CLIFF_MIN_RESULTS` can be removed from constants.
+
+**Interaction with existing parameters:** `limit` and `budget` are independent constraints applied in sequence — limit caps the count, budget caps the total tokens. If limit=8 but only 4 memories fit in the budget, 4 are returned. If limit=3 but the budget could hold 10, 3 are returned. The agent controls precision (limit), the system controls resource use (budget).
+
+**Effort:** 1 session to implement. Add `limit` parameter to `recall()`, wire through to scoring, update CLAUDE.md snippet with anchor guidance, remove cliff detection code.
+
+**What to track after deployment:** Log the agent's chosen limit alongside the cutoff_rank feedback. Over time, this tells us whether the agent is good at predicting how many results it needs — the equivalent of the cutoff calibration study but for prospective rather than retrospective judgment.
 
 ### Where does the feedback loop plateau?
 
@@ -181,41 +215,43 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 1. **Re-tune constants on real GT.** *(In progress: wm24–wm34, ~500 judged queries, 5-fold CV.)* Compare real-data constants against LoCoMo-era constants. Re-run when GT judging completes (1,047 queries) to test stability. Accept if: AUC delta >2% or any constant shifts >20%.
 
-2. **Feedback loop health check.** Compute correlation between historical feedback utility and GT relevance. Accept if: correlation computed, interpretation documented in `experiments.md`.
+2. **Feedback loop health check.** *(Complete — answered by utility calibration study.)* Per-query Spearman r = 0.70 confirms feedback tracks relevance. See experiment #4 and `experiments.md` § Utility calibration study.
 
 3. **Sleep impact measurement.** Snapshot GT metrics on 100-query subset → run sleep → re-judge → compare. Accept if: delta measured with confidence intervals.
 
-4. **Utility calibration study.** For ~50 GT queries, compare historical utility scores (from `recall_feedback()`) with Sonnet-judged relevance. Correlation tells you whether feedback is signal or noise — if low, the dominant scoring component is noise-driven. Accept if: correlation computed, interpretation documented.
+4. **Utility calibration study.** *(Complete.)* Compared 13,396 feedback events against 13,317 GT judgments across 715 overlapping memories. Per-query Spearman r = 0.70 (feedback tracks relevance in context); per-memory r = 0.14 (aggregation destroys context signal). The empirical Bayes prior operates at the weak-correlation level. 16.4% of memories show inflated feedback (context-dependent, not self-reinforcing); 7.0% are coverage gaps. See `experiments.md` § Utility calibration study.
 
 5. **Counterfactual coverage check.** For 20–30 GT queries, exhaustively judge all ~112 candidates (not just those the system retrieved). Measures how many relevant memories the retriever never surfaces — the selection bias that the standard GT can't detect. Accept if: unseen-relevant rate computed and documented.
 
+6. **Replace cliff detector with agent-specified limit.** *(Design complete, ready to implement.)* Score features cannot predict the cutoff (R² < 0). The cliff over-delivers 96.1% of the time. Solution: add `limit` parameter to `recall()`, remove cliff detection. Anchors {1, 3, 5, 8, 13} match the natural distribution (MAE = 0.71 with oracle selection vs 3.46 baseline). See roadmap § "Can cutoff history calibrate the cliff detector?"
+
 ### Tier 2: Deeper investigation (2–3 sessions each)
 
-6. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster AUC, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
+7. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster AUC, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
 
-7. **Generalization study.** Train/test split on GT (tune constants on half, evaluate on other half). Accept if: constants stable across splits (or instability documented as finding).
+8. **Generalization study.** Train/test split on GT (tune constants on half, evaluate on other half). Accept if: constants stable across splits (or instability documented as finding).
 
-8. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
+9. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
 
-9. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
+10. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
 
-10. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: AUC delta under paraphrase computed.
+11. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: AUC delta under paraphrase computed.
 
-11. **Embedding staleness detection.** For each memory, compare theme set at embedding time vs. current. Flag high-drift memories, re-embed them, measure retrieval quality change. Quantifies the representation bifurcation problem. Accept if: drift distribution documented, re-embedding impact measured.
+12. **Embedding staleness detection.** For each memory, compare theme set at embedding time vs. current. Flag high-drift memories, re-embed them, measure retrieval quality change. Quantifies the representation bifurcation problem. Accept if: drift distribution documented, re-embedding impact measured.
 
-12. **Graph null models.** Compare current graph against similarity-only, edge-shuffled, edge-type-restricted, and temporal-only variants. Tests whether graph structure adds real signal or just correlates with similarity. Accept if: retrieval quality delta per variant measured.
+13. **Graph null models.** Compare current graph against similarity-only, edge-shuffled, edge-type-restricted, and temporal-only variants. Tests whether graph structure adds real signal or just correlates with similarity. Accept if: retrieval quality delta per variant measured.
 
 ### Tier 3: New capabilities (3+ sessions each)
 
-13. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Accept if: temporal queries measurably improve.
+14. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Accept if: temporal queries measurably improve.
 
-14. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
+15. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
 
-15. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
+16. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
 
-16. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
+17. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
 
-17. **startup_load subsystem measurement.** Quantify how much apparent memory competence comes from preload vs. explicit retrieval. Tests the cache-vs-recall ambiguity by comparing sessions with and without preload. Accept if: preload contribution isolated and documented.
+18. **startup_load subsystem measurement.** Quantify how much apparent memory competence comes from preload vs. explicit retrieval. Tests the cache-vs-recall ambiguity by comparing sessions with and without preload. Accept if: preload contribution isolated and documented.
 
 ---
 

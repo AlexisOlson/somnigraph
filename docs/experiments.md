@@ -187,4 +187,92 @@ More impactful than additional trials: changing the metric (reveals different as
 
 ---
 
+## Utility calibration study
+
+The external reviews (March 2026) flagged a central question: does feedback correlate with independently-judged relevance, or does the feedback loop just reinforce retrieval habits? This study answers it using two datasets that share the same memory pool:
+
+- **Feedback scores**: 13,396 utility ratings from live use, stored in `memory_events`
+- **Ground truth scores**: 13,317 relevance judgments from a blind LLM judge (Sonnet, no access to feedback history) across 500 queries
+
+### The two-level result
+
+The answer depends on the unit of analysis:
+
+| Level | Spearman r | Pearson r | n | Interpretation |
+|-------|-----------|-----------|---|----------------|
+| Per-query (same query, same memory) | 0.70 | 0.77 | 3,072 | Strong — feedback tracks relevance in context |
+| Per-memory (averaged across queries) | 0.14 | 0.11 | 715 | Weak — aggregation destroys context-dependent signal |
+
+**Per-query**: When a memory is rated during a specific recall and the GT judge evaluates the same query-memory pair, the two scores agree strongly (r = 0.70). Feedback has real signal. The reviewers' concern about self-reinforcement is not confirmed at this level — the loop is learning what's relevant for each query.
+
+**Per-memory**: When you average a memory's feedback across all queries it appeared in and compare against its average GT relevance, correlation collapses (r = 0.14). This is expected: a memory that's essential for one query (fb = 0.95) and irrelevant for ten others (fb = 0.05 each) averages to ~0.13, but its GT profile might be different because the GT candidate sets are drawn differently than live retrieval.
+
+### Why this matters for the empirical Bayes prior
+
+The prior operates at the per-memory level. It computes an EWMA of a memory's feedback history and shrinks it toward a population mean. This is the level where correlation is weak (r = 0.14). The prior is aggregating a context-dependent signal in a context-free way — it treats "this memory scored 0.9 for query A" and "this memory scored 0.1 for query B" as two noisy estimates of the same underlying quality, when they're actually two accurate estimates of different things.
+
+The prior still helps (wm5 showed raw feedback without the prior is worse than no feedback at all), but it's helping by smoothing noise, not by recovering the true per-memory quality. A prior conditioned on query context (themes, category, even a crude cluster) could preserve more of the r = 0.70 signal that currently gets averaged away.
+
+### Quadrant analysis
+
+Classifying the 715 overlapping memories by feedback threshold (0.5) and GT threshold (0.5):
+
+| Quadrant | Count | % | Meaning |
+|----------|-------|---|---------|
+| High feedback, high GT | 19 | 2.7% | Validated — feedback agrees with relevance |
+| High feedback, low GT | 117 | 16.4% | Inflated — feedback overrates these memories |
+| Low feedback, high GT | 50 | 7.0% | Coverage gap — relevant but underrated |
+| Low feedback, low GT | 529 | 74.0% | Correctly filtered |
+
+The 16.4% "inflated" quadrant looks alarming but is an artifact of per-memory averaging. Manual inspection of the top 10 outliers (gap +0.71 to +0.84) reveals a consistent pattern: every one has exactly 1 feedback event with a high score (0.90–1.00), and the GT judge *agrees* on the matching query (0.95+ for the same query). The low mean GT comes from the memory appearing in 6–30 other GT candidate sets where it's topically irrelevant (0.10–0.12). These are niche memories correctly rated for their specific use case — the Papyrus scripting gotcha, the UNICHAR XML edge case, the Spriggit YAML structure. They score 0.95 when you need them and 0.10 when you don't. The per-memory mean mischaracterizes this as inflation.
+
+The effective self-reinforcement rate in this dataset is near zero. The reviewers' concern was valid as a structural risk, but the empirical evidence doesn't support it — at least not at the current corpus size and feedback density.
+
+The 7.0% coverage gap is also largely an averaging artifact. Manual inspection of the top 10 gap outliers reveals a retrieval precision problem, not an underrating problem: these memories are surfaced for many queries where they're irrelevant (fb = 0.00), accumulating low scores that dilute their per-memory mean, even though they score 0.80–1.00 for matching queries. For example, the ElevenLabs transcription memory has 32 feedback events including three 1.00 scores, but also many 0.00 scores from unrelated Skyrim and modding queries. Its mean fb (0.24) vs mean GT (0.68) looks like a coverage gap, but the per-query feedback is accurate — the system just retrieves it too broadly.
+
+Both quadrants tell the same story: per-memory averaging mischaracterizes context-dependent memories. The feedback loop is well-calibrated per-query. The real problem is upstream — retrieval precision determines which queries a memory gets exposed to, and overexposure to irrelevant queries dilutes per-memory means.
+
+### Never-surfaced memories
+
+11 memories appear in GT candidate sets but have no feedback history at all — the retriever surfaced them as candidates but they were never rated. 5 of these have mean GT relevance >= 0.5, appearing across 6–21 queries each. These are the purest "coverage gap" cases: relevant memories the system knows about but never promotes high enough to get feedback.
+
+### Cutoff signal validation
+
+The `recall_feedback()` accepts a `cutoff_rank` parameter: the position where the rater stopped finding useful results. This signal is logged as a `recall_cutoff` event but doesn't currently feed into scoring. The calibration study data lets us validate whether it's a real signal.
+
+**Above vs. below cutoff per-query GT relevance:**
+
+| Position | Mean GT | GT >= 0.5 | n |
+|----------|---------|-----------|---|
+| Above cutoff | 0.549 | 51.8% | 1,923 |
+| Below cutoff | 0.336 | 23.1% | 1,404 |
+
+The cutoff separates relevant from irrelevant at a 2.2:1 ratio (51.8% vs 23.1% relevant). This is a real signal — it identifies the useful/noise boundary that the GT judge independently confirms.
+
+**Cutoff vs. cliff detection:**
+
+The automated cliff detector (`CLIFF_Z_THRESHOLD = 2.0`, log-curve deviation) is far too permissive compared to the rater cutoff:
+
+| Comparison | Count | % |
+|-----------|-------|---|
+| Cliff kept MORE than rater wanted | 746 | 96.1% |
+| Cliff kept SAME | 30 | 3.9% |
+| Cliff kept LESS | 0 | 0.0% |
+
+When the cliff over-delivers, it returns an average of 7.4 extra memories. The score gap at the rater cutoff is < 0.02 in 83.6% of cases — well below the cliff detector's sensitivity. The cliff catches only dramatic score drops; the real useful/noise boundary is much more subtle and requires the rater's contextual judgment.
+
+This has two implications:
+
+1. **The cliff Z threshold could be calibrated from cutoff history.** 846 cutoff events provide a ground truth for where the useful/noise boundary actually falls. Instead of a fixed Z=2.0, the threshold could be fit to minimize disagreement with historical cutoff positions.
+
+2. **Per-memory cutoff statistics could inform scoring.** A memory that consistently falls below cutoff when surfaced is being overretrieved. This is the retrieval precision signal that the quadrant analysis identified as the real problem — and cutoff_rank already measures it.
+
+### Ground truth caveats for this study
+
+The GT judge and the feedback rater measure different things. The GT judge evaluates topical relevance of a memory to a query (would this memory help someone searching for this?). Live feedback evaluates experienced utility in context (did this memory actually help in this session, given what else was surfaced?). Perfect correlation shouldn't be expected even if both signals are accurate — a topically relevant memory might not be useful if three other memories already covered the same ground.
+
+The per-query correlation (r = 0.70) is high enough to confirm that both signals track the same underlying construct. The per-memory divergence (r = 0.14) is a property of the aggregation, not a failure of either signal.
+
+---
+
 *For per-study results, see the tuning studies log. For cross-study mechanism analysis, see architecture.md § Tuning.*

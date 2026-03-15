@@ -10,7 +10,7 @@ Migration from production is complete (Phases 1-5). The system is live and stabl
 
 ### Next session work
 
-GT judging is in progress (~500/1047 queries judged with Sonnet, running in batches). External review complete (4 independent reviewers): PPR contradiction edge traversal bug fixed, narrative corrections applied to architecture.md and experiments.md, roadmap expanded with 8 new experiments and 4 new open questions. See `docs/roadmap.md` § External review findings for the full account. When GT completes, Tier 1 experiments are unblocked — now includes utility calibration study and counterfactual coverage check alongside the original three. The `migrate-gt-scripts` branch is ready for review and merge.
+GT judging ~500/1047. Real-data tuning (wm24-wm34) underway on 500 queries with 5-fold CV. Utility calibration study complete: per-query feedback-GT r=0.70, per-memory r=0.14, no self-reinforcement (see `docs/experiments.md` § Utility calibration study). Ready to implement: replace cliff detector with agent-specified `limit` parameter (Fibonacci anchors {1,3,5,8,13}), design in `docs/roadmap.md` § "Can cutoff history calibrate the cliff detector?" Remaining Tier 1: counterfactual coverage check, sleep impact measurement. See `docs/roadmap.md` for full research agenda.
 
 ### Migration notes
 
