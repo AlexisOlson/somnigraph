@@ -10,7 +10,7 @@ The system gives Claude persistent memory across sessions: the ability to store,
 
 ## Status
 
-All core phases (1–5) are complete: hybrid retrieval, scoring, graph, decay, sleep consolidation, tuning tools, and all 11 MCP tools. Phase 6 (ongoing tending) is in progress.
+All core components are complete and the system is live: hybrid retrieval, scoring, graph expansion, decay, sleep consolidation, tuning tools, and all 11 MCP tools. Active research continues — see [docs/roadmap.md](docs/roadmap.md).
 
 ## What makes it different
 
@@ -30,7 +30,7 @@ Every major design choice was tested against live retrieval data. See [docs/expe
 Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), an OpenAI API key (for embeddings).
 
 ```bash
-git clone https://github.com/alexisolson/somnigraph.git
+git clone https://github.com/AlexisOlson/somnigraph.git
 cd somnigraph
 cp .env.example .env
 # Edit .env: add your OpenAI API key, optionally set SOMNIGRAPH_DATA_DIR

@@ -18,7 +18,7 @@ dependencies = [
 tuning = ["optuna>=4.0", "scikit-learn>=1.0", "matplotlib>=3.8"]
 
 [project.urls]
-Repository = "https://github.com/alexisolson/somnigraph"
+Repository = "https://github.com/AlexisOlson/somnigraph"
 
 [build-system]
 requires = ["hatchling"]

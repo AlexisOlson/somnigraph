@@ -36,9 +36,9 @@ The docs are the product. A feature without documentation is half-finished; docu
 
 **Quality bar for the snippet**: A fresh Claude session using only the snippet should use the memory tools with reasonable judgment within 2-3 sessions. See `docs/claude-md-guide.md` for the depth behind the snippet.
 
-This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet tested via dogfood (5 gaps, all fixed), simulation (no new gaps), and fresh-session test (correct tool usage across all workflow steps). External feedback blocked by private repo — three internal validation passes are sufficient evidence. Documentation now ships with code changes but is no longer the primary work item.
+This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet tested via dogfood (5 gaps, all fixed), simulation (no new gaps), and fresh-session test (correct tool usage across all workflow steps). Repo went public 2026-03-16. Documentation now ships with code changes but is no longer the primary work item.
 
-*Move this back up when*: the repo goes public and real users surface snippet gaps, or a system change invalidates the current docs.
+*Move this back up when*: real users surface snippet gaps, or a system change invalidates the current docs.
 
 ### 4. ~~Migration completion~~ *Self-terminated*
 
