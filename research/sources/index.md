@@ -67,6 +67,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Empirica](https://github.com/Nubaeon/empirica) | empirica.md | Epistemic middleware with git-notes storage, optional Qdrant vectors, and calibration tracking. |
 | [Engram](https://github.com/vthunder/engram) | engram.md | Go HTTP API with PostgreSQL/pgvector implementing multi-system cognitive memory with consolidation and decay. |
 | [Graphiti](https://github.com/getzep/graphiti) | graphiti.md | Zep's production temporal knowledge graph with multi-backend support (Neo4j, FalkorDB, Kuzu, Neptune). |
+| [Hexis](https://github.com/QuixiAI/Hexis) | hexis.md | PostgreSQL-native cognitive architecture with pgvector, Apache AGE graph, autonomous heartbeat with energy budget, drives, identity/worldview system. |
 | [GraphRAG](https://github.com/microsoft/graphrag) | graphrag.md | Microsoft's knowledge graph pipeline with LLM-driven entity extraction and Leiden community detection. |
 | [Hindsight (repo)](https://github.com/vectorize-io/hindsight) | hindsight.md | FastAPI + PostgreSQL/pgvector with four-strategy parallel recall and RRF fusion. |
 | [MemCP](https://github.com/maydali28/memcp) | memcp.md | FastMCP server with MAGMA 4-graph model in SQLite and named context chunking. |

@@ -25,5 +25,11 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude Code local settings
+.claude/
+
 # Backups
 *.bak
+
+# Research clones
+research/clones/
