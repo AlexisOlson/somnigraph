@@ -10,10 +10,12 @@ dependencies = [
     "openai>=2.0.0",
     "tiktoken>=0.7.0",
     "mcp[cli]>=1.2.0",
+    "numpy>=1.26",
+    "lightgbm>=4.0",
 ]
 
 [project.optional-dependencies]
-tuning = ["optuna>=4.0", "numpy>=1.26", "scikit-learn>=1.0", "matplotlib>=3.8"]
+tuning = ["optuna>=4.0", "scikit-learn>=1.0", "matplotlib>=3.8"]
 
 [project.urls]
 Repository = "https://github.com/alexisolson/somnigraph"

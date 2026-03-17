@@ -33,6 +33,7 @@ from memory.session import detect_session_id, get_session_id
 from memory.scoring import (
     rrf_fuse, apply_hebbian, expand_via_ppr,
 )
+from memory.reranker import get_model as get_reranker_model, extract_live_features, rerank
 from memory.stats import compute_stats
 
 
@@ -380,6 +381,91 @@ def impl_remember(
         db.close()
 
 
+def _compute_ppr_for_reranker(
+    db: sqlite3.Connection,
+    all_ids: set[str],
+    vec_ranked: dict[str, int],
+    fts_ranked: dict[str, int],
+    exclude_set: set[str],
+) -> dict[str, float]:
+    """Compute raw PPR scores for reranker features.
+
+    Uses the same graph walk as expand_via_ppr but returns raw scores
+    without mutating any score dict. Seeds are top candidates by RRF.
+    """
+    from memory.scoring import personalized_pagerank
+    from memory.constants import (
+        RRF_K, RRF_VEC_WEIGHT, ADJACENCY_SEED_COUNT,
+        PPR_DAMPING, PPR_MIN_SCORE,
+    )
+
+    if not all_ids:
+        return {}
+
+    # Compute basic RRF scores for seed selection
+    base_scores = {}
+    for mid in all_ids:
+        score = 0.0
+        if mid in vec_ranked:
+            score += RRF_VEC_WEIGHT / (RRF_K + vec_ranked[mid] + 1)
+        if mid in fts_ranked:
+            score += (1.0 - RRF_VEC_WEIGHT) / (RRF_K + fts_ranked[mid] + 1)
+        base_scores[mid] = score
+
+    if not base_scores:
+        return {}
+
+    seed_ids = sorted(base_scores, key=base_scores.get, reverse=True)[:ADJACENCY_SEED_COUNT]
+    seed_set = set(seed_ids)
+    seed_weights = {sid: base_scores[sid] for sid in seed_ids}
+
+    # Build 2-hop subgraph (same as expand_via_ppr but no contradiction filter needed
+    # since the reranker model learns which signals matter)
+    ph = ",".join("?" * len(seed_ids))
+    hop1_rows = db.execute(f"""
+        SELECT source_id, target_id, weight, flags
+        FROM memory_edges
+        WHERE source_id IN ({ph}) OR target_id IN ({ph})
+    """, seed_ids + seed_ids).fetchall()
+
+    hop1_neighbors = set()
+    hop1_clean = []
+    for edge in hop1_rows:
+        flags = edge["flags"] or ""
+        if "contradiction" in flags:
+            continue
+        hop1_clean.append(edge)
+        hop1_neighbors.add(edge["source_id"])
+        hop1_neighbors.add(edge["target_id"])
+    hop1_neighbors -= seed_set
+
+    hop2_rows = []
+    if hop1_neighbors:
+        n_list = list(hop1_neighbors)
+        n_ph = ",".join("?" * len(n_list))
+        hop2_rows = db.execute(f"""
+            SELECT source_id, target_id, weight, flags
+            FROM memory_edges
+            WHERE source_id IN ({n_ph}) OR target_id IN ({n_ph})
+        """, n_list + n_list).fetchall()
+
+    hop2_clean = [e for e in hop2_rows if "contradiction" not in (e["flags"] or "")]
+    adj: dict[str, list[tuple[str, float]]] = {}
+    for edge in hop1_clean + hop2_clean:
+        src, tgt = edge["source_id"], edge["target_id"]
+        w = edge["weight"] if edge["weight"] is not None else 1.0
+        adj.setdefault(src, []).append((tgt, w))
+        adj.setdefault(tgt, []).append((src, w))
+
+    if not adj:
+        return {}
+
+    raw_ppr = personalized_pagerank(adj, seed_weights, damping=PPR_DAMPING)
+    # Return non-seed scores above minimum threshold
+    return {mid: ps for mid, ps in raw_ppr.items()
+            if mid not in seed_set and mid not in exclude_set and ps > PPR_MIN_SCORE}
+
+
 def impl_recall(
     query: str,
     context: str = "",
@@ -433,8 +519,9 @@ def impl_recall(
             (serialize_f32(query_embedding), vec_k),
         ).fetchall()
 
-        # Map rowids to memory_ids
+        # Map rowids to memory_ids (keep raw distances for reranker)
         vec_ranked = {}  # memory_id -> rank (0-based)
+        vec_distances = {}  # memory_id -> raw cosine distance
         for rank, row in enumerate(vec_results):
             mapped = db.execute(
                 "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
@@ -442,9 +529,11 @@ def impl_recall(
             ).fetchone()
             if mapped:
                 vec_ranked[mapped["memory_id"]] = rank
+                vec_distances[mapped["memory_id"]] = row["distance"]
 
-        # --- Keyword search ---
+        # --- Keyword search (keep raw BM25 scores for reranker) ---
         fts_ranked = {}  # memory_id -> rank (0-based)
+        fts_bm25_scores = {}  # memory_id -> raw BM25 score
         fts_query = sanitize_fts_query(query)
         try:
             fts_results = db.execute(
@@ -464,11 +553,12 @@ def impl_recall(
                 ).fetchone()
                 if mapped:
                     fts_ranked[mapped["memory_id"]] = rank
+                    fts_bm25_scores[mapped["memory_id"]] = row["rank"]
         except sqlite3.OperationalError:
             # FTS query syntax error — fall back to vector-only
             pass
 
-        # --- RRF fusion ---
+        # --- Candidate pool ---
         all_ids = set(vec_ranked.keys()) | set(fts_ranked.keys())
 
         # Filter out non-active memories early
@@ -480,14 +570,45 @@ def impl_recall(
             ).fetchall()
             all_ids = {r["id"] for r in active_rows}
 
-        # Scoring pipeline
-        rrf_scores, feedback_map, themes_map = rrf_fuse(
-            db, vec_ranked, fts_ranked, all_ids, boost_themes_list)
-        apply_hebbian(db, rrf_scores)
-        expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit = expand_via_ppr(
-            db, rrf_scores, query_embedding, query, exclude_set)
-        sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
-        top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
+        # --- Scoring: reranker or formula ---
+        reranker_model = get_reranker_model()
+        expansion_new = expansion_boosted = per_seed_cap_hits = 0
+        total_cap_hit = False
+
+        if reranker_model is not None:
+            # Reranker path: compute raw PPR scores for features
+            ppr_scores = _compute_ppr_for_reranker(db, all_ids, vec_ranked, fts_ranked, exclude_set)
+
+            # Get themes_map for feature extraction
+            themes_map = {}
+            if all_ids:
+                t_ph = ",".join("?" * len(all_ids))
+                theme_rows = db.execute(f"""
+                    SELECT id, themes FROM memories WHERE id IN ({t_ph})
+                """, list(all_ids)).fetchall()
+                themes_map = {r["id"]: r["themes"] for r in theme_rows}
+
+            # Extract features and predict
+            features, candidate_ids = extract_live_features(
+                db, vec_ranked, fts_ranked, fts_bm25_scores, vec_distances,
+                all_ids, ppr_scores, {}, themes_map, query,
+            )
+            if len(candidate_ids) > 0:
+                rrf_scores = rerank(reranker_model, features, candidate_ids)
+            else:
+                rrf_scores = {}
+            feedback_map = {}
+            sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
+            top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
+        else:
+            # Formula path (existing)
+            rrf_scores, feedback_map, themes_map = rrf_fuse(
+                db, vec_ranked, fts_ranked, all_ids, boost_themes_list)
+            apply_hebbian(db, rrf_scores)
+            expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit = expand_via_ppr(
+                db, rrf_scores, query_embedding, query, exclude_set)
+            sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
+            top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
 
         # Fetch memories and apply filters (post-RRF), capped by limit
         results = []

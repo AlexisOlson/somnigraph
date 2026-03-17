@@ -10,7 +10,7 @@ Migration from production is complete (Phases 1-5). The system is live and stabl
 
 ### Next session work
 
-GT judging ~500/1047. Real-data tuning (wm24-wm34) underway on 500 queries with 5-fold CV. Utility calibration study complete (see `docs/experiments.md` § Utility calibration study). Cliff detector replaced with agent-specified `limit` parameter (default 5, anchors {1,3,5,8,13}). UCB exploration bonus now uses ESS-corrected pseudo-counts — needs retuning (UCB_COEFF and EWMA_ALPHA jointly). Remaining Tier 1: counterfactual coverage check, sleep impact measurement. See `docs/roadmap.md` for full research agenda.
+Reranker migrated and wired into live scoring (`src/memory/reranker.py`). LightGBM pointwise regressor with 18 features, +5.7% NDCG@5k over hand-tuned formula. Formula remains as fallback (no model file = formula scoring). Next: verify live scoring matches training features, then three improvement experiments (LambdaRank, query features, raw scores). GT judging ~500/1047. Remaining Tier 1: counterfactual coverage check, sleep impact measurement. See `docs/roadmap.md` for full research agenda.
 
 ### Migration notes
 
@@ -32,6 +32,10 @@ GT judging ~500/1047. Real-data tuning (wm24-wm34) underway on 500 queries with 
 - `pyproject.toml` adds optional `[tuning]` dependency group for optuna, numpy, scikit-learn, matplotlib
 - build_ground_truth.py: `DB_PATH`/`get_db()`/`serialize_f32()` imported from memory package (were local redefinitions); `get_embedding()` replaced by `embed_text()` from `memory.embeddings`; `OUTPUT_PATH` uses `DATA_DIR`
 - judge_ground_truth.py: kept standalone (no memory package imports) for portability; default model changed from `claude-opus-4-6` to `claude-sonnet-4-6`
+- train_reranker.py: `SERVERS_DIR`/`SCRIPTS_DIR` → `REPO_ROOT / "src"` and `REPO_ROOT / "scripts"`; `DATA_DIR` from `memory.constants`; `tune_gt` imports unchanged (now from repo's scripts/)
+- tune_gt.py: `SERVERS_DIR` → `REPO_ROOT / "src"`; `DATA_DIR` from `memory.constants`; `MEMORY_DB` → `DB_PATH` from `memory.db`; production-only constants (K_FTS, K_VEC, W_THEME, K_THEME, BM25_SUMMARY_WT, BM25_THEMES_WT) kept as local constants (not in somnigraph's constants.py — the reranker makes them irrelevant for live scoring)
+- reranker.py: new module for live feature extraction + prediction; `MODEL_PATH` constant added to `constants.py`; model loaded eagerly at server startup; `impl_recall()` branches on model availability
+- lightgbm + numpy moved from optional to main dependencies (reranker is the production scoring path)
 
 ## Repo structure
 

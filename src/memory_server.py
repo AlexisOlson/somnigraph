@@ -40,6 +40,17 @@ from memory.tools import (  # noqa: E402
     impl_reembed_all,
     impl_memory_stats,
 )
+from memory.reranker import load_model as _load_reranker  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Eagerly load reranker model (if present) at import time
+# ---------------------------------------------------------------------------
+
+_reranker = _load_reranker()
+if _reranker:
+    logger.info("Reranker model loaded — scoring via learned model")
+else:
+    logger.info("No reranker model — scoring via formula")
 
 # ---------------------------------------------------------------------------
 # MCP Server

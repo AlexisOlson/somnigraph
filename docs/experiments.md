@@ -275,4 +275,67 @@ The per-query correlation (r = 0.70) is high enough to confirm that both signals
 
 ---
 
+## Reranker methodology
+
+The reranker replaces the hand-tuned scoring formula with a learned LightGBM model. This section documents the methodology — feature design, training strategy, and comparison infrastructure.
+
+### Feature extraction
+
+18 features per (query, candidate) pair. The features are raw signals — no derived scores from the formula, no parameter dependencies. This means the model can be retrained without re-tuning any constants.
+
+**Retrieval signals (query-dependent):**
+- `fts_rank`, `vec_rank`, `theme_rank` — Position in each retrieval channel's ranking. -1 if the candidate wasn't retrieved by that channel.
+- `fts_bm25` — Raw BM25 score from FTS5. 0 if not retrieved.
+- `vec_dist` — Raw cosine distance from vector search. 0 if not retrieved.
+- `theme_overlap` — Number of query tokens matching the memory's theme tags. 0 if none.
+
+**Feedback signals (query-independent):**
+- `fb_last` — Most recent utility score. -1 sentinel if no feedback.
+- `fb_mean` — Mean of all utility scores. -1 sentinel if no feedback.
+- `fb_count` — Number of feedback events.
+
+These are raw values, not EWMA-smoothed. The formula used EWMA with a tunable alpha parameter; the model learns its own recency weighting from `fb_last` vs `fb_mean`.
+
+**Graph signals:**
+- `ppr_score` — Raw Personalized PageRank score from graph walk. Uses RRF-based seed selection.
+- `hebbian_pmi` — Raw PMI co-retrieval score. Seeds are top-5 candidates by best channel rank.
+
+**Memory metadata:**
+- `category` — Ordinal encoded (episodic=0, semantic=1, procedural=2, reflection=3, entity=4, meta=5).
+- `priority` — Base priority (1-10).
+- `age_days` — Days since `created_at`.
+- `token_count` — Token length of memory content.
+- `edge_count` — Number of graph edges touching this memory.
+- `theme_count` — Number of themes assigned.
+- `confidence` — Confidence score (0.1-0.95).
+
+### Training strategy
+
+**Cross-validation:** 5-fold GroupKFold, grouped by query. This prevents data leakage — a query's candidates never appear in both train and validation. GroupKFold is critical because candidates for the same query share contextual features; standard KFold would overestimate performance.
+
+**Model:** LightGBM pointwise regressor. Default hyperparameters (num_leaves=31, learning_rate=0.1, n_estimators=500, early stopping at 50 rounds). No hyperparameter tuning — the model's advantage comes from expressiveness, not careful tuning.
+
+**Labels:** Continuous GT relevance scores (0-1) from the judged ground truth set. The regressor predicts relevance directly; ranking is by predicted score.
+
+**LambdaRank variant:** Also implemented (`--lambdarank` flag). Discretizes continuous labels into quantile bins, trains LGBMRanker to optimize NDCG directly. Requires GT-only candidate pools for training (with negative sampling) but evaluates on the full candidate pool. This is an improvement experiment, not the current default.
+
+### Comparison infrastructure
+
+Both the formula and the reranker are evaluated on the same data with the same metrics:
+
+- **NDCG@5k:** Token-budget-aware NDCG. Candidates are packed greedily into a 5000-token budget; ideal DCG uses the same budget constraint.
+- **Graded Recall@5k:** Fraction of GT memories (relevance ≥ 0.5) surfaced within the token budget.
+
+Evaluation is always out-of-fold: the model predicts on held-out queries, never on training data. The formula gets the same query set for a fair comparison.
+
+### The feedback ablation
+
+Dropping all three feedback features (fb_last, fb_mean, fb_count) costs 0.0004 RMSE — within noise. This was confirmed across all 5 folds and in per-query analysis. The implication: feedback is not useful for ranking, even though it correlates with relevance at the per-query level (r=0.70 from the utility calibration study). The correlation exists but the information is redundant with the retrieval signals — if a memory ranks well in FTS and vector search, feedback adds nothing the model doesn't already know.
+
+### Live scoring
+
+Feature extraction during `impl_recall()` must produce identical features to training-time extraction. The key challenge: training extracts features from cached, precomputed search results; live scoring computes them on-the-fly. The `reranker.py` module handles this, using the same raw signals (ranks, PPR scores, feedback sequences, metadata) from live database queries.
+
+---
+
 *For per-study results, see the tuning studies log. For cross-study mechanism analysis, see architecture.md § Tuning.*
