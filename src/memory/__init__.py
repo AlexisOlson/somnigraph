@@ -16,7 +16,7 @@ from memory.graph import (
     _create_edge, _find_related_memories, _compute_shadow_load,
     _check_fast_path, _handle_temporal_evolution, _source_confidence_modifier,
 )
-from memory.scoring import rrf_fuse, apply_hebbian, expand_via_ppr, apply_quality_floor
+from memory.scoring import rrf_fuse, apply_hebbian, expand_via_ppr
 from memory.stats import compute_stats
 from memory.constants import *  # all tuning constants
 
@@ -36,6 +36,6 @@ __all__ = [
     "detect_session_id", "get_session_id",
     "_create_edge", "_find_related_memories", "_compute_shadow_load",
     "_check_fast_path", "_handle_temporal_evolution", "_source_confidence_modifier",
-    "rrf_fuse", "apply_hebbian", "expand_via_ppr", "apply_quality_floor",
+    "rrf_fuse", "apply_hebbian", "expand_via_ppr",
     "compute_stats",
 ]

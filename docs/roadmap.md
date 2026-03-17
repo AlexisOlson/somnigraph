@@ -223,7 +223,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 5. **Counterfactual coverage check.** For 20–30 GT queries, exhaustively judge all ~112 candidates (not just those the system retrieved). Measures how many relevant memories the retriever never surfaces — the selection bias that the standard GT can't detect. Accept if: unseen-relevant rate computed and documented.
 
-6. **Replace cliff detector with agent-specified limit.** *(Design complete, ready to implement.)* Score features cannot predict the cutoff (R² < 0). The cliff over-delivers 96.1% of the time. Solution: add `limit` parameter to `recall()`, remove cliff detection. Anchors {1, 3, 5, 8, 13} match the natural distribution (MAE = 0.71 with oracle selection vs 3.46 baseline). See roadmap § "Can cutoff history calibrate the cliff detector?"
+6. **Replace cliff detector with agent-specified limit.** *(Complete.)* Score features cannot predict the cutoff (R² < 0). The cliff over-delivers 96.1% of the time. Implemented: `limit` parameter on `recall()` (default 5), cliff detection removed from scoring pipeline. Anchors {1, 3, 5, 8, 13} match the natural distribution (MAE = 0.71 with oracle selection vs 3.46 baseline). `recall_meta` events now log `limit` alongside `cutoff_rank` for prospective-vs-retrospective comparison. See roadmap § "Can cutoff history calibrate the cliff detector?"
 
 ### Tier 2: Deeper investigation (2–3 sessions each)
 
@@ -287,7 +287,7 @@ Not architecture — advice. The wrong turns we can help you skip.
 
 2. **Implement feedback from day one.** It's the dominant retrieval signal and needs time to accumulate. A system without feedback is guessing; a system with 50 feedback events per query is learning.
 
-3. **Don't build a quality floor.** Cliff detection (adaptive, score-distribution-aware) beats any fixed threshold. We tested this thoroughly (wm1) — optimal floor ratio is 0.0.
+3. **Don't build a quality floor or cliff detector.** Both fixed thresholds and adaptive score-based heuristics fail — the cutoff is a content-level decision that scores can't capture (R² < 0). Let the agent specify how many results it wants. We tested quality floors (wm1, optimal ratio 0.0), cliff detection (over-delivers 96.1%), and score-feature prediction (anti-predictive) before reaching this conclusion.
 
 4. **Contradiction handling is research-grade hard.** Don't assume you'll solve it. Plan for temporal evolution (`valid_from`/`valid_until`) as the practical workaround. Published F1 is catastrophic across all systems.
 

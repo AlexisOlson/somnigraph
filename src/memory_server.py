@@ -98,7 +98,7 @@ def recall(
     context: str = "",
     budget: int = 5000,
     category: str = "",
-    limit: int = 10,
+    limit: int = 5,
     exclude_ids: str = "[]",
     since: str = "",
     before: str = "",
@@ -129,7 +129,9 @@ def recall(
             simple lookups). Use boost_themes aggressively alongside context.
         budget: Maximum tokens for results (default 5000).
         category: Optional filter by category.
-        limit: Maximum number of results (default 10).
+        limit: How many results to return (default 5). Set per-query based on intent:
+            1-3 focused lookup, 5 standard recall, 8-13 broad exploration.
+            Independent of budget — limit caps count, budget caps tokens.
         exclude_ids: JSON array of memory IDs to skip, e.g. '["id1","id2"]'. Use for iterative refinement.
         since: Only memories created on or after this date. ISO date or relative: "7d", "30d", "90d".
         before: Only memories created before this date. ISO date format.

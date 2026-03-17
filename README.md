@@ -17,7 +17,7 @@ All core phases (1–5) are complete: hybrid retrieval, scoring, graph, decay, s
 Most MCP memory servers store and retrieve. Somnigraph also **forgets, sleeps, and learns from feedback**.
 
 - **Hybrid retrieval**: RRF fusion of FTS5 keyword search and vector similarity (sqlite-vec), with [experiments showing when each channel matters](docs/experiments.md)
-- **Biological decay**: Per-category exponential decay with configurable half-lives, dormancy detection, and a quality floor
+- **Biological decay**: Per-category exponential decay with configurable half-lives and dormancy detection
 - **Sleep consolidation**: Offline batch processing in two phases — NREM (cluster and merge similar memories) and REM (gap analysis, question generation)
 - **PPR graph expansion**: Personalized PageRank over memory edges replaces naive BFS adjacency — [+5.8pp R@10 improvement](docs/experiments.md)
 - **Retrieval feedback**: Explicit utility scoring with empirical Bayes priors, EWMA aggregation, and Hebbian co-retrieval boosting that shapes future recall
@@ -55,6 +55,7 @@ You have persistent memory via the somnigraph MCP server.
   when prior context would change your response — past decisions, gotchas, corrections,
   or anything the user seems to reference from before. `query` feeds FTS5 keyword search;
   `context` feeds vector similarity. Use both for best results.
+  Set `limit` per-query: 1-3 focused lookup, 5 standard (default), 8-13 broad exploration.
   Don't narrate that you're checking memory; just recall and use the results naturally.
 - **After recall**: Call `recall_feedback({id: score, ...})` to rate what surfaced.
   Rate ALL memories: 1.0 = directly useful, 0.0 = surfaced but unused. Don't skip this —

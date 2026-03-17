@@ -1,4 +1,4 @@
-"""Scoring pipeline — RRF fusion, feedback, Hebbian, PPR expansion, quality floor.
+"""Scoring pipeline — RRF fusion, UCB exploration, Hebbian, PPR expansion.
 
 Each function takes explicit parameters and modifies rrf_scores in-place (mutating dict).
 Secondary data needed for logging is returned.
@@ -10,11 +10,10 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from memory.constants import (
-    RRF_K, RRF_VEC_WEIGHT, FEEDBACK_COEFF,
+    RRF_K, RRF_VEC_WEIGHT, UCB_COEFF,
     HEBBIAN_COEFF, HEBBIAN_CAP, HEBBIAN_MIN_JOINT,
     ADJACENCY_BASE_BOOST, ADJACENCY_NOVELTY_FLOOR,
     CONTEXT_RELEVANCE_THRESHOLD,
-    CLIFF_Z_THRESHOLD, CLIFF_MIN_RESULTS,
     THEME_BOOST,
     ADJACENCY_SEED_COUNT, MAX_NEIGHBORS_PER_SEED, MAX_EXPANSION_TOTAL,
     PPR_DAMPING, PPR_BOOST_COEFF, PPR_MIN_SCORE, PPR_MAX_ITER, PPR_CONVERGENCE_TOL,
@@ -143,15 +142,26 @@ def rrf_fuse(
         if mid in fts_ranked:
             score += (1.0 - RRF_VEC_WEIGHT) / (RRF_K + fts_ranked[mid] + 1)
 
-        # Feedback boost (empirical Bayes — Beta prior, centered penalty)
+        # UCB exploration bonus (replaces feedback boost)
+        # Memories with few observations get benefit of the doubt (high uncertainty).
+        # Memories with many observations have tight bounds (low uncertainty).
+        # This breaks the feedback loop: boost shrinks with evidence, not grows.
+        a = prior_mean * prior_strength
+        b = (1 - prior_mean) * prior_strength
         if mid in feedback_map:
             fb = feedback_map[mid]
-            a = prior_mean * prior_strength
-            b = (1 - prior_mean) * prior_strength
-            # Blend EWMA with Beta prior — more observations = more weight on EWMA
-            effective_n = fb["count"]
-            posterior_mean = (fb["ewma"] * effective_n + a) / (effective_n + a + b)
-            score *= (1 + (posterior_mean - prior_mean) * FEEDBACK_COEFF)
+            # Effective sample size of EWMA — honest about how much information
+            # the recency-weighted average actually carries.
+            ess = min(fb["count"], 1.0 / (2 * _EWMA_ALPHA - _EWMA_ALPHA ** 2))
+            a_post = fb["ewma"] * ess + a
+            b_post = (1 - fb["ewma"]) * ess + b
+        else:
+            # No feedback — maximum uncertainty (prior only)
+            a_post = a
+            b_post = b
+        ab = a_post + b_post
+        posterior_var = (a_post * b_post) / (ab * ab * (ab + 1))
+        score *= (1 + UCB_COEFF * math.sqrt(posterior_var))
 
         # Theme boost (multiplicative)
         if boost_themes_list and mid in themes_map and themes_map[mid]:
@@ -539,81 +549,3 @@ def _expand_adjacency_legacy(
     return expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit
 
 
-def _fit_log_curve(ranks: list[int], scores: list[float]) -> tuple[float, float]:
-    """Fit s = a - b·ln(rank) via OLS. Returns (a, b)."""
-    n = len(ranks)
-    lx = [math.log(r) for r in ranks]
-    mx = sum(lx) / n
-    my = sum(scores) / n
-    ssxx = sum((x - mx) ** 2 for x in lx)
-    if ssxx < 1e-12:
-        return my, 0.0
-    ssxy = sum((x - mx) * (y - my) for x, y in zip(lx, scores))
-    slope = ssxy / ssxx
-    return my - slope * mx, -slope
-
-
-def apply_quality_floor(
-    rrf_scores: dict[str, float],
-) -> tuple[list[str], list[str], float, float]:
-    """Adaptive cliff detection with safety floor.
-
-    Fits a log curve (s = a - b·ln(rank)) to the score sequence using a
-    rolling window. At each position i >= CLIFF_MIN_RESULTS, fits to
-    positions [1..i], predicts i+1, and cuts when the actual score falls
-    more than CLIFF_Z_THRESHOLD standard deviations below the prediction.
-
-    Returns (sorted_ids, dropped_ids, top_score, floor_val).
-    """
-    sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
-
-    if not sorted_ids:
-        return sorted_ids, [], 0.0, 0.0
-
-    top_score = rrf_scores[sorted_ids[0]]
-    if top_score <= 0:
-        return sorted_ids, [], top_score, 0.0
-
-    safety_floor = 0
-    above_floor = [mid for mid in sorted_ids if rrf_scores[mid] >= safety_floor]
-    dropped_ids = [mid for mid in sorted_ids if rrf_scores[mid] < safety_floor]
-
-    if len(above_floor) <= CLIFF_MIN_RESULTS:
-        return above_floor, dropped_ids, top_score, safety_floor
-
-    # Normalize scores for curve fitting
-    norm_scores = [rrf_scores[mid] / top_score for mid in above_floor]
-
-    # Rolling log-curve cliff detection
-    cliff_pos = len(above_floor)  # default: keep all above floor
-    for i in range(CLIFF_MIN_RESULTS, len(norm_scores)):
-        fit_ranks = list(range(1, i + 1))
-        fit_scores = norm_scores[:i]
-        a, b = _fit_log_curve(fit_ranks, fit_scores)
-
-        # RMSE on training data
-        preds = [a - b * math.log(r) for r in fit_ranks]
-        residuals = [fit_scores[j] - preds[j] for j in range(len(fit_scores))]
-        rmse = math.sqrt(sum(r * r for r in residuals) / len(residuals))
-        rmse = max(rmse, 0.005)  # floor to avoid false positives on perfect fits
-
-        # Predict next position
-        predicted = a - b * math.log(i + 1)
-        actual = norm_scores[i]
-        deviation = predicted - actual  # positive = dropped more than expected
-
-        if deviation > CLIFF_Z_THRESHOLD * rmse:
-            cliff_pos = i
-            break
-
-    kept_ids = above_floor[:cliff_pos]
-    cliff_dropped = above_floor[cliff_pos:]
-    dropped_ids = cliff_dropped + dropped_ids
-
-    # floor_val reflects the effective cutoff (cliff or safety, whichever was higher)
-    if kept_ids:
-        floor_val = rrf_scores[kept_ids[-1]]
-    else:
-        floor_val = safety_floor
-
-    return kept_ids, dropped_ids, top_score, floor_val

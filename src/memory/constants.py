@@ -22,7 +22,8 @@ DATA_DIR = Path(os.environ.get("SOMNIGRAPH_DATA_DIR",
 
 RRF_K = 6                    # wm13 best. Confirmed across wm12 (6D) and wm13 (4D). Was 14 (wm9).
 RRF_VEC_WEIGHT = 0.5        # Weight for vector vs keyword: score = w*vec + (1-w)*kw. 0.5 = equal (baseline).
-FEEDBACK_COEFF = 5.15        # wm9 bootstrap mean. Was 8.09 (wm1).
+FEEDBACK_COEFF = 0.0         # Deprecated — replaced by UCB exploration bonus. Was 5.15 (wm9).
+UCB_COEFF = 1.0              # Exploration bonus: score *= (1 + UCB_COEFF * sqrt(posterior_var)). Tune this.
 ADJACENCY_BASE_BOOST = 0.33  # wm9: flat landscape, restored original. Was 0.93 (wm7).
 ADJACENCY_NOVELTY_FLOOR = 0.67  # wm9 bootstrap mean. Was 0.05 (wm7).
 HEBBIAN_COEFF = 3.0          # wm9 bootstrap mean (rounded). Was 1.06 (wm7).
@@ -50,9 +51,9 @@ DECAY_FLOOR = 0.35
 # SHADOW_PENALTY_COEFF = 0.005
 # CONFIDENCE_WEIGHT = 0.04
 
-# REMOVED: QUALITY_FLOOR_RATIO (was 0.0, dead code — cliff detection remains)
-CLIFF_Z_THRESHOLD = 2.0      # Std devs below log-curve prediction to trigger cliff cutoff
-CLIFF_MIN_RESULTS = 5        # Minimum results before cliff detection activates
+# REMOVED: QUALITY_FLOOR_RATIO (was 0.0, dead code)
+# REMOVED: CLIFF_Z_THRESHOLD, CLIFF_MIN_RESULTS — cliff detection replaced by agent-specified limit parameter.
+# See docs/roadmap.md § "Can cutoff history calibrate the cliff detector?" for the analysis.
 
 # Confidence learning rates (Group 3)
 CONF_USEFUL_THRESHOLD = 0.5    # utility >= this triggers growth

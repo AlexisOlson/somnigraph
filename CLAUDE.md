@@ -10,7 +10,7 @@ Migration from production is complete (Phases 1-5). The system is live and stabl
 
 ### Next session work
 
-GT judging ~500/1047. Real-data tuning (wm24-wm34) underway on 500 queries with 5-fold CV. Utility calibration study complete: per-query feedback-GT r=0.70, per-memory r=0.14, no self-reinforcement (see `docs/experiments.md` § Utility calibration study). Ready to implement: replace cliff detector with agent-specified `limit` parameter (Fibonacci anchors {1,3,5,8,13}), design in `docs/roadmap.md` § "Can cutoff history calibrate the cliff detector?" Remaining Tier 1: counterfactual coverage check, sleep impact measurement. See `docs/roadmap.md` for full research agenda.
+GT judging ~500/1047. Real-data tuning (wm24-wm34) underway on 500 queries with 5-fold CV. Utility calibration study complete (see `docs/experiments.md` § Utility calibration study). Cliff detector replaced with agent-specified `limit` parameter (default 5, anchors {1,3,5,8,13}). UCB exploration bonus now uses ESS-corrected pseudo-counts — needs retuning (UCB_COEFF and EWMA_ALPHA jointly). Remaining Tier 1: counterfactual coverage check, sleep impact measurement. See `docs/roadmap.md` for full research agenda.
 
 ### Migration notes
 

@@ -31,8 +31,7 @@ from memory.write import _insert_memory
 from memory.graph import _create_edge
 from memory.session import detect_session_id, get_session_id
 from memory.scoring import (
-    rrf_fuse, apply_hebbian,
-    expand_via_ppr, apply_quality_floor,
+    rrf_fuse, apply_hebbian, expand_via_ppr,
 )
 from memory.stats import compute_stats
 
@@ -386,7 +385,7 @@ def impl_recall(
     context: str = "",
     budget: int = 5000,
     category: str = "",
-    limit: int = 10,
+    limit: int = 5,
     exclude_ids: str = "[]",
     since: str = "",
     before: str = "",
@@ -487,10 +486,10 @@ def impl_recall(
         apply_hebbian(db, rrf_scores)
         expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit = expand_via_ppr(
             db, rrf_scores, query_embedding, query, exclude_set)
-        sorted_ids, dropped_ids, top_score, floor_val = apply_quality_floor(rrf_scores)
-        quality_dropped = len(dropped_ids)
+        sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
+        top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
 
-        # Fetch memories and apply filters (post-RRF)
+        # Fetch memories and apply filters (post-RRF), capped by limit
         results = []
         for mid in sorted_ids:
             if mid in exclude_set:
@@ -516,9 +515,7 @@ def impl_recall(
             return f"No memories found for query: {query}"
 
         # Format within budget
-        header = f'## Recall: "{query}" ({len(results)} results)'
-        if quality_dropped:
-            header += f" [{quality_dropped} below quality floor]"
+        header = f'## Recall: "{query}" ({len(results)} results, limit={limit})'
         output_lines = [header + "\n"]
         tokens_used = count_tokens(output_lines[0])
         returned_ids = []
@@ -589,19 +586,17 @@ def impl_recall(
             # Log recall_meta summary
             returned_ids_set = set(returned_ids)
             kept_scores = [(mid[:8], round(rrf_scores[mid], 5)) for mid in returned_ids]
-            dropped_scores = [(mid[:8], round(rrf_scores[mid], 5)) for mid in dropped_ids]
-            budget_trimmed = [(mid[:8], round(rrf_scores[mid], 5))
-                              for mid in sorted_ids if mid not in returned_ids_set]
+            beyond_limit = [(mid[:8], round(rrf_scores[mid], 5))
+                            for mid in sorted_ids if mid not in returned_ids_set]
             recall_meta = {
                 "top_score": round(top_score, 5),
-                "floor": round(floor_val, 5),
+                "limit": limit,
                 "kept": kept_scores,
-                "dropped": dropped_scores,
             }
             if context and context.strip() and context.strip() != query:
                 recall_meta["vector_input"] = context.strip()
-            if budget_trimmed:
-                recall_meta["budget_trimmed"] = budget_trimmed
+            if beyond_limit:
+                recall_meta["beyond_limit"] = beyond_limit
             _log_event(db, "_recall", "recall_meta", query=query, context=recall_meta)
 
         db.commit()

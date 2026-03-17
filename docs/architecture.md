@@ -182,9 +182,9 @@ At the current scale (~700 memories), adjacency expansion rarely fires — the g
 
 ### Cliff detection
 
-After scoring, results are sorted by final score. A log-curve is fit to the score sequence, and the system looks for a "cliff" — a point where actual scores drop sharply below the fitted curve (more than 2.0 standard deviations). Everything below the cliff is cut.
+After scoring, results are sorted by final score and truncated to the agent-specified `limit`. The agent sets limit per-query based on intent (1-3 focused, 5 standard, 8-13 broad), then token budget provides a second independent cap.
 
-This replaces a fixed quality floor (which was removed — see [What didn't work](#what-didnt-work)). The adaptive approach handles the fact that score distributions vary wildly across queries.
+This replaces both the fixed quality floor (removed in wm1 — optimal ratio was 0.0) and the adaptive cliff detector (removed after the utility calibration study showed it over-delivers 96.1% of the time — see `docs/roadmap.md` § "Can cutoff history calibrate the cliff detector?"). The agent's contextual judgment outperforms any score-based heuristic for deciding how many results are useful.
 
 ---
 
@@ -292,7 +292,7 @@ The system started as a single `memory_server.py` file that grew past 2,000 line
 | `privacy.py` | ~40 | Regex-based secret redaction (API keys, JWTs, tokens) |
 | `themes.py` | ~100 | Theme normalization, variant mappings, content-based expansion |
 | `fts.py` | ~80 | FTS5 query sanitization, known phrases, index management |
-| `scoring.py` | 454 | RRF fusion, feedback boost, Hebbian, adjacency, cliff detection |
+| `scoring.py` | ~350 | RRF fusion, UCB exploration, Hebbian, PPR expansion |
 | `graph.py` | 291 | Edge creation, related memory search, shadow load, temporal evolution |
 | `decay.py` | 32 | Exponential decay with per-category rates and retention immunity |
 | `formatting.py` | ~40 | Display formatting (compact, full, pending) |

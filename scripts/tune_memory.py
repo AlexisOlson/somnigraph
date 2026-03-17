@@ -51,10 +51,12 @@ from memory.constants import (
     HEBBIAN_COEFF, HEBBIAN_CAP, HEBBIAN_MIN_JOINT,
     ADJACENCY_BASE_BOOST, ADJACENCY_NOVELTY_FLOOR,
     CONTEXT_RELEVANCE_THRESHOLD,
-    CLIFF_Z_THRESHOLD, CLIFF_MIN_RESULTS,
     THEME_BOOST,
     CATEGORY_DECAY_RATES, DEFAULT_DECAY_RATE,
 )
+# Legacy cliff constants — removed from scoring pipeline, hardcoded for tuning compat
+CLIFF_Z_THRESHOLD = 2.0
+CLIFF_MIN_RESULTS = 5
 FEEDBACK_MIN_COUNT = 1  # Legacy -- kept for loading existing studies. Now replaced by Beta prior.
 # Removed from scoring -- hardcode to zero/no-op for tuning compatibility
 SHADOW_PENALTY_COEFF = 0.0
