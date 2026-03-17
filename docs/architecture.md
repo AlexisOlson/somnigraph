@@ -12,8 +12,9 @@ This document tells the story of how Somnigraph's architecture emerged — what 
 6. [Sleep](#sleep)
 7. [The refactor](#the-refactor)
 8. [Tuning](#tuning)
-9. [What didn't work](#what-didnt-work)
-10. [Open problems](#open-problems)
+9. [The reranker](#the-reranker)
+10. [What didn't work](#what-didnt-work)
+11. [Open problems](#open-problems)
 
 ---
 
@@ -342,9 +343,89 @@ The wiring layer (`memory_server.py`) still has re-exports for backward compatib
 
 ---
 
+## The reranker
+
+38 tuning studies over several weeks produced a genuinely good scoring formula. The studies found real structure — two basins, a Pareto front, stable feature importances, load-bearing components that validated design decisions (the feedback prior, PPR replacing theme boost). The formula worked well.
+
+Then a LightGBM pointwise regressor trained in 8 seconds on the same ground truth data beat it by +5.7% NDCG@5k in 5-fold cross-validation.
+
+The formula couldn't express "fts_rank matters more when age < 20 days." It was blind to metadata features (age, token count, edge count, confidence) that turned out to be the second most important signal tier. The limitation wasn't in the parameter values — it was in the functional form. But the limitation only became visible once enough labeled data existed to train a model, and that labeled data came from the tuning infrastructure the formula studies built.
+
+### Why the formula was the wrong abstraction
+
+The hand-tuned formula computes a score as: RRF fusion (2 channels) → UCB exploration bonus → theme boost → Hebbian PMI → PPR expansion. Each stage applies its signal as a multiplicative or additive modification, with coefficients tuned by Optuna. The formula has three structural limitations that no amount of tuning can fix:
+
+1. **No interaction effects.** The formula can't condition one signal on another. "FTS rank matters more for recent memories" requires an interaction term between `fts_rank` and `age_days`. The formula treats them independently — it applies the same RRF weighting regardless of memory age, category, or any other context.
+
+2. **Blind to metadata.** The formula uses retrieval signals (ranks, feedback, graph) but ignores memory metadata (age, token count, edge count, confidence, category). These signals are available in the database but have no entry point in the scoring pipeline. Adding each one would require designing a new formula term, choosing a functional form, and tuning its coefficient — the parametric approach doesn't scale.
+
+3. **Sequential composition.** Each scoring stage modifies the output of the previous stage. UCB can only scale what RRF produced; Hebbian can only boost what UCB+RRF scored. If RRF ranked a memory poorly, downstream signals can't rescue it. The formula's architecture imposes an ordering that constrains what the system can learn.
+
+### The reranker design
+
+A LightGBM pointwise regressor. Input: 18 per-candidate features. Output: predicted relevance (0–1). Training: 5-fold GroupKFold cross-validation on ~500 judged queries.
+
+The features are the raw signals the formula consumed, plus metadata it couldn't see:
+
+| Tier | Features | Importance |
+|------|----------|-----------|
+| Retrieval | fts_rank, vec_rank, theme_rank, fts_bm25, vec_dist, theme_overlap | Highest (fts_rank dominant) |
+| Metadata | category, priority, age_days, token_count, edge_count, theme_count, confidence | Second tier |
+| Graph | ppr_score, hebbian_pmi | Third tier |
+| Feedback | fb_last, fb_mean, fb_count | Lowest (near-zero marginal contribution) |
+
+Key design decisions:
+
+- **Raw signals, not derived scores.** The model receives fts_rank (position in BM25 results) and vec_rank (position in KNN results), not the RRF-fused score. It learns its own weighting instead of inheriting the formula's. Same for feedback: raw last/mean/count, not EWMA (which bakes in an alpha parameter the model doesn't need).
+
+- **No scoring parameters.** The formula had 14 tunable constants. The reranker has zero. The "parameters" are the model's learned splits, which adapt to the data structure instead of being hand-specified.
+
+- **Graceful fallback.** If no model file exists, the formula path runs unchanged. This preserves research comparison and handles the case where a user hasn't trained a model.
+
+### What feedback's role became
+
+The most surprising finding: feedback features contribute almost nothing to ranking. Dropping all three feedback features (fb_last, fb_mean, fb_count) costs 0.0004 RMSE — within noise. This was confirmed from three independent directions:
+
+1. **Feature importance:** fb_mean ranks 9th of 18, fb_count 11th, fb_last 12th.
+2. **Ablation:** Full model RMSE vs no-feedback RMSE: negligible difference.
+3. **UCB analysis:** The shown-vs-ranked-out feedback distributions are nearly identical — feedback doesn't distinguish between good and bad candidates.
+
+This doesn't mean feedback is useless to the system. It means feedback is useless *for ranking*. Feedback still drives storage decisions (what to keep, what to decay), confidence updates, edge weight learning, and the sleep pipeline. The feedback loop's value is in shaping the memory store over time, not in scoring individual retrieval results.
+
+### Architecture
+
+The reranker lives in `src/memory/reranker.py`. Three functions:
+
+- `load_model()` — Load pickled model from `DATA_DIR/tuning_studies/reranker_model.pkl`. Called once at server startup.
+- `extract_live_features()` — Build the (N, 18) feature matrix from live retrieval data. Must produce identical features to `train_reranker.py`'s training-time extraction.
+- `rerank()` — Run `model.predict(features)`, return scores keyed by memory ID.
+
+In `impl_recall()`, after candidate retrieval (FTS + vec search), the code branches:
+
+```
+if reranker model loaded:
+    compute raw PPR scores (for features, not scoring)
+    extract feature matrix
+    predict scores → sort by prediction
+else:
+    existing formula path (rrf_fuse → apply_hebbian → expand_via_ppr)
+```
+
+The formula code stays in `scoring.py` for research comparison and fallback.
+
+---
+
 ## What didn't work
 
 Honest accounting of ideas that were implemented, tested, and removed.
+
+### The parametric scoring formula (superseded)
+
+38 tuning studies optimizing a hand-designed formula: RRF fusion → UCB exploration bonus → theme boost → Hebbian PMI → PPR expansion. 14 parameters. The formula was successful — it found real structure, improved retrieval, and validated design decisions. But its functional form had a ceiling: it couldn't express interaction effects, was blind to metadata, and imposed sequential composition.
+
+A LightGBM pointwise regressor with 18 parameter-free features, trained in 8 seconds, beat the formula by +5.7% NDCG@5k. The formula code remains in `scoring.py` as fallback and for research comparison. See [The reranker](#the-reranker) for the full story.
+
+The studies weren't wasted — they built the ground truth data, the evaluation infrastructure, and the understanding of signal tiers that made the reranker possible. The lesson: a well-tuned formula is the right approach until enough labeled data exists to learn the scoring function directly. Once it does, the learned approach is both better and cheaper.
 
 ### Quality floor (removed)
 

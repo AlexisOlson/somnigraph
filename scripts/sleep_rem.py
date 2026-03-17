@@ -1079,6 +1079,9 @@ Respond with JSON:
 # Step 5: Summary Maintenance
 # ---------------------------------------------------------------------------
 
+# Personal vault path — provides section headers as context for the summary audit
+# prompt. Not load-bearing: if missing, returns "(core.md not found)" and the
+# audit still runs. Adapt this path to your own setup or remove it.
 CORE_MD_PATH = Path.home() / ".claude" / "Personal Vault" / "Claude" / "core.md"
 
 
@@ -1874,6 +1877,9 @@ def log_rem_cycle(db, started_at: str, report: str, stats: dict):
 # Seed curation
 # ---------------------------------------------------------------------------
 
+# Personal seed file — curate_seed() checks whether entries have graduated to
+# stored memories and rewrites the file. Not load-bearing: if missing, the
+# entire step is a no-op. Adapt this path or remove if you don't use a seed file.
 SEED_PATH = Path.home() / ".claude" / "private" / "seed.md"
 SEED_MAX_TOKENS = 500  # approximate budget — enforced by LLM judgment, not exact count
 
@@ -1916,6 +1922,10 @@ def curate_seed(db) -> dict:
     # Budget: ~50k tokens = ~200k chars total. Seed + prompt + response ~24k chars.
     # Remaining ~176k chars split among sources, journal gets whatever's left.
     TOTAL_CHAR_BUDGET = 176000
+
+    # Personal vault paths below provide context for the seed curation LLM prompt.
+    # None are load-bearing — if missing, the prompt gets less context but still
+    # works. Adapt these paths to your own setup or remove them.
 
     # Recent session logs — what actually happened in recent sessions (~30k chars)
     archive_dir = Path.home() / ".claude" / "Personal Vault" / "Claude" / "Archive"

@@ -136,6 +136,26 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What we took**: The enriched embedding pattern (the single most directly borrowed idea in the system). Empirical proof that link-based retrieval expansion works. The insight that write-time enrichment pays off at read-time.
 
+### Hexis
+
+**What it is**: A PostgreSQL-native cognitive architecture by Eric Hartford (QuixiAI) that provides persistent memory, identity, and autonomous behavior to AI agents. All state lives in Postgres (memories, worldview, goals, graph); Python workers are stateless. Uses pgvector for embeddings, Apache AGE for knowledge graphs, and an autonomous heartbeat loop with energy-budgeted actions.
+
+**What it does well**:
+- Precomputed neighborhoods for spreading activation. Memory neighborhoods are computed during maintenance and stored as JSONB, enabling O(1) associative recall without real-time graph traversal. Hot-path retrieval combines vector similarity + neighborhood expansion + temporal context in a single SQL query (~5-50ms).
+- Energy budget as situational constraint. Actions are gated not by compute cost but by irreversibility, social exposure, and identity impact. A web search costs 2; sending a message costs 5. Context multipliers (first use, error rate, time-of-day) add nuance. The agent can propose cost changes but can't modify them directly.
+- Drives as internal pressure. Four accumulating drives (curiosity, connection, coherence, competence) nudge the heartbeat toward behaviors without commanding them. The coherence drive — pressure to resolve contradictions — creates natural urgency for knowledge base hygiene.
+- Identity as evolving epistemology. Worldview memories with confidence scores, Big Five personality encoding, beliefs that accumulate evidence. The agent's identity is memories, not configuration.
+- Rich graph vocabulary. 18 edge types across 11 node types in Apache AGE, including `CAUSES`, `BLOCKS`, `CONTESTED_BECAUSE`, `INSTANCE_OF` — enabling reasoning patterns that simpler edge schemas can't express.
+
+**Where it falls short**:
+- No feedback loop. Scoring is a fixed formula (importance × decay × similarity). No mechanism to learn from retrieval outcomes — parameters are hand-set and static.
+- No keyword retrieval channel. Vector-primary with pg_trgm as secondary. No BM25 or FTS5 equivalent, no RRF fusion of multiple channels.
+- Heavy infrastructure. Requires PostgreSQL + Apache AGE + Ollama (or other embedding service) + Docker. Not portable in the way SQLite-based systems are.
+- No LLM-mediated consolidation. Maintenance worker does clustering and neighborhood recomputation, but no question-driven summarization, no merge/archive/annotate decisions, no Hebbian edge weighting from co-retrieval.
+- Embeddings are not enriched. Raw content is embedded directly — no concatenation of categories, themes, or summaries into the vector space.
+
+**What's interesting for us**: The precomputed neighborhood pattern could optimize Somnigraph's per-query PPR expansion — compute during sleep, use as fast path, fall back to live expansion for fresh memories. The coherence drive (urgency signal for unresolved contradictions) could improve our contradiction handling. The energy budget is a thoughtful model for autonomous agent constraints, orthogonal to our scope but a good reference.
+
 ### Cognee
 
 **What it is**: A document-to-knowledge-graph system with LLM extraction, multi-backend storage, and 14 search types. The flagship retrieval mode (GRAPH_COMPLETION) seeds with vector search, projects through the graph, and scores triplets by importance.

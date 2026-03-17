@@ -16,6 +16,9 @@ from pathlib import Path
 DATA_DIR = Path(os.environ.get("SOMNIGRAPH_DATA_DIR",
                 Path.home() / ".somnigraph"))
 
+# Reranker model path — learned scoring replaces the hand-tuned formula when present
+MODEL_PATH = DATA_DIR / "tuning_studies" / "reranker_model.pkl"
+
 # ---------------------------------------------------------------------------
 # Core — wm15 study (2026-03-09), NSGA-II dual AUC+MRR, 500 trials, k=6 fixed
 # ---------------------------------------------------------------------------

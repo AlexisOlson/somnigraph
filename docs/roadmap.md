@@ -213,7 +213,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ### Tier 1: Unblocked by GT completion (1 session each)
 
-1. **Re-tune constants on real GT.** *(In progress: wm24–wm34, ~500 judged queries, 5-fold CV.)* Compare real-data constants against LoCoMo-era constants. Re-run when GT judging completes (1,047 queries) to test stability. Accept if: AUC delta >2% or any constant shifts >20%.
+1. **~~Re-tune constants on real GT.~~** *(Superseded by reranker.)* The hand-tuned formula was replaced by a learned LightGBM reranker that achieved +5.7% NDCG@5k over the formula in 5-fold CV. The tuning studies (wm24–wm34) produced the ground truth and evaluation infrastructure that made the reranker possible. Remaining reranker improvement experiments: raw scores as features (fts_bm25, vec_dist), query-dependent features, and LambdaRank (optimizes NDCG directly instead of pointwise MSE). See `architecture.md` § The reranker.
 
 2. **Feedback loop health check.** *(Complete — answered by utility calibration study.)* Per-query Spearman r = 0.70 confirms feedback tracks relevance. See experiment #4 and `experiments.md` § Utility calibration study.
 
@@ -225,33 +225,39 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 6. **Replace cliff detector with agent-specified limit.** *(Complete.)* Score features cannot predict the cutoff (R² < 0). The cliff over-delivers 96.1% of the time. Implemented: `limit` parameter on `recall()` (default 5), cliff detection removed from scoring pipeline. Anchors {1, 3, 5, 8, 13} match the natural distribution (MAE = 0.71 with oracle selection vs 3.46 baseline). `recall_meta` events now log `limit` alongside `cutoff_rank` for prospective-vs-retrospective comparison. See roadmap § "Can cutoff history calibrate the cliff detector?"
 
-### Tier 2: Deeper investigation (2–3 sessions each)
+7. **Reranker improvement: LambdaRank.** Train LGBMRanker with `lambdarank` objective to optimize NDCG directly instead of pointwise MSE. The biggest expected win — the current regressor minimizes squared error on relevance predictions, but ranking quality depends on ordering, not prediction accuracy. Accept if: NDCG@5k improves over pointwise regressor. Training infrastructure already exists (`--lambdarank` flag in `train_reranker.py`).
 
-7. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster AUC, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
+8. **Reranker improvement: query features.** Add query-dependent features (query token count, query specificity, category distribution of candidates). Currently the model sees each candidate independently; query-level features could help it calibrate predictions across different query types. Accept if: NDCG@5k improves, or negative result documented.
 
-8. **Generalization study.** Train/test split on GT (tune constants on half, evaluate on other half). Accept if: constants stable across splits (or instability documented as finding).
+9. **UCB retuning reassessment.** The ESS-corrected UCB exploration bonus (from the limit-parameter branch) needs joint retuning of UCB_COEFF and EWMA_ALPHA. However, if the reranker is the production scoring path, UCB only matters for the formula fallback. Decide whether retuning is worth the effort. Accept if: decision documented with reasoning.
 
-9. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
+### Tier 2: Deeper investigation (2-3 sessions each)
 
-10. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
+10. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster metrics, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
 
-11. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: AUC delta under paraphrase computed.
+11. **Generalization study.** Train/test split on GT (tune constants on half, evaluate on other half). Accept if: constants stable across splits (or instability documented as finding).
 
-12. **Embedding staleness detection.** For each memory, compare theme set at embedding time vs. current. Flag high-drift memories, re-embed them, measure retrieval quality change. Quantifies the representation bifurcation problem. Accept if: drift distribution documented, re-embedding impact measured.
+12. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
 
-13. **Graph null models.** Compare current graph against similarity-only, edge-shuffled, edge-type-restricted, and temporal-only variants. Tests whether graph structure adds real signal or just correlates with similarity. Accept if: retrieval quality delta per variant measured.
+13. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
+
+14. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: NDCG delta under paraphrase computed.
+
+15. **Embedding staleness detection.** For each memory, compare theme set at embedding time vs. current. Flag high-drift memories, re-embed them, measure retrieval quality change. Quantifies the representation bifurcation problem. Accept if: drift distribution documented, re-embedding impact measured.
+
+16. **Graph null models.** Compare current graph against similarity-only, edge-shuffled, edge-type-restricted, and temporal-only variants. Tests whether graph structure adds real signal or just correlates with similarity. Accept if: retrieval quality delta per variant measured.
 
 ### Tier 3: New capabilities (3+ sessions each)
 
-14. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Accept if: temporal queries measurably improve.
+17. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Accept if: temporal queries measurably improve.
 
-15. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
+18. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
 
-16. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
+19. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
 
-17. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
+20. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
 
-18. **startup_load subsystem measurement.** Quantify how much apparent memory competence comes from preload vs. explicit retrieval. Tests the cache-vs-recall ambiguity by comparing sessions with and without preload. Accept if: preload contribution isolated and documented.
+21. **startup_load subsystem measurement.** Quantify how much apparent memory competence comes from preload vs. explicit retrieval. Tests the cache-vs-recall ambiguity by comparing sessions with and without preload. Accept if: preload contribution isolated and documented.
 
 ---
 
