@@ -40,7 +40,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from memory.constants import (
     UCB_COEFF,
     HEBBIAN_COEFF, HEBBIAN_CAP, HEBBIAN_MIN_JOINT,
-    PPR_DAMPING, PPR_BOOST_COEFF, PPR_MIN_SCORE,
+    PPR_DAMPING, PPR_BOOST_COEFF, PPR_MIN_SCORE, PPR_RERANKER_SEEDS,
     RRF_VEC_WEIGHT, RRF_K,
 )
 
@@ -101,7 +101,7 @@ SEARCH_RANGES = {
     "bm25_themes_wt": (5.0, 6.0, "float"),  # wm38 peak ~5.73
 }
 
-PPR_MAX_SEEDS = 30
+PPR_MAX_SEEDS = PPR_RERANKER_SEEDS  # shared with live scoring
 PPR_DAMPING_GRID = sorted(set(
     [round(0.10 + i * 0.05, 2) for i in range(17)]    # 0.10..0.90 coarse
     + [round(0.20 + i * 0.01, 2) for i in range(31)]  # 0.20..0.50 fine
@@ -160,12 +160,12 @@ def load_data(db: sqlite3.Connection, gt: dict[str, dict[str, float]]):
         "SELECT id, coalesce(token_count, length(content)/4) FROM memories WHERE status='active'"
     ).fetchall())
 
-    # Themes map
+    # Themes map (lowercased for case-insensitive matching against query tokens)
     themes_map: dict[str, set[str]] = {}
     for row in db.execute("SELECT id, themes FROM memories WHERE status='active'"):
         if row["themes"]:
             try:
-                themes_map[row["id"]] = set(json.loads(row["themes"]))
+                themes_map[row["id"]] = {t.lower() for t in json.loads(row["themes"])}
             except (json.JSONDecodeError, TypeError):
                 themes_map[row["id"]] = set()
         else:
@@ -209,18 +209,23 @@ def load_data(db: sqlite3.Connection, gt: dict[str, dict[str, float]]):
     }
     print(f"  Hebbian: {hebb_total_queries} queries, {len(hebb_mem_freq)} memories")
 
-    # Edges (for PPR)
+    # Edges (for PPR) — exclude contradiction-flagged edges
     edge_rows = db.execute("""
-        SELECT source_id, target_id, weight FROM memory_edges
+        SELECT source_id, target_id, weight, flags FROM memory_edges
     """).fetchall()
     ppr_adj: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    n_contradiction = 0
     for r in edge_rows:
+        if r["flags"] and "contradiction" in r["flags"]:
+            n_contradiction += 1
+            continue
         s, t, w = r["source_id"], r["target_id"], r["weight"] or 1.0
         if s in active_ids and t in active_ids:
             ppr_adj[s].append((t, w))
             ppr_adj[t].append((s, w))
     ppr_adj = dict(ppr_adj)
-    print(f"  Edges: {len(edge_rows)} raw, {len(ppr_adj)} memories with edges")
+    print(f"  Edges: {len(edge_rows)} raw ({n_contradiction} contradiction excluded), "
+          f"{len(ppr_adj)} memories with edges")
 
     # Memory embeddings (for PPR subgraph)
     mem_embs: dict[str, list[float]] = {}
@@ -397,14 +402,14 @@ def precompute_ppr_cache(gt_queries: list[str], search_data: dict,
         vec_ranked = {mid: rank for rank, mid in enumerate(vec_ids)}
         text_ids = set(fts_ranked.keys()) | set(vec_ranked.keys())
 
-        # Base RRF scores (production params for seed selection)
+        # Base RRF scores for seed selection (symmetric RRF_K)
         base_scores = {}
         for mid in text_ids:
             score = 0.0
             if mid in fts_ranked:
-                score += (1 - RRF_VEC_WEIGHT) / (K_FTS + fts_ranked[mid] + 1)
+                score += (1 - RRF_VEC_WEIGHT) / (RRF_K + fts_ranked[mid] + 1)
             if mid in vec_ranked:
-                score += RRF_VEC_WEIGHT / (K_VEC + vec_ranked[mid] + 1)
+                score += RRF_VEC_WEIGHT / (RRF_K + vec_ranked[mid] + 1)
             base_scores[mid] = score
 
         if not base_scores:
@@ -743,15 +748,24 @@ def compute_ndcg(ranked_results: dict[str, list[str]], token_map: dict[str, int]
 def compute_graded_recall(ranked_results: dict[str, list[str]], token_map: dict[str, int],
                           ground_truth: dict[str, dict[str, float]], budget: int = 5000,
                           threshold: float = 0.5) -> float:
-    """Fraction of memories with GT score >= threshold appearing within budget."""
-    total_relevant = 0
-    total_found = 0
+    """Relevance-weighted recall: did the ranker find the *best* relevant memories?
+
+    For each query, count N relevant memories in the budget, then score:
+      sum(GT scores of those N) / sum(top-N GT scores)
+
+    A ranker that surfaces the N most relevant scores 1.0 regardless of how
+    many relevant memories exist beyond the budget.  A ranker that surfaces
+    N low-relevance memories when high-relevance ones exist scores < 1.0.
+    """
+    total_score = 0.0
+    total_ideal = 0.0
 
     for qtext, ranked in ranked_results.items():
         gt = ground_truth.get(qtext)
         if not gt:
             continue
 
+        # What the ranker actually retrieved within budget
         shown = set()
         used_tokens = 0
         for mid in ranked:
@@ -761,11 +775,26 @@ def compute_graded_recall(ranked_results: dict[str, list[str]], token_map: dict[
             used_tokens += tokens
             shown.add(mid)
 
-        relevant_ids = {mid for mid, score in gt.items() if score >= threshold}
-        total_relevant += len(relevant_ids)
-        total_found += len(relevant_ids & shown)
+        # Relevant memories that were shown
+        found_relevant = {mid for mid in shown if gt.get(mid, 0) >= threshold}
+        n = len(found_relevant)
+        if n == 0:
+            continue
 
-    return total_found / total_relevant if total_relevant > 0 else 0.0
+        # Actual: sum of GT scores for the N relevant memories retrieved
+        actual = sum(gt[mid] for mid in found_relevant)
+
+        # Ideal: sum of top-N GT scores (best possible N relevant memories)
+        all_relevant_scores = sorted(
+            (score for mid, score in gt.items() if score >= threshold),
+            reverse=True,
+        )
+        ideal = sum(all_relevant_scores[:n])
+
+        total_score += actual
+        total_ideal += ideal
+
+    return total_score / total_ideal if total_ideal > 0 else 0.0
 
 
 def compute_recall_at_k(ranked_results: dict[str, list[str]],

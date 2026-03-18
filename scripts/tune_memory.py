@@ -2593,9 +2593,17 @@ def compute_ndcg(detailed_results: list[dict], token_map: dict[str, int],
 def compute_graded_recall(detailed_results: list[dict], token_map: dict[str, int],
                           ground_truth: dict[str, dict[str, float]], budget: int = 5000,
                           threshold: float = 0.5) -> float:
-    """Fraction of memories with ground truth relevance >= threshold that appear within budget."""
-    total_relevant = 0
-    total_found = 0
+    """Relevance-weighted recall: did the ranker find the *best* relevant memories?
+
+    For each query, count N relevant memories in the budget, then score:
+      sum(GT scores of those N) / sum(top-N GT scores)
+
+    A ranker that surfaces the N most relevant scores 1.0 regardless of how
+    many relevant memories exist beyond the budget.  A ranker that surfaces
+    N low-relevance memories when high-relevance ones exist scores < 1.0.
+    """
+    total_score = 0.0
+    total_ideal = 0.0
 
     for qr in detailed_results:
         query = qr["query"]
@@ -2604,12 +2612,27 @@ def compute_graded_recall(detailed_results: list[dict], token_map: dict[str, int
             continue
 
         shown = _shown_at_budget(qr["ranked"], token_map, budget)
-        relevant_ids = {mid for mid, score in gt.items() if score >= threshold}
 
-        total_relevant += len(relevant_ids)
-        total_found += len(relevant_ids & shown)
+        # Relevant memories that were shown
+        found_relevant = {mid for mid in shown if gt.get(mid, 0) >= threshold}
+        n = len(found_relevant)
+        if n == 0:
+            continue
 
-    return total_found / total_relevant if total_relevant > 0 else 0.0
+        # Actual: sum of GT scores for the N relevant memories retrieved
+        actual = sum(gt[mid] for mid in found_relevant)
+
+        # Ideal: sum of top-N GT scores (best possible N relevant memories)
+        all_relevant_scores = sorted(
+            (score for mid, score in gt.items() if score >= threshold),
+            reverse=True,
+        )
+        ideal = sum(all_relevant_scores[:n])
+
+        total_score += actual
+        total_ideal += ideal
+
+    return total_score / total_ideal if total_ideal > 0 else 0.0
 
 
 def compute_discovery_rate(detailed_results: list[dict],

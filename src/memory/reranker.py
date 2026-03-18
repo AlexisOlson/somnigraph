@@ -117,18 +117,18 @@ def extract_live_features(
         return np.zeros((0, len(FEATURE_NAMES)), dtype=np.float32), []
 
     # --- Theme channel (rank by query-token overlap) ---
+    # Iterate all memories in themes_map (not just all_ids) to match training,
+    # which scans the entire active corpus for theme overlap.
     query_tokens = set(query.lower().split())
     theme_scored = []
     theme_overlap_map: dict[str, int] = {}
-    for mid in all_ids:
-        raw_themes = themes_map.get(mid)
+    for mid, raw_themes in themes_map.items():
         if not raw_themes:
             continue
         try:
             mem_themes = set(json.loads(raw_themes))
         except (json.JSONDecodeError, TypeError):
             continue
-        # Lowercase for matching
         mem_themes_lower = {t.lower() for t in mem_themes}
         overlap = len(mem_themes_lower & query_tokens)
         if overlap > 0:

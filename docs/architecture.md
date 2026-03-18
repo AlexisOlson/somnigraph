@@ -347,7 +347,7 @@ The wiring layer (`memory_server.py`) still has re-exports for backward compatib
 
 38 tuning studies over several weeks produced a genuinely good scoring formula. The studies found real structure — two basins, a Pareto front, stable feature importances, load-bearing components that validated design decisions (the feedback prior, PPR replacing theme boost). The formula worked well.
 
-Then a LightGBM pointwise regressor trained in 8 seconds on the same ground truth data beat it by +5.7% NDCG@5k in 5-fold cross-validation.
+Then a LightGBM pointwise regressor trained in 8 seconds on the same ground truth data beat it by +5.1% NDCG@5k in 5-fold cross-validation (v2 GT with hard negatives; +6.8% on the original selection-biased v1 GT).
 
 The formula couldn't express "fts_rank matters more when age < 20 days." It was blind to metadata features (age, token count, edge count, confidence) that turned out to be the second most important signal tier. The limitation wasn't in the parameter values — it was in the functional form. But the limitation only became visible once enough labeled data existed to train a model, and that labeled data came from the tuning infrastructure the formula studies built.
 
@@ -423,7 +423,7 @@ Honest accounting of ideas that were implemented, tested, and removed.
 
 38 tuning studies optimizing a hand-designed formula: RRF fusion → UCB exploration bonus → theme boost → Hebbian PMI → PPR expansion. 14 parameters. The formula was successful — it found real structure, improved retrieval, and validated design decisions. But its functional form had a ceiling: it couldn't express interaction effects, was blind to metadata, and imposed sequential composition.
 
-A LightGBM pointwise regressor with 18 parameter-free features, trained in 8 seconds, beat the formula by +5.7% NDCG@5k. The formula code remains in `scoring.py` as fallback and for research comparison. See [The reranker](#the-reranker) for the full story.
+A LightGBM pointwise regressor with 18 parameter-free features, trained in 8 seconds, beat the formula by +5.1% NDCG@5k on v2 GT (hard negatives). The formula code remains in `scoring.py` as fallback and for research comparison. See [The reranker](#the-reranker) for the full story.
 
 The studies weren't wasted — they built the ground truth data, the evaluation infrastructure, and the understanding of signal tiers that made the reranker possible. The lesson: a well-tuned formula is the right approach until enough labeled data exists to learn the scoring function directly. Once it does, the learned approach is both better and cheaper.
 
@@ -444,6 +444,10 @@ Shadow load remains as metadata, informing dormancy decisions during sleep. It j
 Confidence (0.1–0.95) tracks how trustworthy a memory is, compounding through feedback and edge signals. Using it as a scoring multiplier was intuitive but marginal — tuning studies showed <0.1% contribution. The reason: confidence correlates with feedback (well-confirmed memories have high confidence), so multiplying by confidence mostly double-counts the feedback signal.
 
 Confidence remains as metadata, used in sleep for classification decisions and visible in diagnostics. It was removed from the scoring multiplication.
+
+### Diversity feature in pointwise reranker (removed)
+
+An MMR-style feature (`max_sim_to_higher`: max cosine similarity to any higher-ranked candidate) was tested as a reranker feature. Despite ranking #6 in feature importance, it hurt NDCG by 0.3% and Recall by 0.8%. The problem: a pointwise model can't coordinate which results to keep vs. drop. It suppresses results similar to higher-ranked candidates, but those higher-ranked candidates might also be suppressed, creating cascading errors. Diversity-aware reranking requires a listwise model, not a pointwise feature. Additionally, the O(n²) pairwise similarity computation caused a 70x latency increase (2.4s → 175s).
 
 ### Intent routing (removed)
 

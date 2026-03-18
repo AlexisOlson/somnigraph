@@ -392,11 +392,11 @@ def _compute_ppr_for_reranker(
 
     Uses the same graph walk as expand_via_ppr but returns raw scores
     without mutating any score dict. Seeds are top candidates by RRF.
+    Contradiction-flagged edges are excluded.
     """
     from memory.scoring import personalized_pagerank
     from memory.constants import (
-        RRF_K, RRF_VEC_WEIGHT, ADJACENCY_SEED_COUNT,
-        PPR_DAMPING, PPR_MIN_SCORE,
+        RRF_K, RRF_VEC_WEIGHT, PPR_DAMPING, PPR_RERANKER_SEEDS,
     )
 
     if not all_ids:
@@ -415,12 +415,11 @@ def _compute_ppr_for_reranker(
     if not base_scores:
         return {}
 
-    seed_ids = sorted(base_scores, key=base_scores.get, reverse=True)[:ADJACENCY_SEED_COUNT]
+    seed_ids = sorted(base_scores, key=base_scores.get, reverse=True)[:PPR_RERANKER_SEEDS]
     seed_set = set(seed_ids)
     seed_weights = {sid: base_scores[sid] for sid in seed_ids}
 
-    # Build 2-hop subgraph (same as expand_via_ppr but no contradiction filter needed
-    # since the reranker model learns which signals matter)
+    # Build 2-hop subgraph, excluding contradiction-flagged edges
     ph = ",".join("?" * len(seed_ids))
     hop1_rows = db.execute(f"""
         SELECT source_id, target_id, weight, flags
@@ -431,8 +430,7 @@ def _compute_ppr_for_reranker(
     hop1_neighbors = set()
     hop1_clean = []
     for edge in hop1_rows:
-        flags = edge["flags"] or ""
-        if "contradiction" in flags:
+        if edge["flags"] and "contradiction" in edge["flags"]:
             continue
         hop1_clean.append(edge)
         hop1_neighbors.add(edge["source_id"])
@@ -449,7 +447,8 @@ def _compute_ppr_for_reranker(
             WHERE source_id IN ({n_ph}) OR target_id IN ({n_ph})
         """, n_list + n_list).fetchall()
 
-    hop2_clean = [e for e in hop2_rows if "contradiction" not in (e["flags"] or "")]
+    hop2_clean = [e for e in hop2_rows
+                  if not (e["flags"] and "contradiction" in e["flags"])]
     adj: dict[str, list[tuple[str, float]]] = {}
     for edge in hop1_clean + hop2_clean:
         src, tgt = edge["source_id"], edge["target_id"]
@@ -461,9 +460,8 @@ def _compute_ppr_for_reranker(
         return {}
 
     raw_ppr = personalized_pagerank(adj, seed_weights, damping=PPR_DAMPING)
-    # Return non-seed scores above minimum threshold
     return {mid: ps for mid, ps in raw_ppr.items()
-            if mid not in seed_set and mid not in exclude_set and ps > PPR_MIN_SCORE}
+            if mid not in seed_set and mid not in exclude_set and ps > 0}
 
 
 def impl_recall(
@@ -579,14 +577,12 @@ def impl_recall(
             # Reranker path: compute raw PPR scores for features
             ppr_scores = _compute_ppr_for_reranker(db, all_ids, vec_ranked, fts_ranked, exclude_set)
 
-            # Get themes_map for feature extraction
-            themes_map = {}
-            if all_ids:
-                t_ph = ",".join("?" * len(all_ids))
-                theme_rows = db.execute(f"""
-                    SELECT id, themes FROM memories WHERE id IN ({t_ph})
-                """, list(all_ids)).fetchall()
-                themes_map = {r["id"]: r["themes"] for r in theme_rows}
+            # Get themes_map for feature extraction — all active memories,
+            # not just FTS/vec candidates, to match training-time theme scanning
+            theme_rows = db.execute(
+                "SELECT id, themes FROM memories WHERE status = 'active'"
+            ).fetchall()
+            themes_map = {r["id"]: r["themes"] for r in theme_rows}
 
             # Extract features and predict
             features, candidate_ids = extract_live_features(

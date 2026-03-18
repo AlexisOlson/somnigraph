@@ -323,8 +323,8 @@ These are raw values, not EWMA-smoothed. The formula used EWMA with a tunable al
 
 Both the formula and the reranker are evaluated on the same data with the same metrics:
 
-- **NDCG@5k:** Token-budget-aware NDCG. Candidates are packed greedily into a 5000-token budget; ideal DCG uses the same budget constraint.
-- **Graded Recall@5k:** Fraction of GT memories (relevance ≥ 0.5) surfaced within the token budget.
+- **NDCG@5k:** Token-budget-aware NDCG. Candidates are packed greedily into a 5000-token budget; ideal DCG uses the same budget constraint. This is the primary comparison metric.
+- **Graded Recall@5k:** Relevance-weighted recall. For each query, count N relevant memories (GT ≥ 0.5) in the budget, then score: sum(GT scores of those N) / sum(top-N GT scores). A ranker that finds the N most relevant memories scores 1.0, even when more relevant memories exist than the budget holds. *(Revised March 2026 — the original metric used total relevant count as denominator, which penalized rankers when GT had more relevant memories than the budget could hold. See § GT v2.)*
 
 Evaluation is always out-of-fold: the model predicts on held-out queries, never on training data. The formula gets the same query set for a fair comparison.
 
@@ -335,6 +335,83 @@ Dropping all three feedback features (fb_last, fb_mean, fb_count) costs 0.0004 R
 ### Live scoring
 
 Feature extraction during `impl_recall()` must produce identical features to training-time extraction. The key challenge: training extracts features from cached, precomputed search results; live scoring computes them on-the-fly. The `reranker.py` module handles this, using the same raw signals (ranks, PPR scores, feedback sequences, metadata) from live database queries.
+
+### Feature parity verification (March 2026)
+
+Comparing live feature extraction (`reranker.py`) against training-time extraction (`train_reranker.py` / `tune_gt.py`) revealed six mismatches. All were fixed to ensure live scoring produces identical features to training:
+
+| Feature | Training path | Live path (before) | Fix |
+|---------|--------------|-------------------|-----|
+| PPR seed k-values | Asymmetric K_FTS=8.002, K_VEC=6.845 | Symmetric RRF_K=6 | Both → symmetric RRF_K |
+| PPR seed count | 30 | 5 | Both → 30 (PPR_RERANKER_SEEDS) |
+| Theme scan scope | All active memories | FTS/vec candidates only | Both → all active |
+| Theme case matching | Raw themes vs lowered query | Both lowered | Both → both lowered |
+| PPR contradiction edges | Included | Excluded | Both → excluded |
+| PPR score threshold | All > 0 | Only > PPR_MIN_SCORE (0.007) | Both → all > 0 |
+
+Retraining with corrected features improved NDCG from +5.7% to +6.8% on v1 GT (500 queries) — the mismatches were actively hurting live performance.
+
+### GT v2: hard negatives and selection bias
+
+GT v1 (`gt_calibrated.json`, 500 queries) derives relevance labels from historical retrievals — only memories the system already surfaced get judged. GT v2 (`gt_v2.json`, 337+ queries in progress) judges the full candidate pool per query, including memories the system never retrieved.
+
+The difference is stark:
+
+| Metric | v1 GT | v2 GT (337q) |
+|--------|-------|-------------|
+| Candidates judged / query | 26.6 | 52.3 |
+| Relevant memories / query (mean) | 2.9 | 10.2 |
+| Relevant memories / query (max) | 19 | 146 |
+| Queries with >25 relevant | 0% | 8.6% |
+| Formula NDCG@5k | 0.74 | 0.73 |
+
+NDCG is stable across GT versions (0.74 → 0.73), confirming that ranking quality is unchanged — v2 is a harder test set, not evidence of a regression.
+
+The original Recall@5k metric (fraction of all relevant memories in the budget) dropped from 0.89 to 0.55 on v2, but this was a metric defect: it penalized the ranker for there being more relevant memories than the budget could hold. The metric was revised to relevance-weighted recall (see § Comparison infrastructure). With the corrected metric, both formula and reranker score ~0.96 — when the system finds relevant memories, it finds the best ones. The metric has near-zero discriminative power between scoring methods because GT relevance scores cluster tightly (std=0.156 on the 0.5–1.0 range).
+
+**Implication:** NDCG is the primary comparison metric. Relevance-weighted recall is a useful sanity check (confirms the system selects high-quality results) but can't differentiate scoring methods at the current GT score resolution.
+
+### Improvement experiments
+
+#### LambdaRank: negative result
+
+**Hypothesis:** Training LGBMRanker with `lambdarank` objective (optimizes NDCG directly) should outperform pointwise MSE regressor.
+
+**Result:** Pointwise wins on both GT sets.
+
+| Model | GT | NDCG@5k | vs Formula |
+|-------|-----|---------|------------|
+| Pointwise | v1 (500q, selection-biased) | 0.8097 | +6.8% |
+| LambdaRank | v1 | 0.7937 | +5.2% |
+| Pointwise | v2 (337q, hard negatives) | 0.7831 | +5.1% |
+| LambdaRank | v2 | 0.7701 | +3.8% |
+
+The v1→v2 NDCG drop (0.81→0.78) reflects v2's harder evaluation, not a regression. v2 is the honest number.
+
+The gap is consistent: pointwise outperforms by 1.3–1.6 NDCG points across both GT sets. Three likely explanations:
+
+1. **Data volume.** Pointwise trains on the full candidate pool (222k samples). LambdaRank trains on GT-only candidates + 2x random negatives (52k samples). More data outweighs a better objective.
+2. **Label discretization.** LambdaRank bins continuous relevance into quantile levels, losing granularity the regressor preserves.
+3. **The pointwise objective is already good enough.** At this data scale, accurate relevance prediction produces good rankings. The listwise ordering benefit is marginal.
+
+The `--lambdarank` flag remains in `train_reranker.py` for future experimentation if more GT data changes the balance.
+
+#### Diversity feature (max_sim_to_higher): negative result
+
+**Hypothesis:** An MMR-style diversity signal — for each candidate, the maximum cosine similarity to any higher-ranked candidate — would help the reranker avoid redundant results.
+
+**Result:** High feature importance (rank #6 of 19 by gain), but hurts NDCG.
+
+| Model | v2 NDCG@5k |
+|-------|-----------|
+| Pointwise (18 features) | 0.7847 |
+| Pointwise + max_sim_to_higher | 0.7821 (−0.3%) |
+
+The model uses the feature heavily but learns the wrong thing: it penalizes results similar to higher-ranked candidates, but in a pointwise model there's no coordination about which results are actually selected. Suppressing a relevant memory because it's similar to *another relevant memory that might also be suppressed* creates cascading errors. This is the fundamental mismatch between a listwise signal (diversity) and a pointwise model (independent predictions).
+
+The feature also has practical costs: 175s extraction time (vs 2.4s without) due to O(n²) pairwise similarity on ~750 candidates with 1536-dim vectors. Even if it helped ranking, the 70x latency penalty would be prohibitive for live scoring.
+
+**Takeaway:** Diversity-aware reranking requires a listwise model that coordinates selections, not a pointwise feature hack. This is a genuine architectural limitation, not a tuning problem.
 
 ---
 

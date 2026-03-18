@@ -75,7 +75,8 @@ MAX_EXPANSION_TOTAL = 20       # Absolute cap on new neighbors
 # PPR expansion (replaces adjacency BFS) — Phase 17, wm19 (906 trials, 4D)
 PPR_DAMPING = 0.775            # wm19. Was 0.5. Higher = more graph walk, less teleport.
 PPR_BOOST_COEFF = 2.0          # wm19. Was 0.33. At search ceiling — true optimum may be higher.
-PPR_MIN_SCORE = 0.007          # wm19. Was 0.001. Stricter filter reduces noise.
+PPR_MIN_SCORE = 0.007          # wm19. Was 0.001. Stricter filter reduces noise. (Formula path only.)
+PPR_RERANKER_SEEDS = 30        # Reranker uses more seeds than the formula path for better graph coverage.
 PPR_MAX_ITER = 50              # convergence limit (not tuned)
 PPR_CONVERGENCE_TOL = 1e-6     # early stopping (not tuned)
 
