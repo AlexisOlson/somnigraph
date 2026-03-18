@@ -56,6 +56,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | Title | File | Summary |
 |-------|------|---------|
 | [AI Smartness](https://github.com/VzKtS/ai-smartness) | ai-smartness.md | Rust-based multi-agent memory with SQLite, gossip propagation, and Claude Code hook integration. |
+| [Aurora](https://github.com/hamr0/aurora) | aurora.md | Code intelligence tool with ACT-R cognitive architecture, type-specific decay, chunk-type-aware hybrid retrieval (BM25 + ACT-R + semantic), and friction analysis. |
 | [Athena](https://github.com/winstonkoh87/Athena-Public) | athena.md | MCP server with Supabase/pgvector, Gemini embeddings, hybrid RAG with cross-encoder reranking. |
 | [Claude Cognitive](https://github.com/GMaN1911/claude-cognitive) | claude-cognitive.md | Attention-based context router injecting docs into Claude Code's system prompt via hooks. |
 | [Claude Total Memory](https://github.com/vbcherepanov/claude-total-memory) | claude-total-memory.md | Single-file MCP server with SQLite/FTS5 + optional ChromaDB and session transcript extraction. |
@@ -65,16 +66,19 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Daem0n-MCP](https://github.com/DasBluEyedDevil/Daem0n-MCP) | daem0n.md | Async MCP memory/decision system with Qdrant vectors, Leiden community detection, and E2B sandboxing. |
 | [Ember MCP](https://github.com/Arkya-AI/ember-mcp) | ember-mcp.md | Async MCP server using FAISS vectors with Voronoi cell spatial partitioning. |
 | [Empirica](https://github.com/Nubaeon/empirica) | empirica.md | Epistemic middleware with git-notes storage, optional Qdrant vectors, and calibration tracking. |
-| [Engram](https://github.com/vthunder/engram) | engram.md | Go HTTP API with PostgreSQL/pgvector implementing multi-system cognitive memory with consolidation and decay. |
+| [Engram](https://github.com/Harshitk-cp/engram) | engram.md | Go HTTP API with PostgreSQL/pgvector implementing multi-system cognitive memory with consolidation and decay. |
 | [Graphiti](https://github.com/getzep/graphiti) | graphiti.md | Zep's production temporal knowledge graph with multi-backend support (Neo4j, FalkorDB, Kuzu, Neptune). |
 | [Hexis](https://github.com/QuixiAI/Hexis) | hexis.md | PostgreSQL-native cognitive architecture with pgvector, Apache AGE graph, autonomous heartbeat with energy budget, drives, identity/worldview system. |
 | [GraphRAG](https://github.com/microsoft/graphrag) | graphrag.md | Microsoft's knowledge graph pipeline with LLM-driven entity extraction and Leiden community detection. |
 | [Hindsight (repo)](https://github.com/vectorize-io/hindsight) | hindsight.md | FastAPI + PostgreSQL/pgvector with four-strategy parallel recall and RRF fusion. |
+| [Letta (MemGPT)](https://github.com/letta-ai/letta) | letta.md | OS-inspired virtual context management with agent-as-memory-manager, three-tier hierarchy (core blocks/recall/archival), sleeptime agents, git-backed versioning. ~21k stars. |
 | [MemCP](https://github.com/maydali28/memcp) | memcp.md | FastMCP server with MAGMA 4-graph model in SQLite and named context chunking. |
+| [memv](https://github.com/vstorm-co/memv) | memv.md | SQLite + sqlite-vec temporal memory library with bi-temporal validity, predict-calibrate extraction, supersession chains, and episode segmentation. |
 | [Mengram](https://github.com/alibaizhanov/mengram) | mengram.md | Dual-mode memory with Tulving-inspired three-type separation and knowledge graph traversal. |
 | [memsearch](https://github.com/zilliztech/memsearch) | memsearch.md | Milvus-backed MCP server with markdown source of truth and watchdog file monitoring. |
 | [MSAM](https://github.com/jadenschwab/msam) | msam.md | REST API server with four cognitive streams, ACT-R activation scoring, and sleep consolidation. |
 | [Neuroca](https://github.com/Modern-Prometheus-AI/Neuroca) | neuroca.md | Multi-tiered memory (STM/MTM/LTM) with biological inspiration; alpha status, predominantly AI-generated. |
+| [OmniMemory](https://github.com/OmniNode-ai/omnimemory) | omnimemory.md | Enterprise multi-backend memory subsystem (Qdrant + Memgraph + PostgreSQL + Valkey) with ONEX 4-node architecture, lifecycle state machine, PII detection, and intent event sourcing. |
 | [OpenClaw Memory](https://github.com/gavdalf/openclaw-memory) | openclaw.md | Pure Bash/shell memory using markdown logs, LLM-driven consolidation via cron, and inotify watching. |
 | [Ori-Mnemos](https://github.com/aayoawoyemi/Ori-Mnemos) | ori-mnemos.md | TypeScript MCP server with markdown vault files as memory, wiki-link graph edges, and ACT-R decay. |
 | [PLTM-Claude](https://github.com/Alby2007/PLTM-Claude) | pltm-claude.md | MCP server with four-type cognitive memory, prediction book, and confabulation logging. |

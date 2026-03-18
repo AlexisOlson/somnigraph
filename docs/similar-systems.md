@@ -22,6 +22,10 @@ AI memory systems cluster into three approaches:
 
 **Stream-based**: Append observations to a memory stream, retrieve by a scoring function over recency/importance/relevance. Generative Agents is the exemplar. Simple, but no consolidation and no forgetting.
 
+**Agent-managed**: Give the LLM agent direct control over its own memory hierarchy, with tools to read, write, and edit memory at multiple tiers. Letta (MemGPT) is the exemplar. Flexible and agent-driven, but memory quality depends on the agent's meta-cognitive judgment — which is unreliable for long-term decisions.
+
+**Temporal-first**: Extract facts from conversations with bi-temporal validity (event time + transaction time), supersede rather than overwrite on contradiction. memv is the clearest implementation. Clean temporal reasoning, but no offline consolidation and retrieval is basic.
+
 Somnigraph doesn't fit neatly into any of these. It stores discrete memories (like extract-and-store), builds a graph of relationships between them (like graph-based), and shapes retrieval through a feedback loop (unlike any of them). The sleep pipeline adds offline consolidation that none of the others attempt at this level.
 
 ---
@@ -172,6 +176,68 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What we took**: The triplet embedding concept influenced our edge `linking_context` + `linking_embedding` design. Usage frequency as a signal for edge weighting.
 
+### OmniMemory
+
+**What it is**: An enterprise memory subsystem for the OmniNode multi-agent platform. Built on the ONEX 4-node architecture (EFFECT/COMPUTE/REDUCER/ORCHESTRATOR), with five storage backends: Qdrant (vectors), Memgraph (graph), PostgreSQL (state), Valkey (cache), and filesystem (archive). All operations typed through strict Pydantic models with zero `Any` types.
+
+**What it does well**:
+- Lifecycle state machine with five states (ACTIVE → STALE → EXPIRED → ARCHIVED → DELETED). The STALE intermediate is the most interesting: memories past their soft TTL are flagged but still accessible, allowing graceful degradation rather than binary alive/dead transitions.
+- Optimistic concurrency for lifecycle transitions. A `lifecycle_revision` counter with CAS-style updates prevents concurrent agents from corrupting state. Well-established pattern, cleanly implemented.
+- Frozen (immutable) models at subsystem boundaries prevent mutation bugs that plague distributed systems where objects are passed by reference through multiple layers.
+- Integrated PII detection in the write path — regex-based scanning for 7 PII types (email, phone, SSN, credit card, IP, API keys, password hashes) with <10ms overhead. Not NER-grade, but having any PII filtering is ahead of most memory systems.
+- Intent event sourcing: first-class support for storing and querying intent classifications from Kafka, linking memory to agent decision-making.
+
+**Where it falls short**:
+- No feedback loop. Scoring is a fixed composition of similarity, BM25, recency, and graph proximity. Nothing learns from retrieval outcomes.
+- No consolidation. REDUCER nodes are scaffolded but not implemented. No question-driven summarization, no merge/archive decisions, no contradiction detection.
+- No enriched embeddings. Raw content embedded directly — no metadata concatenation into the vector space.
+- BFS for graph traversal (HippoRAG demonstrated PPR is superior for variable-depth multi-hop).
+- Heavy infrastructure: Docker Compose with 6 services. Justified for enterprise multi-agent deployments, but a high floor for adoption.
+
+**What's interesting for us**: The STALE intermediate state could complement somnigraph's continuous EWMA decay — a memory decayed below threshold but not yet consolidated could be flagged for sleep review. The PII detection pattern is a responsible addition for a public repo. Frozen boundary models could catch mutation bugs in sleep pipeline chains. The optimistic concurrency pattern would matter if somnigraph ever supported concurrent agent recalls.
+
+### Letta (MemGPT)
+
+**What it is**: A platform for building stateful AI agents, originating from the 2023 paper "MemGPT: Towards LLMs as Operating Systems" (Packer et al., arXiv:2310.08560). The core insight is treating the LLM context window like virtual memory: the agent manages its own memory hierarchy, paging information between fast in-context storage and slower external storage. Apache-2.0, ~21k stars, actively maintained with 100+ database migrations.
+
+**What it does well**:
+- The agent-as-memory-manager paradigm is genuinely influential. The LLM decides when and how to move information between three tiers: core memory (editable text blocks pinned in the system prompt), recall memory (searchable conversation history), and archival memory (long-term passage store). No external system decides what to remember.
+- Rich memory editing tools. Core blocks support append, find-and-replace, line-insert, full rewrite (`memory_rethink`), and unified diff patches. This reflects real iteration on what agents need.
+- Git-backed memory versioning (`BlockManagerGit`) with commit history, author attribution, and point-in-time retrieval. Every edit is attributable and reversible.
+- Sleeptime agents: background agents that review conversation history between turns and update shared memory blocks. Same agent loop for background processing and foreground use — architecturally elegant.
+- Shared memory blocks across agents via junction table. When one agent updates a shared block, all agents sharing it see the change.
+
+**Where it falls short**:
+- Archival retrieval is surprisingly basic — vector-only cosine similarity with no fusion, no learned ranking, no feedback loop. For a system that stores all long-term knowledge in archival passages, this is the weakest point.
+- No decay or forgetting. Memories accumulate indefinitely. No system-level lifecycle management.
+- No contradiction detection. Old content is simply overwritten when the agent edits core blocks.
+- No offline consolidation. Sleeptime agents are online (between turns), not batch. They're an LLM reading recent conversation and updating blocks — shallow compared to multi-phase consolidation with classification, summarization, and maintenance.
+- No evaluation framework in the open-source repo. No ground-truth, no retrieval metrics, no A/B infrastructure.
+- Agent memory decisions are unreliable. Agents over-store trivial information and under-store important context. The fundamental promise — that the agent will manage its own memory well — depends on meta-cognitive capability that current LLMs don't reliably have.
+
+**What's interesting for us**: The "pinned memory block" concept (editable always-in-context text) addresses layered memory from a different angle than importance scoring — a qualitatively different tier for always-relevant information. Block checkpointing for memory provenance (who changed what, when, with undo) could improve auditability of sleep consolidation edits. The variety of editing operations suggests a lightweight `update_memory()` tool could complement `remember()`.
+
+### memv
+
+**What it is**: A temporal memory library for AI agents (MIT, v0.1.0, Python 3.13+). SQLite + sqlite-vec + FTS5. Synthesizes ideas from Nemori (predict-calibrate extraction), Graphiti (bi-temporal validity), and SimpleMem (write-time temporal normalization). The claim that "no single competitor has all four" core features is credible based on our corpus.
+
+**What it does well**:
+- Strongest bi-temporal model in the corpus. Dual timelines: event time (`valid_at`/`invalid_at` — when the fact was true) and transaction time (`created_at`/`expired_at` — when the system learned it). Facts are never deleted on contradiction; they're expired and linked to their successor via `superseded_by`. Point-in-time queries on both axes.
+- Predict-calibrate extraction faithfully implements the Nemori/Hindsight approach: predict what the conversation should contain given existing knowledge, then extract only the gaps. Importance emerges from prediction error, not explicit scoring.
+- Extraction-source discipline: extraction works from raw messages (ground truth), not from LLM-generated episode narratives. Prevents hallucination propagation into the knowledge base.
+- Write-time temporal normalization: relative dates ("last week") resolved to absolute timestamps at extraction time. Accounts for a major class of temporal reasoning failures.
+- Episode segmentation groups conversations into topic-coherent units before extraction, providing context for the predict-calibrate loop.
+
+**Where it falls short**:
+- No retrieval learning or feedback. Static RRF with fixed k=60, no mechanism to learn from retrieval outcomes.
+- No offline processing. Knowledge stays exactly as extracted — no consolidation, no decay, no relationship discovery, no maintenance.
+- No graph structure. The planned `extends` relationship (v0.2.0) addresses parent-child facts only.
+- LLM-expensive write path: 3-5 LLM calls per conversation turn (segmentation, episode generation, prediction, extraction). Somnigraph's write path is zero LLM calls; LLM work happens during offline sleep.
+- v0.1.0 maturity. Acknowledged missing features; the "Not doing (yet)" list is longer than the "Completed" list.
+- Benchmark claims unvalidated. LongMemEval harness built but not run.
+
+**What's interesting for us**: The `superseded_by` field for explicit contradiction chains — a schema migration that would make Somnigraph's contradiction handling traversable. An `at_time` parameter on `recall()` for point-in-time queries — Somnigraph has the temporal fields but doesn't expose them through the API. The extraction-source discipline principle — worth auditing whether any sleep consolidation steps extract from LLM-generated content rather than originals. Write-time temporal normalization for `remember()` or during sleep.
+
 ---
 
 ## What we borrowed
@@ -208,7 +274,7 @@ A summary of borrowed ideas, attributed to their source:
 
 **Scale.** HippoRAG and GraphRAG are designed for thousands of documents and millions of tokens. Somnigraph is tested at ~700 memories. The novelty-scored expansion, the feedback loop, the sleep pipeline — these are all validated at personal scale. Whether they work at 10x or 100x is unknown.
 
-**Temporal reasoning.** Zep's bi-temporal model with four timestamps per edge is more rigorous than Somnigraph's two-field (valid_from/valid_until) approach. Somnigraph doesn't track when the system learned a fact vs. when the fact was true in the world, which limits certain temporal queries.
+**Temporal reasoning.** memv has the strongest bi-temporal model in the corpus — dual timelines (event time vs. transaction time) with explicit `superseded_by` chains and point-in-time queries. Zep's four-timestamp model on edges is also more rigorous than Somnigraph's two-field (valid_from/valid_until) approach. Somnigraph doesn't track when the system learned a fact vs. when the fact was true in the world, which limits certain temporal queries.
 
 ---
 
@@ -218,15 +284,15 @@ These problems are unsolved across all systems we surveyed:
 
 ### Contradiction detection
 
-Every system either ignores contradictions or handles them poorly. Mem0 hard-deletes the old fact. Zep invalidates edges but requires extraction to detect the conflict. HippoRAG and GraphRAG don't detect contradictions at all. Generative Agents stores conflicting facts without awareness.
+Most systems either ignore contradictions or handle them poorly. Mem0 hard-deletes the old fact. Zep invalidates edges but requires extraction to detect the conflict. HippoRAG, GraphRAG, and Letta don't detect contradictions at all. Generative Agents stores conflicting facts without awareness. memv handles contradictions well at extraction time (predict-calibrate surfaces them, `superseded_by` chains preserve history) but cannot detect transitive contradictions (a child fact surviving when its parent is superseded). Engram has the most sophisticated approach: five-level graded tension classification (hard/temporal/contextual/soft/none) with distinct behaviors per level.
 
 Benchmark performance across all systems: 0.025–0.037 F1 on contradiction detection tasks. This isn't a tuning problem — it's a representation problem. Detecting that "we use REST" and "we migrated to GraphQL" are about the same claim requires understanding what a "claim" is, which current systems don't model.
 
 ### Write-path quality
 
-All systems accept whatever they're given. Mem0's InformationContent() gating is the closest to write-path quality control, but it only prevents destructive updates — it doesn't evaluate whether a new memory is worth storing.
+Most systems accept whatever they're given. Mem0's InformationContent() gating is the closest to write-path quality control, but it only prevents destructive updates — it doesn't evaluate whether a new memory is worth storing. memv's predict-calibrate extraction is the notable exception: by predicting what a conversation should contain and extracting only the gaps, it filters at write time rather than relying on post-hoc consolidation. This is the most principled write-path quality approach in the corpus.
 
-The result: every system accumulates low-value memories over time. Consolidation (where it exists) can clean up afterward, but preventing low-quality writes in the first place would be more efficient.
+The result for most systems: low-value memories accumulate over time. Consolidation (where it exists) can clean up afterward, but preventing low-quality writes in the first place would be more efficient.
 
 ### Consolidation evaluation
 
@@ -238,7 +304,7 @@ Building a consolidation benchmark requires: a memory store with known quality i
 
 Most memories lack temporal anchors beyond their creation timestamp. "We decided to use Postgres last month" — when is "last month"? If the memory was stored immediately, creation time works. If it was stored days later during a recap, creation time is wrong.
 
-Zep's bi-temporal model is the most thoughtful approach, but even it requires accurate extraction of temporal references from conversation — which is an unsolved NLP problem for casual temporal expressions.
+memv makes the strongest attempt: write-time temporal normalization resolves relative dates to absolute timestamps at extraction time, and the bi-temporal model with `superseded_by` chains creates explicit fact-evolution histories. Zep's bi-temporal model on edges is also thoughtful. But even these require accurate extraction of temporal references from conversation — which remains hard for casual temporal expressions.
 
 ---
 
