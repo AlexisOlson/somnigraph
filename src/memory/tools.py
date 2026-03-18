@@ -1474,3 +1474,318 @@ def impl_memory_stats() -> str:
     result = compute_stats(db)
     db.close()
     return result
+
+
+# ---------------------------------------------------------------------------
+# Sleep MCP tools
+# ---------------------------------------------------------------------------
+
+
+def impl_sleep_gather(mode: str = "standard") -> str:
+    """Gather memories needing sleep processing and their related memories.
+
+    Returns JSON with fast-path pairs (no LLM needed) and classify pairs
+    (need LLM classification).
+    """
+    from memory.graph import _find_related_memories, _check_fast_path
+
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Last sleep timestamp (for reporting)
+    last_sleep_row = db.execute(
+        "SELECT completed_at FROM sleep_log ORDER BY completed_at DESC LIMIT 1"
+    ).fetchone()
+    last_sleep = last_sleep_row["completed_at"] if last_sleep_row else None
+
+    # Fetch memories to process
+    if mode == "deep":
+        memories = db.execute(
+            "SELECT * FROM memories WHERE status = 'active' ORDER BY created_at DESC"
+        ).fetchall()
+    else:
+        memories = db.execute(
+            "SELECT * FROM memories WHERE status = 'active' "
+            "AND last_sleep_processed IS NULL "
+            "ORDER BY created_at DESC",
+        ).fetchall()
+
+    if not memories:
+        db.close()
+        return json.dumps({"status": "nothing_to_process", "last_sleep": last_sleep})
+
+    # For each memory, find related and sort into fast-path vs classify
+    fast_path_pairs = []
+    classify_pairs = []
+    processed_ids = []
+    pair_index = 0
+
+    for mem in memories:
+        processed_ids.append(mem["id"])
+        related = _find_related_memories(db, mem["id"], mem["content"], limit=5)
+
+        if not related:
+            continue
+
+        fast_target = _check_fast_path(db, mem, related)
+        if fast_target:
+            fast_path_pairs.append({
+                "source_id": mem["id"],
+                "target_id": fast_target,
+                "note": "Schema-consistent (fast path)",
+            })
+            continue
+
+        # Full pipeline: top 3 related memories become classify pairs
+        themes = json.loads(mem["themes"]) if mem["themes"] else []
+        for rel in related[:3]:
+            rel_row = rel["row"]
+            rel_themes = json.loads(rel_row["themes"]) if rel_row["themes"] else []
+            classify_pairs.append({
+                "pair_index": pair_index,
+                "source_id": mem["id"],
+                "source_content": mem["content"],
+                "source_category": mem["category"],
+                "source_themes": ", ".join(themes),
+                "source_date": mem["created_at"][:10],
+                "source_source": mem["source"] or "session",
+                "target_id": rel_row["id"],
+                "target_content": rel_row["content"],
+                "target_category": rel_row["category"],
+                "target_themes": ", ".join(rel_themes),
+                "target_date": rel_row["created_at"][:10],
+                "target_source": rel_row["source"] or "session",
+            })
+            pair_index += 1
+
+    db.close()
+
+    return json.dumps({
+        "status": "ready",
+        "last_sleep": last_sleep,
+        "memories_count": len(memories),
+        "processed_ids": processed_ids,
+        "fast_path_pairs": fast_path_pairs,
+        "classify_pairs": classify_pairs,
+    })
+
+
+def impl_sleep_write_results(results_json: str, processed_ids_json: str = "[]") -> str:
+    """Write classification results as edges and handle side effects.
+
+    Accepts JSON array of {source_id, target_id, edge_type, confidence, note}.
+    Applies: edge creation, temporal evolution, reinforcement caps, priority boosts.
+    """
+    from memory.graph import (
+        _create_edge, _handle_temporal_evolution, _source_confidence_modifier,
+    )
+
+    try:
+        results = json.loads(results_json)
+    except (json.JSONDecodeError, TypeError):
+        return json.dumps({"error": "Invalid results_json"})
+
+    try:
+        processed_ids = json.loads(processed_ids_json)
+    except (json.JSONDecodeError, TypeError):
+        processed_ids = []
+
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+
+    edges_created = 0
+    priority_boosts = 0
+    contradictions_flagged = 0
+    temporal_evolutions = 0
+    per_memory_changes = {}
+
+    valid_edge_types = {
+        "none", "supports", "hard_contradiction", "soft_contradiction",
+        "contextual", "temporal_evolution", "related", "evolved_from",
+    }
+
+    for result in results:
+        edge_type = result.get("edge_type", "none")
+        if edge_type not in valid_edge_types:
+            edge_type = "related"
+
+        source_id = result.get("source_id", "")
+        target_id = result.get("target_id", "")
+        confidence = float(result.get("confidence", 0.5))
+        note = result.get("note", "")
+
+        if not source_id or not target_id:
+            continue
+
+        if edge_type in ("none", "related"):
+            continue
+
+        source_mem = db.execute(
+            "SELECT * FROM memories WHERE id = ?", (source_id,)
+        ).fetchone()
+        target_mem = db.execute(
+            "SELECT * FROM memories WHERE id = ?", (target_id,)
+        ).fetchone()
+
+        if not source_mem or not target_mem:
+            continue
+
+        source_modifier = _source_confidence_modifier(source_mem["source"])
+        weighted_confidence = confidence * source_modifier
+
+        if weighted_confidence < 0.3:
+            continue
+
+        for mid in (source_id, target_id):
+            if mid not in per_memory_changes:
+                per_memory_changes[mid] = {"priority_boost": 0, "edges_added": 0}
+
+        target_changes = per_memory_changes[target_id]
+        source_changes = per_memory_changes[source_id]
+
+        if target_changes["edges_added"] >= MAX_EDGES_PER_CYCLE:
+            continue
+        if source_changes["edges_added"] >= MAX_EDGES_PER_CYCLE:
+            continue
+
+        # Temporal evolution
+        if edge_type == "temporal_evolution":
+            if source_mem["created_at"] <= target_mem["created_at"]:
+                existing, newer = source_mem, target_mem
+            else:
+                existing, newer = target_mem, source_mem
+
+            _handle_temporal_evolution(db, existing, newer, note)
+            temporal_evolutions += 1
+            target_changes["edges_added"] += 1
+            source_changes["edges_added"] += 1
+            edges_created += 1
+            continue
+
+        # Map classification to flags
+        edge_flags = []
+        if edge_type in ("hard_contradiction", "soft_contradiction"):
+            edge_flags = ["contradiction"]
+        elif edge_type in ("temporal_evolution", "evolved_from"):
+            edge_flags = ["revision"]
+
+        edge_id = _create_edge(
+            db, source_id, target_id,
+            linking_context=note,
+            flags=edge_flags if edge_flags else None,
+            created_by="sleep",
+            edge_type=edge_type,
+            note=note,
+        )
+        if edge_id:
+            edges_created += 1
+            target_changes["edges_added"] += 1
+            source_changes["edges_added"] += 1
+
+            # Priority boost for "supports" edges
+            if edge_type == "supports" and target_changes["priority_boost"] < MAX_PRIORITY_BOOST_PER_CYCLE:
+                current_priority = target_mem["base_priority"]
+                if current_priority < 10:
+                    boost = min(1, MAX_PRIORITY_BOOST_PER_CYCLE - target_changes["priority_boost"])
+                    new_priority = min(10, current_priority + boost)
+                    if new_priority > current_priority:
+                        db.execute(
+                            "UPDATE memories SET base_priority = ? WHERE id = ?",
+                            (new_priority, target_id),
+                        )
+                        target_changes["priority_boost"] += boost
+                        priority_boosts += 1
+
+            # Confidence boost on both memories for support edges
+            if edge_type == "supports":
+                for mid in (source_id, target_id):
+                    db.execute(
+                        """UPDATE memories SET confidence = MIN(0.95,
+                           COALESCE(confidence, 0.5) + 0.03 * (1.0 - COALESCE(confidence, 0.5)))
+                           WHERE id = ?""",
+                        (mid,))
+
+            # Track contradictions
+            if edge_type in ("hard_contradiction", "soft_contradiction"):
+                contradictions_flagged += 1
+                penalty = 0.10 if edge_type == "hard_contradiction" else 0.05
+                older_id = source_id if source_mem["created_at"] <= target_mem["created_at"] else target_id
+                db.execute(
+                    "UPDATE memories SET confidence = MAX(0.1, COALESCE(confidence, 0.5) - ?) WHERE id = ?",
+                    (penalty, older_id))
+
+    # Mark all processed memories
+    for mid in processed_ids:
+        db.execute(
+            "UPDATE memories SET last_sleep_processed = ? WHERE id = ?",
+            (now, mid),
+        )
+
+    # Batch-embed linking contexts for edges without embeddings
+    edges_to_embed = db.execute(
+        "SELECT id, linking_context FROM memory_edges "
+        "WHERE linking_context IS NOT NULL AND linking_context != '' "
+        "AND linking_embedding IS NULL"
+    ).fetchall()
+    if edges_to_embed:
+        try:
+            texts = [e["linking_context"] for e in edges_to_embed]
+            embeddings = embed_batch(texts)
+            for edge_row, emb in zip(edges_to_embed, embeddings):
+                db.execute(
+                    "UPDATE memory_edges SET linking_embedding = ? WHERE id = ?",
+                    (serialize_f32(emb), edge_row["id"]),
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger("claude-memory").warning(f"Failed to batch-embed edge contexts: {e}")
+
+    db.commit()
+    db.close()
+
+    return json.dumps({
+        "edges_created": edges_created,
+        "priority_boosts": priority_boosts,
+        "contradictions_flagged": contradictions_flagged,
+        "temporal_evolutions": temporal_evolutions,
+        "per_memory_changes": per_memory_changes,
+    })
+
+
+def impl_sleep_log_cycle(mode: str, report: str, stats_json: str = "{}") -> str:
+    """Write a sleep cycle to the sleep_log table for audit trail."""
+    try:
+        stats = json.loads(stats_json)
+    except (json.JSONDecodeError, TypeError):
+        stats = {}
+
+    db = get_db()
+    log_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    db.execute(
+        """INSERT INTO sleep_log
+           (id, started_at, completed_at, mode, memories_processed,
+            relationships_found, summaries_refreshed, contradictions_flagged,
+            fast_path_count, full_pipeline_count, per_memory_changes, report)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            log_id,
+            stats.get("started_at", now),
+            now,
+            mode,
+            stats.get("memories_processed", 0),
+            stats.get("relationships_found", 0),
+            stats.get("summaries_refreshed", 0),
+            stats.get("contradictions_flagged", 0),
+            stats.get("fast_path_count", 0),
+            stats.get("full_pipeline_count", 0),
+            json.dumps(stats.get("per_memory_changes", [])),
+            report,
+        ),
+    )
+
+    db.commit()
+    db.close()
+
+    return json.dumps({"log_id": log_id, "completed_at": now})

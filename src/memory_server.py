@@ -6,10 +6,11 @@
 Somnigraph Memory MCP Server — persistent memory with hybrid search.
 
 MCP wiring layer — tool decorators delegate to memory/ package modules.
-11 tools: startup_load, remember, recall, recall_feedback, link, forget,
-  reflect, review_pending, consolidate, reembed_all, memory_stats
+14 tools: startup_load, remember, recall, recall_feedback, link, forget,
+  reflect, review_pending, consolidate, reembed_all, memory_stats,
+  sleep_gather, sleep_write_results, sleep_log_cycle
 
-Stack: SQLite + sqlite-vec (vector KNN) + FTS5 (keyword) + OpenAI embeddings API
+Stack: SQLite + sqlite-vec (vector KNN) + FTS5 (keyword) + configurable embeddings (OpenAI or fastembed)
 Transport: stdio (spawned by Claude Code)
 Database: ~/.somnigraph/memory.db (override with SOMNIGRAPH_DATA_DIR)
 """
@@ -39,6 +40,9 @@ from memory.tools import (  # noqa: E402
     impl_consolidate,
     impl_reembed_all,
     impl_memory_stats,
+    impl_sleep_gather,
+    impl_sleep_write_results,
+    impl_sleep_log_cycle,
 )
 from memory.reranker import load_model as _load_reranker  # noqa: E402
 
@@ -273,6 +277,51 @@ def memory_stats() -> str:
     """Diagnostic overview of the memory store. Returns counts, access stats,
     decay distribution, and token budget without loading memory content."""
     return impl_memory_stats()
+
+
+# ---------------------------------------------------------------------------
+# Sleep tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def sleep_gather(mode: str = "standard") -> str:
+    """Gather memories needing sleep processing and their related memories.
+
+    Returns JSON with fast-path pairs (no LLM needed) and classify pairs
+    (need LLM classification). The sleep skill dispatches classify pairs to
+    Sonnet subagents in batches.
+
+    Args:
+        mode: 'standard' (since last sleep) or 'deep' (all active memories).
+    """
+    return impl_sleep_gather(mode)
+
+
+@mcp.tool()
+def sleep_write_results(results_json: str, processed_ids_json: str = "[]") -> str:
+    """Write classification results as edges and handle side effects.
+
+    Accepts JSON array of classification results and applies them:
+    edge creation, temporal evolution, reinforcement caps, priority boosts.
+
+    Args:
+        results_json: JSON array of {source_id, target_id, edge_type, confidence, note}.
+        processed_ids_json: JSON array of memory IDs to mark as sleep-processed.
+    """
+    return impl_sleep_write_results(results_json, processed_ids_json)
+
+
+@mcp.tool()
+def sleep_log_cycle(mode: str, report: str, stats_json: str = "{}") -> str:
+    """Write a sleep cycle to the sleep_log table for audit trail.
+
+    Args:
+        mode: 'standard' or 'deep'.
+        report: The full sleep report text.
+        stats_json: JSON with cycle statistics (memories_processed, relationships_found, etc.).
+    """
+    return impl_sleep_log_cycle(mode, report, stats_json)
 
 
 # ---------------------------------------------------------------------------
