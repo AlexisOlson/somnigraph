@@ -323,6 +323,7 @@ What we can't measure yet and would need to build.
 - **Sleep ablation framework.** Can't isolate which sleep step (NREM edges, REM summaries, consolidation archival) helps or hurts. Need: per-step before/after measurement.
 - **Event log analysis toolkit.** 249K events, no query tools beyond raw SQL. Need: utilities for common queries ("which memories are never retrieved?", "feedback distribution by category", "retrieval latency percentiles").
 - **Regression test suite.** Changing `scoring.py` has no automated quality check. Need: lightweight metric validation on a fixed query set, runnable as a pre-commit check.
+- **Snippet and prompt eval loop.** The CLAUDE.md snippet (Tier 1 instructions) and sleep pipeline prompts (NREM/REM) are tested manually. Anthropic's [Skill Creator](https://github.com/anthropics/skills) provides an agentic eval loop (executor/grader/comparator/analyzer agents, train/test split, iterative refinement) that could automate this. Write eval cases like "does a fresh Claude using only the snippet correctly call recall() with dual-input?" or "does NREM correctly classify this memory pair as contradicting?" and iterate prompts to 100% pass rate. Discovered via r/aimemory (u/m3umax uses 36 eval tests for their memory system instructions).
 
 ---
 

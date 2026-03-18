@@ -276,6 +276,75 @@ def extract_queries(db: sqlite3.Connection) -> list[dict]:
     return queries
 
 
+def dedup_queries(
+    queries: list[dict],
+    threshold: float = 0.75,
+) -> list[dict]:
+    """Deduplicate near-identical keyword queries using containment similarity.
+
+    Queries like "corrections calibration patterns gotchas working preferences memory"
+    and "corrections calibration patterns gotchas working preferences claudie" are
+    superset variants of a shared core. They retrieve nearly identical candidate sets,
+    so judging both is redundant.
+
+    Uses asymmetric containment: if the smaller token set is >= threshold contained
+    in the larger, they cluster together. This catches superset variants that Jaccard
+    misses (e.g., 6 shared tokens + 3 unique = Jaccard 0.67, but containment 1.0).
+
+    Keeps the highest-count representative from each cluster.
+    """
+    if not queries:
+        return queries
+
+    # Precompute token sets
+    tokenized = [(q, set(q["query"].lower().split())) for q in queries]
+
+    # Greedy clustering: assign each query to the first cluster it matches
+    clusters: list[list[dict]] = []
+    cluster_tokens: list[set[str]] = []
+
+    for q, tokens in tokenized:
+        if not tokens:
+            clusters.append([q])
+            cluster_tokens.append(tokens)
+            continue
+
+        matched = False
+        for ci, ct in enumerate(cluster_tokens):
+            if not ct:
+                continue
+            smaller = min(len(tokens), len(ct))
+            if smaller == 0:
+                continue
+            intersection = len(tokens & ct)
+            # Containment: fraction of the smaller set that overlaps
+            containment = intersection / smaller
+            if containment >= threshold:
+                clusters[ci].append(q)
+                matched = True
+                break
+
+        if not matched:
+            clusters.append([q])
+            cluster_tokens.append(tokens)
+
+    # Pick representative: highest retrieval count per cluster
+    representatives = []
+    removed = 0
+    for cluster in clusters:
+        cluster.sort(key=lambda q: q["count"], reverse=True)
+        representatives.append(cluster[0])
+        removed += len(cluster) - 1
+
+    representatives.sort(key=lambda q: q["count"], reverse=True)
+
+    if removed > 0:
+        print(f"Query dedup: {len(queries)} -> {len(representatives)} "
+              f"({removed} near-duplicates removed, containment >= {threshold})")
+
+    return representatives
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build unbiased ground truth for memory eval")
     parser.add_argument("--budget", type=int, default=100,
@@ -296,11 +365,18 @@ def main():
                         help="Start from this query index (0-based, sorted by retrieval count desc)")
     parser.add_argument("--export-candidates", type=str, default="",
                         help="Export candidate sets to JSON (no LLM calls). For offline judging.")
+    parser.add_argument("--no-dedup", action="store_true",
+                        help="Skip query deduplication (judge all unique query strings)")
+    parser.add_argument("--dedup-threshold", type=float, default=0.75,
+                        help="Containment similarity threshold for query dedup (default: 0.75)")
     args = parser.parse_args()
 
     db = get_db()
     queries = extract_queries(db)
     print(f"Found {len(queries)} unique queries")
+
+    if not args.no_dedup:
+        queries = dedup_queries(queries, threshold=args.dedup_threshold)
 
     # --- Export candidates mode ---
     if args.export_candidates:
