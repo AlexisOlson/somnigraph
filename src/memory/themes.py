@@ -101,10 +101,17 @@ def add_theme_mapping(from_theme: str, to_theme: str):
 # ---------------------------------------------------------------------------
 
 
+def _auto_hyphenate(theme: str) -> str:
+    """Convert underscores/spaces to hyphens (the canonical separator)."""
+    if "_" in theme or " " in theme:
+        return theme.replace("_", "-").replace(" ", "-")
+    return theme
+
+
 def normalize_themes(themes_list: list[str], content: str = "") -> list[str]:
     """Normalize variant themes to canonical forms. Optionally auto-expand from content. Deduplicates."""
     mappings = _get_all_mappings()
-    result = [mappings.get(t, t) for t in themes_list]
+    result = [mappings.get(t, _auto_hyphenate(t)) for t in themes_list]
 
     # Content-aware auto-expansion
     if content:
