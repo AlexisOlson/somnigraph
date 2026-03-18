@@ -1,6 +1,6 @@
 # Similar Systems
 
-An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (63 sources), see `research/sources/index.md`.
+An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (68 sources), see `research/sources/index.md`.
 
 ## Contents
 
@@ -25,6 +25,8 @@ AI memory systems cluster into three approaches:
 **Agent-managed**: Give the LLM agent direct control over its own memory hierarchy, with tools to read, write, and edit memory at multiple tiers. Letta (MemGPT) is the exemplar. Flexible and agent-driven, but memory quality depends on the agent's meta-cognitive judgment — which is unreliable for long-term decisions.
 
 **Temporal-first**: Extract facts from conversations with bi-temporal validity (event time + transaction time), supersede rather than overwrite on contradiction. memv is the clearest implementation. Clean temporal reasoning, but no offline consolidation and retrieval is basic.
+
+**Platform-first**: Build a unified memory + toolkit layer that multiple AI agents can share, with integrations across dozens of apps as the differentiator. RedPlanet CORE is the exemplar. Broad but shallow on memory quality — retrieval doesn't learn from use.
 
 Somnigraph doesn't fit neatly into any of these. It stores discrete memories (like extract-and-store), builds a graph of relationships between them (like graph-based), and shapes retrieval through a feedback loop (unlike any of them). The sleep pipeline adds offline consolidation that none of the others attempt at this level.
 
@@ -217,6 +219,28 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What's interesting for us**: The "pinned memory block" concept (editable always-in-context text) addresses layered memory from a different angle than importance scoring — a qualitatively different tier for always-relevant information. Block checkpointing for memory provenance (who changed what, when, with undo) could improve auditability of sleep consolidation edits. The variety of editing operations suggests a lightweight `update_memory()` tool could complement `remember()`.
 
+### RedPlanet CORE
+
+**What it is**: A self-hosted digital brain platform that gives AI agents (Claude Code, Cursor, local LLMs) persistent memory and unified toolkit access across 50+ apps. Neo4j knowledge graph + PostgreSQL + pluggable vector stores (pgvector/Qdrant/Turbopuffer). TypeScript monorepo.
+
+**What it does well**:
+- Four-node graph model (Episode → Statement → Entity, with CompactedSession for consolidation) provides genuine structured knowledge representation. Statements are SPO triples with typed entities, enabling queries like "what does person X know about topic Y" that flat memory stores can't express.
+- 12 statement aspects split into Graph (identity, relationship, event, decision, knowledge, problem, task) and Voice (directive, preference, habit, belief, goal). The Voice/Graph duality is the interesting part: decomposed triples for structured queries, complete undecomposed statements for preserving user intent. Somnigraph's 5 categories are coarser.
+- Entity deduplication via `mergeEntities()` + name-based dedup is practical and functional. More useful than AriGraph's exact-match (our Phase 14 negative result), less sophisticated than Graphiti's two-pass (deterministic + LLM).
+- Temporal validity on statements (`validAt`/`invalidAt`/`invalidatedBy`) with explicit contradiction detection via `findContradictoryStatements()`. Binary (valid/invalid) but traversable.
+- Multi-strategy retrieval (BM25, semantic, aspect-based, entity lookup, temporal, relationship traversal, BFS graph, faceted navigation) covers a wide surface area.
+- Claims 88.24% accuracy on LoCoMo — the highest reported score in our corpus if validated.
+
+**Where it falls short**:
+- No feedback loop. `recallCount` tracks access frequency but doesn't reshape scoring. This is the critical gap — the system doesn't learn which retrievals are useful.
+- No decay. No time-based forgetting, no dormancy detection. Old facts persist equally.
+- Session compaction is lossy replacement — agents see summaries, never originals. No relationship detection or contradiction classification during consolidation. No summary maintenance or multi-layer hierarchy.
+- BFS for graph traversal (HippoRAG demonstrated PPR is superior).
+- Binary contradiction handling — no graded classification (hard/soft/temporal/contextual), no tension detection.
+- Heavy infrastructure: Neo4j + PostgreSQL + vector DB + Trigger.dev + WebSocket.
+
+**What's interesting for us**: The Voice/Graph aspect duality could enrich Somnigraph's category system — storing directives and preferences as complete statements while decomposing factual memories into structured triples. The entity dedup approach (mergeEntities) directly informs our gap item #13 (lightweight entity resolution). The `invalidatedBy` field creating traversable contradiction chains is worth combining with memv's `superseded_by` concept for a stronger temporal evolution schema.
+
 ### memv
 
 **What it is**: A temporal memory library for AI agents (MIT, v0.1.0, Python 3.13+). SQLite + sqlite-vec + FTS5. Synthesizes ideas from Nemori (predict-calibrate extraction), Graphiti (bi-temporal validity), and SimpleMem (write-time temporal normalization). The claim that "no single competitor has all four" core features is credible based on our corpus.
@@ -270,7 +294,7 @@ A summary of borrowed ideas, attributed to their source:
 
 **Real-time graph construction.** Zep/Graphiti and Cognee extract entities and relationships in real-time during conversations. Somnigraph's graph is built primarily during sleep (offline), which means new memories don't immediately benefit from graph structure. For multi-hop queries about recently-stored information, this is a real disadvantage.
 
-**Entity resolution.** Graphiti's two-pass entity resolution (deterministic pre-filter + LLM) is more sophisticated than anything in Somnigraph, which has no entity resolution at all. "The database," "Postgres," and "our persistence layer" are separate concepts unless a human or sleep cycle links them.
+**Entity resolution.** Graphiti's two-pass entity resolution (deterministic pre-filter + LLM) is the most sophisticated. CORE's `mergeEntities()` + name dedup is simpler but functional. Somnigraph has no entity resolution at all. "The database," "Postgres," and "our persistence layer" are separate concepts unless a human or sleep cycle links them.
 
 **Scale.** HippoRAG and GraphRAG are designed for thousands of documents and millions of tokens. Somnigraph is tested at ~700 memories. The novelty-scored expansion, the feedback loop, the sleep pipeline — these are all validated at personal scale. Whether they work at 10x or 100x is unknown.
 
@@ -308,4 +332,4 @@ memv makes the strongest attempt: write-time temporal normalization resolves rel
 
 ---
 
-*For the full research corpus of 63 source analyses, see `research/sources/`. Each analysis extracts architecture, key claims with evidence, relevance to this project, and ideas worth borrowing.*
+*For the full research corpus of 68 source analyses, see `research/sources/`. Each analysis extracts architecture, key claims with evidence, relevance to this project, and ideas worth borrowing.*

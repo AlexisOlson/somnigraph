@@ -79,6 +79,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [MSAM](https://github.com/jadenschwab/msam) | msam.md | REST API server with four cognitive streams, ACT-R activation scoring, and sleep consolidation. |
 | [Neuroca](https://github.com/Modern-Prometheus-AI/Neuroca) | neuroca.md | Multi-tiered memory (STM/MTM/LTM) with biological inspiration; alpha status, predominantly AI-generated. |
 | [OmniMemory](https://github.com/OmniNode-ai/omnimemory) | omnimemory.md | Enterprise multi-backend memory subsystem (Qdrant + Memgraph + PostgreSQL + Valkey) with ONEX 4-node architecture, lifecycle state machine, PII detection, and intent event sourcing. |
+| [RedPlanet CORE](https://github.com/RedPlanetHQ/core) | redplanet-core.md | Self-hosted digital brain platform with Neo4j knowledge graph (4-node model: episodes, statements, entities, compacted sessions), 12 statement aspects (Voice/Graph split), 200+ app integrations, 88.24% claimed LoCoMo accuracy. |
 | [OpenClaw Memory](https://github.com/gavdalf/openclaw-memory) | openclaw.md | Pure Bash/shell memory using markdown logs, LLM-driven consolidation via cron, and inotify watching. |
 | [Ori-Mnemos](https://github.com/aayoawoyemi/Ori-Mnemos) | ori-mnemos.md | TypeScript MCP server with markdown vault files as memory, wiki-link graph edges, and ACT-R decay. |
 | [PLTM-Claude](https://github.com/Alby2007/PLTM-Claude) | pltm-claude.md | MCP server with four-type cognitive memory, prediction book, and confabulation logging. |

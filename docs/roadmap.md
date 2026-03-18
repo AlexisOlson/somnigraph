@@ -6,7 +6,7 @@ What we've learned, what's still open, and what's worth pursuing next. Read alon
 
 ## What we learned
 
-Seven findings from 63 source analyses and 20+ tuning studies that would change your first decisions if you were building a memory system from scratch.
+Seven findings from 68 source analyses and 20+ tuning studies that would change your first decisions if you were building a memory system from scratch.
 
 ### 1. Feedback is the system
 
