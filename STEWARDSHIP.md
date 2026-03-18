@@ -40,7 +40,17 @@ This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet
 
 *Move this back up when*: real users surface snippet gaps, or a system change invalidates the current docs.
 
-### 4. ~~Migration completion~~ *Self-terminated*
+### 4. End-to-end LoCoMo QA benchmark
+
+Port RedPlanet CORE's LoCoMo evaluation harness to Python and run against Somnigraph. CORE claims 85% end-to-end QA accuracy; our current LoCoMo number (R@10 = 67.3%) measures retrieval recall only — different metric, not comparable. This bridges the gap: same benchmark, same metric, apples-to-apples comparison.
+
+**What to build:** Python adapter with three steps: (1) ingestion feeding LoCoMo dialog turns into `remember()`, (2) QA pipeline doing `recall()` → LLM generate → LLM judge, (3) optional sleep pass between ingestion and evaluation. Run with/without sleep and with/without feedback loop to isolate contributions. See `docs/roadmap.md` § Comparative benchmarking for full analysis of CORE's harness and implementation notes.
+
+**Why now:** The reranker and scoring pipeline are stable enough to benchmark. This is the first opportunity to put a number next to another system on a shared benchmark — and to measure whether the feedback loop and sleep consolidation actually help on standardized QA, not just our internal GT.
+
+*Move this down when*: initial benchmark run is complete and results are documented, regardless of outcome. Move up if external interest in comparative numbers increases.
+
+### 5. ~~Migration completion~~ *Self-terminated*
 
 All phases complete. Packaging verified (wheel includes memory_server.py). This priority is done.
 

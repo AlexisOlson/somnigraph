@@ -279,7 +279,16 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ### Proposed benchmarking experiments
 
-- **LoCoMo eval** with somnigraph's retrieval pipeline, for apples-to-apples comparison with Mem0's reported numbers. Effort: 1–2 sessions.
+- **LoCoMo end-to-end QA eval.** Port RedPlanet CORE's benchmark harness ([RedPlanetHQ/core-benchmark](https://github.com/RedPlanetHQ/core-benchmark)) to Python and run against Somnigraph. Their pipeline: ingest LoCoMo conversations → search memory → LLM generates answer → LLM judges CORRECT/WRONG. CORE claims 85% overall (88.24% in README, 85% in benchmark repo — discrepancy unexplained). Key implementation notes from analyzing their harness:
+  - GPT-4.1 for both answer generation and evaluation (generous prompt: "as long as it touches on the same topic")
+  - Category 5 (adversarial) skipped entirely
+  - Default retrieval limit=20, returns episodes + facts with validAt timestamps
+  - Code as shipped only runs conversation 1 (`if (i === 0)` guard in both ingest and eval loops) — they presumably ran all 10 manually
+  - Heuristic fallback (30% word overlap) if LLM judge fails
+  - Our existing LoCoMo benchmark measures retrieval recall (R@10 = 67.3%); this measures end-to-end QA accuracy — different metric, not directly comparable
+  - **Somnigraph advantages to test:** feedback loop (run a first pass, feed back scores, re-run), hybrid RRF vs their multi-strategy routing, sleep consolidation between ingestion and evaluation
+  - **Build:** Python adapter with three steps: (1) ingestion script feeding LoCoMo turns into `remember()`, (2) QA script doing `recall()` → generate → judge, (3) optional sleep pass between ingestion and evaluation to measure consolidation impact
+  - Effort: 2–3 sessions. Run with and without sleep, with and without feedback loop, to isolate contributions.
 - **Contradiction detection rate** on the real corpus: manually annotate ~50 known contradictions, measure NREM's detection rate. Effort: 1 session.
 - **Latency profiling:** p50/p95/p99 for `recall()` at current corpus size. Effort: trivial (instrument one session).
 
