@@ -693,25 +693,15 @@ def write_results(db, results: list[dict], processed_ids: list[str],
     if embedded_count:
         log(f"  Embedded {embedded_count} edge linking contexts")
 
-    # Mark memories as sleep-processed:
-    # - Memories not in classify_memory_ids had no pairs to classify — legitimately done
-    # - Memories in classify_memory_ids are only stamped if they had successful edges
-    # This prevents failed classifications from permanently skipping memories
-    if classify_memory_ids is None:
-        classify_memory_ids = set()
+    # Mark all gathered memories as sleep-processed. A memory that entered
+    # classification but produced no edges was still *attempted* — stamping it
+    # prevents a permanent retry loop where the same memory is picked up every
+    # run and fails classification the same way each time.
     for mid in processed_ids:
-        if mid in classify_memory_ids:
-            if mid in successfully_processed:
-                db.execute(
-                    "UPDATE memories SET last_sleep_processed = ? WHERE id = ?",
-                    (now, mid),
-                )
-        else:
-            # No pairs to classify — legitimately processed
-            db.execute(
-                "UPDATE memories SET last_sleep_processed = ? WHERE id = ?",
-                (now, mid),
-            )
+        db.execute(
+            "UPDATE memories SET last_sleep_processed = ? WHERE id = ?",
+            (now, mid),
+        )
 
     db.commit()
 
