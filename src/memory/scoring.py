@@ -11,10 +11,10 @@ from datetime import datetime, timedelta, timezone
 
 from memory.constants import (
     RRF_K, RRF_VEC_WEIGHT, UCB_COEFF,
+    K_FTS, K_VEC, W_THEME, K_THEME, EWMA_ALPHA,
     HEBBIAN_COEFF, HEBBIAN_CAP, HEBBIAN_MIN_JOINT,
     ADJACENCY_BASE_BOOST, ADJACENCY_NOVELTY_FLOOR,
     CONTEXT_RELEVANCE_THRESHOLD,
-    THEME_BOOST,
     ADJACENCY_SEED_COUNT, MAX_NEIGHBORS_PER_SEED, MAX_EXPANSION_TOTAL,
     PPR_DAMPING, PPR_BOOST_COEFF, PPR_MIN_SCORE, PPR_MAX_ITER, PPR_CONVERGENCE_TOL,
 )
@@ -91,8 +91,9 @@ def rrf_fuse(
     fts_ranked: dict[str, int],
     all_ids: set[str],
     boost_themes_list: list[str],
+    theme_ranked: dict[str, int] | None = None,
 ) -> tuple[dict[str, float], dict, dict]:
-    """RRF fusion + feedback boost + theme boost.
+    """RRF fusion with per-channel k, theme channel, UCB exploration.
 
     Returns (rrf_scores, feedback_map, themes_map).
     """
@@ -110,7 +111,6 @@ def rrf_fuse(
               AND event_type = 'feedback'
             ORDER BY created_at ASC
         """, id_list).fetchall()
-        _EWMA_ALPHA = 0.3
         for r in fb_rows:
             mid_fb = r["memory_id"]
             try:
@@ -122,7 +122,7 @@ def rrf_fuse(
                 feedback_map[mid_fb] = {"count": 0, "ewma": utility}
             else:
                 prev = feedback_map[mid_fb]["ewma"]
-                feedback_map[mid_fb]["ewma"] = _EWMA_ALPHA * utility + (1 - _EWMA_ALPHA) * prev
+                feedback_map[mid_fb]["ewma"] = EWMA_ALPHA * utility + (1 - EWMA_ALPHA) * prev
             feedback_map[mid_fb]["count"] += 1
 
         # Themes
@@ -138,40 +138,26 @@ def rrf_fuse(
     for mid in all_ids:
         score = 0.0
         if mid in vec_ranked:
-            score += RRF_VEC_WEIGHT / (RRF_K + vec_ranked[mid] + 1)
+            score += RRF_VEC_WEIGHT / (K_VEC + vec_ranked[mid] + 1)
         if mid in fts_ranked:
-            score += (1.0 - RRF_VEC_WEIGHT) / (RRF_K + fts_ranked[mid] + 1)
+            score += (1.0 - RRF_VEC_WEIGHT) / (K_FTS + fts_ranked[mid] + 1)
+        if theme_ranked is not None and mid in theme_ranked:
+            score += W_THEME / (K_THEME + theme_ranked[mid] + 1)
 
         # UCB exploration bonus (replaces feedback boost)
-        # Memories with few observations get benefit of the doubt (high uncertainty).
-        # Memories with many observations have tight bounds (low uncertainty).
-        # This breaks the feedback loop: boost shrinks with evidence, not grows.
         a = prior_mean * prior_strength
         b = (1 - prior_mean) * prior_strength
         if mid in feedback_map:
             fb = feedback_map[mid]
-            # Effective sample size of EWMA — honest about how much information
-            # the recency-weighted average actually carries.
-            ess = min(fb["count"], 1.0 / (2 * _EWMA_ALPHA - _EWMA_ALPHA ** 2))
+            ess = min(fb["count"], 1.0 / (2 * EWMA_ALPHA - EWMA_ALPHA ** 2))
             a_post = fb["ewma"] * ess + a
             b_post = (1 - fb["ewma"]) * ess + b
         else:
-            # No feedback — maximum uncertainty (prior only)
             a_post = a
             b_post = b
         ab = a_post + b_post
         posterior_var = (a_post * b_post) / (ab * ab * (ab + 1))
         score *= (1 + UCB_COEFF * math.sqrt(posterior_var))
-
-        # Theme boost (multiplicative)
-        if boost_themes_list and mid in themes_map and themes_map[mid]:
-            try:
-                mem_themes = set(json.loads(themes_map[mid]))
-                overlap = len(mem_themes & set(boost_themes_list))
-                if overlap:
-                    score *= (1 + THEME_BOOST * overlap)
-            except (json.JSONDecodeError, TypeError):
-                pass
 
         rrf_scores[mid] = score
 

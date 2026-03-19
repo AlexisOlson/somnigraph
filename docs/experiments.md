@@ -373,28 +373,27 @@ The original Recall@5k metric (fraction of all relevant memories in the budget) 
 
 ### Improvement experiments
 
-#### LambdaRank: negative result
+#### LambdaRank: negative result, then parity
 
 **Hypothesis:** Training LGBMRanker with `lambdarank` objective (optimizes NDCG directly) should outperform pointwise MSE regressor.
 
-**Result:** Pointwise wins on both GT sets.
+**Initial result (2026-03-17):** Pointwise wins by 1.3-1.6pp on both GT sets. LambdaRank trained on GT-only candidates + 2x random negatives with ~5 coarse quantile bins.
+
+**Revised result (2026-03-19):** Two fixes brought LambdaRank to parity:
+
+1. **Full candidate pool.** `--neg-ratio 0` feeds the same ~460k samples to LambdaRank that pointwise uses. The GT-only + random negatives pattern was cargo-culted from IR literature where features aren't precomputed for all candidates -- but `train_reranker.py` already has them.
+2. **Fine-grained labels.** `--lr-levels 100` uses direct scaling (`round(utility * 100)`) instead of quantile binning. 100 discrete levels preserve nearly all continuous signal.
 
 | Model | GT | NDCG@5k | vs Formula |
 |-------|-----|---------|------------|
-| Pointwise | v1 (500q, selection-biased) | 0.8097 | +6.8% |
-| LambdaRank | v1 | 0.7937 | +5.2% |
-| Pointwise | v2 (337q, hard negatives) | 0.7831 | +5.1% |
-| LambdaRank | v2 | 0.7701 | +3.8% |
+| Pointwise | v2+v3 merged (849q) | 0.7997 | +6.29pp |
+| LambdaRank (full pool, 100 levels) | v2 (500q) | 0.8099 | +6.99pp |
+| Two-stage (MSE -> LambdaRank) | v2 (500q) | 0.8119 | +7.18pp |
+| Pointwise | v2 (500q) | 0.8127 | +7.26pp |
 
-The v1→v2 NDCG drop (0.81→0.78) reflects v2's harder evaluation, not a regression. v2 is the honest number.
+On matched 500q data, all three converge to ~0.81 NDCG. The 849q number (0.7997) is lower because v3 queries are harder (recall drops from 0.9936 to 0.9533).
 
-The gap is consistent: pointwise outperforms by 1.3–1.6 NDCG points across both GT sets. Three likely explanations:
-
-1. **Data volume.** Pointwise trains on the full candidate pool (222k samples). LambdaRank trains on GT-only candidates + 2x random negatives (52k samples). More data outweighs a better objective.
-2. **Label discretization.** LambdaRank bins continuous relevance into quantile levels, losing granularity the regressor preserves.
-3. **The pointwise objective is already good enough.** At this data scale, accurate relevance prediction produces good rankings. The listwise ordering benefit is marginal.
-
-The `--lambdarank` flag remains in `train_reranker.py` for future experimentation if more GT data changes the balance.
+**Conclusion:** At 500-849 queries, the objective function doesn't differentiate. The signal is in the features, not the loss. Pointwise wins by simplicity and remains the production model.
 
 #### Diversity feature (max_sim_to_higher): negative result
 

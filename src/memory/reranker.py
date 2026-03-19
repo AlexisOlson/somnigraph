@@ -208,7 +208,12 @@ def rerank(model_dict: dict, features: np.ndarray, candidate_ids: list[str]) -> 
     Returns dict[memory_id, predicted_score] sorted by score descending.
     """
     model = model_dict["model"]
-    preds = model.predict(features)
+    # Use booster directly to avoid sklearn wrapper's feature-name validation
+    # (the training script saves numpy arrays, but sklearn expects DataFrames)
+    try:
+        preds = model.booster_.predict(features)
+    except (AttributeError, TypeError):
+        preds = model.predict(features)
     # Clip for regressor (ranker scores are unbounded but ordering is what matters)
     if hasattr(model, '_objective_type') and 'regression' in str(getattr(model, '_objective_type', '')):
         preds = np.clip(preds, 0, 1)

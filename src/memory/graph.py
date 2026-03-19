@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from memory.constants import RRF_K, RRF_VEC_WEIGHT
+from memory.constants import RRF_K, RRF_VEC_WEIGHT, BM25_SUMMARY_WT, BM25_THEMES_WT
 from memory.fts import sanitize_fts_query
 from memory.vectors import serialize_f32
 
@@ -71,7 +71,7 @@ def _find_related_memories(
     fts_query = sanitize_fts_query(content[:200])
     try:
         fts_results = db.execute(
-            "SELECT rowid, bm25(memory_fts, 5.0, 3.0) as rank FROM memory_fts "
+            f"SELECT rowid, bm25(memory_fts, {BM25_SUMMARY_WT}, {BM25_THEMES_WT}) as rank FROM memory_fts "
             "WHERE memory_fts MATCH ? ORDER BY rank LIMIT ?",
             (fts_query, limit * 3),
         ).fetchall()

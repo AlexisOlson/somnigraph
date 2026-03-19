@@ -10,6 +10,7 @@ from memory.constants import (
     DATA_DIR,
     DEDUP_THRESHOLD, PENDING_STALE_DAYS, CATEGORY_DECAY_RATES,
     DEFAULT_DECAY_RATE, RRF_K,
+    BM25_SUMMARY_WT, BM25_THEMES_WT,
     MAX_EDGES_PER_CYCLE, MAX_PRIORITY_BOOST_PER_CYCLE,
     CO_UTILITY_THRESHOLD, BRIDGE_THEME_THRESHOLD, BRIDGE_TERM_MIN_LEN,
     DISAPPOINTED_RECALL_MAX_UTIL, DISAPPOINTED_RETRIEVAL_SCORE,
@@ -237,7 +238,7 @@ def impl_remember(
             summary = _strip_sensitive(summary)
 
         # Validate category
-        valid_categories = {"episodic", "semantic", "procedural", "reflection", "meta"}
+        valid_categories = {"episodic", "semantic", "procedural", "reflection", "meta", "entity"}
         if category not in valid_categories:
             return f"Invalid category '{category}'. Must be one of: {', '.join(sorted(valid_categories))}"
 
@@ -535,8 +536,8 @@ def impl_recall(
         fts_query = sanitize_fts_query(query)
         try:
             fts_results = db.execute(
-                """
-                SELECT rowid, bm25(memory_fts, 5.0, 3.0) as rank FROM memory_fts
+                f"""
+                SELECT rowid, bm25(memory_fts, {BM25_SUMMARY_WT}, {BM25_THEMES_WT}) as rank FROM memory_fts
                 WHERE memory_fts MATCH ?
                 ORDER BY rank
                 LIMIT ?
@@ -556,8 +557,33 @@ def impl_recall(
             # FTS query syntax error — fall back to vector-only
             pass
 
+        # --- Theme channel: rank active memories by theme overlap with query ---
+        query_tokens = set(query.lower().split())
+        theme_ranked: dict[str, int] = {}
+        if query_tokens:
+            theme_rows_all = db.execute(
+                "SELECT id, themes FROM memories WHERE status = 'active' AND themes IS NOT NULL AND themes != '[]'"
+            ).fetchall()
+            theme_overlaps = []
+            for r in theme_rows_all:
+                try:
+                    mem_themes = set(json.loads(r["themes"])) if r["themes"] else set()
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                # Lowercase theme tokens for matching
+                mem_theme_tokens = set()
+                for t in mem_themes:
+                    mem_theme_tokens.update(str(t).lower().replace("-", " ").split())
+                overlap = len(query_tokens & mem_theme_tokens)
+                if overlap > 0:
+                    theme_overlaps.append((r["id"], overlap))
+            # Sort descending by overlap, assign ranks
+            theme_overlaps.sort(key=lambda x: x[1], reverse=True)
+            for rank, (mid, _) in enumerate(theme_overlaps):
+                theme_ranked[mid] = rank
+
         # --- Candidate pool ---
-        all_ids = set(vec_ranked.keys()) | set(fts_ranked.keys())
+        all_ids = set(vec_ranked.keys()) | set(fts_ranked.keys()) | set(theme_ranked.keys())
 
         # Filter out non-active memories early
         if all_ids:
@@ -597,9 +623,10 @@ def impl_recall(
             sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
             top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
         else:
-            # Formula path (existing)
+            # Formula path
             rrf_scores, feedback_map, themes_map = rrf_fuse(
-                db, vec_ranked, fts_ranked, all_ids, boost_themes_list)
+                db, vec_ranked, fts_ranked, all_ids, boost_themes_list,
+                theme_ranked=theme_ranked)
             apply_hebbian(db, rrf_scores)
             expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit = expand_via_ppr(
                 db, rrf_scores, query_embedding, query, exclude_set)
@@ -792,7 +819,7 @@ def impl_recall_feedback(
         # Signal enrichment for parameter tuning
         event_context["confidence_before"] = round(mem["confidence"] if mem["confidence"] is not None else 0.5, 4)
 
-        _last_accessed = mem["last_accessed"] or ""
+        _last_accessed = mem["last_accessed"] or mem.get("created_at", "")
         if _last_accessed:
             try:
                 _la = datetime.fromisoformat(_last_accessed)

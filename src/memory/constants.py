@@ -1,7 +1,7 @@
 """Tuning constants for the memory system.
 
 Organized in three tiers:
-- Core: wm1 study validated (RRF, feedback, adjacency, Hebbian)
+- Core: wm38 study (2026-03-16), 500q GT, blended ratio=0.5
 - Secondary: Tuned occasionally (decay rates, shadow, confidence)
 - Fixed: Structural (embedding model, thresholds, sleep limits)
 """
@@ -20,19 +20,27 @@ DATA_DIR = Path(os.environ.get("SOMNIGRAPH_DATA_DIR",
 MODEL_PATH = DATA_DIR / "tuning_studies" / "reranker_model.pkl"
 
 # ---------------------------------------------------------------------------
-# Core — wm15 study (2026-03-09), NSGA-II dual AUC+MRR, 500 trials, k=6 fixed
+# Core — wm38 study (2026-03-16), 500q GT, blended ratio=0.5, tight refinement
 # ---------------------------------------------------------------------------
 
-RRF_K = 6                    # wm13 best. Confirmed across wm12 (6D) and wm13 (4D). Was 14 (wm9).
-RRF_VEC_WEIGHT = 0.5        # Weight for vector vs keyword: score = w*vec + (1-w)*kw. 0.5 = equal (baseline).
-FEEDBACK_COEFF = 0.0         # Deprecated — replaced by UCB exploration bonus. Was 5.15 (wm9).
-UCB_COEFF = 1.0              # Exploration bonus: score *= (1 + UCB_COEFF * sqrt(posterior_var)). Tune this.
-ADJACENCY_BASE_BOOST = 0.33  # wm9: flat landscape, restored original. Was 0.93 (wm7).
-ADJACENCY_NOVELTY_FLOOR = 0.67  # wm9 bootstrap mean. Was 0.05 (wm7).
-HEBBIAN_COEFF = 3.0          # wm9 bootstrap mean (rounded). Was 1.06 (wm7).
-HEBBIAN_CAP = 0.21           # wm15 Pareto #4. Was 0.07 (wm9). Old "degrades above 0.1" was wrong at k=6.
+RRF_K = 6                    # wm13 best. Legacy — used as PPR seed k. Scoring uses K_FTS/K_VEC.
+K_FTS = 8.002                # wm38. Was 6.593 (wm37). 12D tight, +79bp blended.
+K_VEC = 6.845                # wm38. Was 5.637 (wm37).
+RRF_VEC_WEIGHT = 0.505       # wm38. Was 0.532 (wm37).
+FEEDBACK_COEFF = 0.0         # Deprecated — replaced by UCB exploration bonus. Was 2.15 (wm27).
+UCB_COEFF = 0.840            # wm38. Was 0.805 (wm37).
+ADJACENCY_BASE_BOOST = 0.33  # DEPRECATED by PPR.
+ADJACENCY_NOVELTY_FLOOR = 0.67  # DEPRECATED by PPR.
+HEBBIAN_COEFF = 0.001746     # wm36. 2D NDCG tune, top-10 cluster 0.00174±0.00004. Was 0.0016 (wm35).
+HEBBIAN_CAP = 0.275          # wm38. Was 0.285 (wm37).
 HEBBIAN_MIN_JOINT = 2        # min co-retrieval count before PMI contributes
-CONTEXT_RELEVANCE_THRESHOLD = 0.5  # wm9: flat landscape, kept. Min cos(query, linking_emb) for edge to fire.
+CONTEXT_RELEVANCE_THRESHOLD = 0.5  # DEPRECATED by PPR.
+
+W_THEME = 0.116              # wm38. Was 0.087 (wm37). Theme channel weight.
+K_THEME = 4.924              # wm38. Was 3.327 (wm37). Softer theme fusion.
+EWMA_ALPHA = 0.431           # wm38. Was 0.375 (wm37). More recency in feedback.
+BM25_SUMMARY_WT = 13.278     # wm38. Was 15.033 (wm37). Less summary dominance.
+BM25_THEMES_WT = 5.731       # wm38. Was 6.337 (wm37).
 
 # ---------------------------------------------------------------------------
 # Secondary — tune occasionally
@@ -41,6 +49,7 @@ CONTEXT_RELEVANCE_THRESHOLD = 0.5  # wm9: flat landscape, kept. Min cos(query, l
 # Per-category decay rates: decay_rate = ln(2) / half_life_days
 # Higher = faster decay. 0 = timeless. NULL = use category default.
 CATEGORY_DECAY_RATES = {
+    "entity":      0.0,     # timeless — refreshed during sleep, not decayed
     "meta":        0.004,   # ~173 day half-life — foundational, rarely changes
     "reflection":  0.006,   # ~116 day half-life — insights age slowly
     "semantic":    0.008,   # ~87 day half-life  — anchored near current 90d global
@@ -72,16 +81,16 @@ ADJACENCY_SEED_COUNT = 5       # Top-scoring memories to expand from
 MAX_NEIGHBORS_PER_SEED = 5     # Max neighbors per seed (legacy adjacency only)
 MAX_EXPANSION_TOTAL = 20       # Absolute cap on new neighbors
 
-# PPR expansion (replaces adjacency BFS) — Phase 17, wm19 (906 trials, 4D)
-PPR_DAMPING = 0.775            # wm19. Was 0.5. Higher = more graph walk, less teleport.
-PPR_BOOST_COEFF = 2.0          # wm19. Was 0.33. At search ceiling — true optimum may be higher.
-PPR_MIN_SCORE = 0.007          # wm19. Was 0.001. Stricter filter reduces noise. (Formula path only.)
+# PPR expansion (replaces adjacency BFS) — wm38 (2026-03-16), tight refinement
+PPR_DAMPING = 0.216            # wm38. Was 0.227 (wm37).
+PPR_BOOST_COEFF = 1.591        # wm38. Was 1.807 (wm37).
+PPR_MIN_SCORE = 0.0            # wm36. Was 0.0002. Near-zero; no signal in 0-0.0005 range.
 PPR_RERANKER_SEEDS = 30        # Reranker uses more seeds than the formula path for better graph coverage.
 PPR_MAX_ITER = 50              # convergence limit (not tuned)
 PPR_CONVERGENCE_TOL = 1e-6     # early stopping (not tuned)
 
 # DEPRECATED by PPR: ADJACENCY_BASE_BOOST, ADJACENCY_NOVELTY_FLOOR, CONTEXT_RELEVANCE_THRESHOLD
-THEME_BOOST = 0.19             # wm19. Was 0.97 (wm15). PPR absorbs much of theme boost's prior role.
+THEME_BOOST = 0.0              # DEPRECATED — replaced by W_THEME/K_THEME (third RRF channel).
 # REMOVED: FEEDBACK_MIN_COUNT — replaced by empirical Bayes Beta prior (scoring._compute_beta_prior).
 # Beta(a,b) fitted from population feedback via method of moments. a+b (~11) replaces the old alpha=1 shrinkage.
 

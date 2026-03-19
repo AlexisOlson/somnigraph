@@ -28,12 +28,17 @@ import math
 import pickle
 import sys
 import time
+import warnings
 from collections import defaultdict
 from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
 from sklearn.model_selection import GroupKFold
+
+# Suppress sklearn feature-name warnings — we use numpy arrays throughout,
+# but LightGBM's eval_set validation warns about missing feature names.
+warnings.filterwarnings("ignore", message=".*does not have valid feature names.*")
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -455,7 +460,8 @@ def extract_all_features(full_data: dict, ground_truth: dict,
 # ---------------------------------------------------------------------------
 
 
-def train_and_evaluate(feature_data: dict, n_folds: int = 5) -> dict:
+def train_and_evaluate(feature_data: dict, n_folds: int = 5,
+                       n_estimators: int = 500) -> dict:
     """Train LightGBM with GroupKFold CV. Returns results dict."""
     X = feature_data["features"]
     y = feature_data["labels"]
@@ -465,13 +471,14 @@ def train_and_evaluate(feature_data: dict, n_folds: int = 5) -> dict:
     print("TRAINING: LightGBM Pointwise Regressor")
     print(f"{'='*70}")
     print(f"  Samples: {len(y)}, Features: {X.shape[1]}, Folds: {n_folds}")
+    print(f"  n_estimators: {n_estimators}")
 
     lgb_params = {
         "objective": "regression",
         "metric": "rmse",
         "num_leaves": 31,
         "learning_rate": 0.1,
-        "n_estimators": 500,
+        "n_estimators": n_estimators,
         "min_child_samples": 20,
         "subsample": 0.8,
         "colsample_bytree": 0.8,
@@ -536,23 +543,33 @@ def train_and_evaluate(feature_data: dict, n_folds: int = 5) -> dict:
 def discretize_labels(y, n_levels: int = 10):
     """Convert continuous GT (0-1) to integer relevance levels.
 
-    Uses quantile-based binning on nonzero scores to create balanced classes,
-    with 0 reserved for irrelevant (score == 0).
+    When n_levels >= 100, uses direct scaling: round(score * n_levels).
+    This preserves nearly all granularity of continuous scores.
+
+    When n_levels < 100, uses quantile-based binning on nonzero scores
+    to create balanced classes, with 0 reserved for irrelevant (score == 0).
     """
     result = np.zeros(len(y), dtype=np.int32)
     nonzero_mask = y > 0
     if nonzero_mask.sum() == 0:
         return result
 
-    # Quantile bins on nonzero scores
-    nonzero_scores = y[nonzero_mask]
-    # n_levels - 1 quantile bins for positives, level 0 = irrelevant
-    quantiles = np.linspace(0, 100, n_levels)
-    bin_edges = np.percentile(nonzero_scores, quantiles)
-    # Deduplicate edges (ties in scores)
-    bin_edges = np.unique(bin_edges)
-    # digitize: level 1..n for positives
-    result[nonzero_mask] = np.digitize(nonzero_scores, bin_edges[:-1])
+    if n_levels >= 100:
+        # Direct scaling — preserves granularity, no quantile compression
+        result[nonzero_mask] = np.clip(
+            np.round(y[nonzero_mask] * n_levels).astype(np.int32),
+            1, n_levels  # floor at 1 so positives never map to 0 (irrelevant)
+        )
+    else:
+        # Quantile bins on nonzero scores
+        nonzero_scores = y[nonzero_mask]
+        # n_levels - 1 quantile bins for positives, level 0 = irrelevant
+        quantiles = np.linspace(0, 100, n_levels)
+        bin_edges = np.percentile(nonzero_scores, quantiles)
+        # Deduplicate edges (ties in scores)
+        bin_edges = np.unique(bin_edges)
+        # digitize: level 1..n for positives
+        result[nonzero_mask] = np.digitize(nonzero_scores, bin_edges[:-1])
 
     return result
 
@@ -1055,7 +1072,7 @@ def evaluate_two_stage(feature_data: dict, full_data: dict,
     gkf = GroupKFold(n_splits=n_folds)
 
     print(f"\n{'='*70}")
-    print("RANKING EVALUATION: Two-Stage (MSE → LambdaRank) vs Production RRF")
+    print("RANKING EVALUATION: Two-Stage (MSE -> LambdaRank) vs Production RRF")
     print(f"{'='*70}")
 
     all_fold_metrics = []
@@ -1184,6 +1201,8 @@ def main():
                         help="For topk strategy: keep negs ranked in top-K per channel")
     parser.add_argument("--two-stage", action="store_true",
                         help="Two-stage: MSE predictions as feature for LambdaRank")
+    parser.add_argument("--n-estimators", type=int, default=500,
+                        help="Max boosting rounds (default: 500)")
     parser.add_argument("--folds", type=int, default=5,
                         help="Number of CV folds")
     parser.add_argument("--gt", type=str, default=str(GT_PATH),
@@ -1278,7 +1297,8 @@ def main():
 
     else:
         # Train pointwise regressor
-        train_results = train_and_evaluate(feature_data, n_folds=args.folds)
+        train_results = train_and_evaluate(feature_data, n_folds=args.folds,
+                                           n_estimators=args.n_estimators)
 
         # Save model
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
