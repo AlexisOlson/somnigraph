@@ -5,7 +5,7 @@
 """
 Train a LoCoMo-specific LightGBM reranker and run ablation experiments.
 
-Extracts 15 features designed for fresh LoCoMo DBs (no feedback, no edges,
+Extracts 17 features designed for fresh LoCoMo DBs (no feedback, no edges,
 no Hebbian — those are all dead on benchmark data). Uses leave-one-conversation-out
 cross-validation (10-fold, one fold per conversation).
 
@@ -44,6 +44,31 @@ from memory.constants import BM25_SUMMARY_WT, BM25_THEMES_WT, DATA_DIR
 from memory.reranker import _compute_proximity
 
 BENCHMARK_DIR = DATA_DIR / "benchmark"
+
+# ---------------------------------------------------------------------------
+# Entity extraction
+# ---------------------------------------------------------------------------
+
+_ENTITY_STOPWORDS = {
+    "i'm", "i've", "i'll", "i'd", "it", "it's", "its", "we", "he", "she",
+    "they", "what", "how", "the", "this", "that", "your", "my", "do",
+    "can't", "don't", "won't", "have", "keep", "take", "thanks", "well",
+}
+
+
+def _extract_entities(text: str, speakers: set[str]) -> set[str]:
+    """Extract likely proper nouns, excluding speakers and stopwords."""
+    text = re.sub(r'^\[[^\]]+\]\s*', '', text)  # strip [Speaker] prefix
+    entities = set()
+    for i, w in enumerate(text.split()):
+        if i == 0:
+            continue
+        clean = re.sub(r'[.,!?"\';:()]+$', '', w)
+        if clean and len(clean) >= 2 and clean[0].isupper() and not clean.isupper():
+            lower = clean.lower()
+            if lower not in _ENTITY_STOPWORDS and lower not in speakers:
+                entities.add(lower)
+    return entities
 FEATURES_PATH = BENCHMARK_DIR / "locomo_features.pkl"
 MODEL_PATH = BENCHMARK_DIR / "locomo_reranker_model.pkl"
 
@@ -55,46 +80,64 @@ MODEL_PATH = BENCHMARK_DIR / "locomo_reranker_model.pkl"
 # Group B: Query-content text features (5-8)
 # Group C: Cross-result features (9-11)
 # Group D: Metadata (12-14)
+# Group E: Entity & session features (15-16)
 
 FEATURE_NAMES = [
     # Group A
-    "fts_rank",         # 0: FTS rank (-1 if not retrieved)
-    "vec_rank",         # 1: Vec rank (-1 if not retrieved)
-    "fts_bm25",         # 2: Raw BM25 score
-    "vec_dist",         # 3: Raw cosine distance
-    "theme_overlap",    # 4: Query token overlap with themes
+    "fts_rank",             # 0: FTS rank (-1 if not retrieved)
+    "vec_rank",             # 1: Vec rank (-1 if not retrieved)
+    "fts_bm25",             # 2: Raw BM25 score
+    "vec_dist",             # 3: Raw cosine distance
+    "theme_overlap",        # 4: Query token overlap with themes
     # Group B
-    "query_coverage",   # 5: matched_query_terms / total_query_terms
-    "proximity",        # 6: Inverse min-span of query terms in content
-    "speaker_match",    # 7: Does query mention this turn's speaker?
-    "query_length",     # 8: Number of query tokens
+    "query_coverage",       # 5: matched_query_terms / total_query_terms
+    "proximity",            # 6: Inverse min-span of query terms in content
+    "speaker_match",        # 7: Does query mention this turn's speaker?
+    "query_length",         # 8: Number of query tokens
     # Group C
-    "rank_agreement",   # 9: abs(fts_rank - vec_rank), 9999 if one missing
-    "neighbor_density", # 10: Candidates within ±2 dia_id positions
-    "score_percentile", # 11: Percentile of bare RRF score within query
+    "rank_agreement",       # 9: abs(fts_rank - vec_rank), 9999 if one missing
+    "neighbor_density",     # 10: Candidates within ±2 dia_id positions
+    "score_percentile",     # 11: Percentile of bare RRF score within query
     # Group D
-    "token_count",      # 12: Turn length
-    "age_days",         # 13: Temporal position in conversation
-    "theme_count",      # 14: Number of themes
+    "token_count",          # 12: Turn length
+    "age_days",             # 13: Temporal position in conversation
+    "theme_count",          # 14: Number of themes
+    # Group E
+    "entity_overlap",       # 15: Shared named entities between query and candidate
+    "session_cooccurrence", # 16: Other top-20 RRF candidates in same session
 ]
+
+NUM_FEATURES = len(FEATURE_NAMES)  # 17
 
 FEATURE_GROUPS = {
     "A": list(range(0, 5)),
     "B": list(range(5, 9)),
     "C": list(range(9, 12)),
     "D": list(range(12, 15)),
+    "E": list(range(15, 17)),
 }
+
+_ALL_INDICES = list(range(NUM_FEATURES))
 
 ABLATION_CONFIGS = {
     "A_only": ["A"],
     "B_only": ["B"],
     "C_only": ["C"],
     "D_only": ["D"],
-    "all": ["A", "B", "C", "D"],
-    "no_A": ["B", "C", "D"],
-    "no_B": ["A", "C", "D"],
-    "no_C": ["A", "B", "D"],
-    "no_D": ["A", "B", "C"],
+    "E_only": ["E"],
+    "all": ["A", "B", "C", "D", "E"],
+    "no_A": ["B", "C", "D", "E"],
+    "no_B": ["A", "C", "D", "E"],
+    "no_C": ["A", "B", "D", "E"],
+    "no_D": ["A", "B", "C", "E"],
+    "no_E": ["A", "B", "C", "D"],
+    # Individual C feature drops
+    "no_C9": [i for i in _ALL_INDICES if i != 9],   # drop rank_agreement
+    "no_C10": [i for i in _ALL_INDICES if i != 10],  # drop neighbor_density
+    "no_C11": [i for i in _ALL_INDICES if i != 11],  # drop score_percentile
+    # Dead feature pruning (proximity=6, age_days=13, theme_count=14)
+    "pruned": [i for i in _ALL_INDICES if i not in (6, 13, 14)],
+    "no_C_pruned": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14)],
 }
 
 RRF_K = 60  # Standard RRF constant
@@ -149,10 +192,20 @@ def load_conversation_data(conv_idx: int) -> dict | None:
         FROM memories WHERE status = 'active'
     """).fetchall()
 
-    memories = {}
+    # First pass: collect all speakers for entity extraction
+    all_speakers = set()
+    parsed_rows = []
     for r in rows:
-        mid = r["id"]
         content = r["content"] or ""
+        sp_match = re.match(r"^\[([^\]]+)\]", content)
+        speaker = sp_match.group(1).lower() if sp_match else ""
+        if speaker:
+            all_speakers.add(speaker)
+        parsed_rows.append((r, content, speaker))
+
+    memories = {}
+    for r, content, speaker in parsed_rows:
+        mid = r["id"]
         themes_list = []
         if r["themes"]:
             try:
@@ -160,14 +213,6 @@ def load_conversation_data(conv_idx: int) -> dict | None:
             except json.JSONDecodeError:
                 pass
 
-        # Parse speaker from "[Speaker] text" format
-        speaker = ""
-        sp_match = re.match(r"^\[([^\]]+)\]", content)
-        if sp_match:
-            speaker = sp_match.group(1).lower()
-
-        # Parse dia_id ordinal from content position in DB
-        # (we'll build ordering from created_at)
         try:
             from datetime import datetime, timezone
             created = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
@@ -184,6 +229,13 @@ def load_conversation_data(conv_idx: int) -> dict | None:
         for t in themes_list:
             theme_tokens.update(str(t).lower().replace("-", " ").split())
 
+        # Parse session from themes (e.g. "session_3")
+        session = None
+        for t in themes_list:
+            if isinstance(t, str) and t.startswith("session_"):
+                session = t
+                break
+
         memories[mid] = {
             "content": content,
             "content_lower": content_lower,
@@ -195,6 +247,8 @@ def load_conversation_data(conv_idx: int) -> dict | None:
             "token_count": r["token_count"] or len(content.split()),
             "age_days": age_days,
             "created_at": r["created_at"],
+            "entities": _extract_entities(content, all_speakers),
+            "session": session,
         }
 
     db.close()
@@ -398,10 +452,24 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
         # Speaker detection: check if any speaker name appears in query
         query_lower = qtext.lower()
 
+        # Entity overlap: extract query entities
+        # Build all_speakers from memories (already computed during load)
+        all_speakers_set = {mem["speaker"] for mem in memories.values() if mem["speaker"]}
+        query_entities = _extract_entities(qtext, all_speakers_set)
+
+        # Session co-occurrence: get top-20 RRF candidates' sessions
+        top20_rrf = sorted(candidate_ids, key=lambda m: rrf_scores.get(m, 0), reverse=True)[:20]
+        top20_set = set(top20_rrf)
+        session_counts = defaultdict(int)
+        for mid in top20_rrf:
+            mem = memories.get(mid)
+            if mem and mem.get("session"):
+                session_counts[mem["session"]] += 1
+
         # Build feature matrix
         candidate_list = sorted(candidate_ids)
         n = len(candidate_list)
-        features = np.zeros((n, 15), dtype=np.float32)
+        features = np.zeros((n, NUM_FEATURES), dtype=np.float32)
         labels = np.zeros(n, dtype=np.float32)
 
         for i, mid in enumerate(candidate_list):
@@ -465,6 +533,12 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
             features[i, 13] = mem["age_days"]                         # age_days
             features[i, 14] = mem["theme_count"]                      # theme_count
 
+            # Group E: Entity & session features
+            features[i, 15] = len(query_entities & mem.get("entities", set()))  # entity_overlap
+            mem_session = mem.get("session")
+            if mem_session and mid in top20_set:
+                features[i, 16] = session_counts.get(mem_session, 1) - 1  # session_cooccurrence
+
             # Label: binary
             labels[i] = 1.0 if mid in evidence_mids else 0.0
 
@@ -474,7 +548,7 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
         all_mids.extend([(qtext, mid) for mid in candidate_list])
 
     if not all_features:
-        return {"features": np.zeros((0, 15)), "labels": np.zeros(0),
+        return {"features": np.zeros((0, NUM_FEATURES)), "labels": np.zeros(0),
                 "query_ids": np.zeros(0, dtype=np.int32), "memory_ids": []}
 
     features = np.concatenate(all_features, axis=0)
@@ -745,16 +819,25 @@ def print_results_table(results: list[dict]):
             print(row)
 
 
+def _feature_group_label(feature_idx: int) -> str:
+    """Return the group letter for a feature index."""
+    for group, indices in FEATURE_GROUPS.items():
+        if feature_idx in indices:
+            return group
+    return "?"
+
+
 def print_importance_table(importances: np.ndarray, feature_indices: list[int]):
     """Print feature importance from full model."""
-    print(f"\n{'=' * 50}")
+    print(f"\n{'=' * 55}")
     print("Feature Importance (gain, full model)")
-    print(f"{'=' * 50}")
+    print(f"{'=' * 55}")
 
     names = [FEATURE_NAMES[i] for i in feature_indices]
     order = np.argsort(importances)[::-1]
     for idx in order:
-        print(f"  {names[idx]:20s}: {importances[idx]:8.1f}")
+        group = _feature_group_label(feature_indices[idx])
+        print(f"  [{group}] {names[idx]:20s}: {importances[idx]:8.1f}")
 
 
 # ---------------------------------------------------------------------------
@@ -769,8 +852,11 @@ def main():
                         default=list(range(10)),
                         help="Conversation indices (default: 0-9)")
     parser.add_argument("--features", nargs="+",
-                        choices=["A", "B", "C", "D"],
+                        choices=["A", "B", "C", "D", "E"],
                         help="Feature groups to use (default: all)")
+    parser.add_argument("--config", type=str,
+                        choices=list(ABLATION_CONFIGS.keys()),
+                        help="Named ablation config (overrides --features)")
     parser.add_argument("--ablation", action="store_true",
                         help="Run full ablation matrix")
     parser.add_argument("--extract-only", action="store_true",
@@ -787,13 +873,22 @@ def main():
     t_start = time.time()
 
     # Determine feature indices
-    if args.features:
+    if args.config:
+        config_val = ABLATION_CONFIGS[args.config]
+        if config_val and isinstance(config_val[0], str):
+            feature_indices = []
+            for g in config_val:
+                feature_indices.extend(FEATURE_GROUPS[g])
+            feature_indices.sort()
+        else:
+            feature_indices = sorted(config_val)
+    elif args.features:
         feature_indices = []
         for g in args.features:
             feature_indices.extend(FEATURE_GROUPS[g])
         feature_indices.sort()
     else:
-        feature_indices = list(range(15))  # all
+        feature_indices = list(range(NUM_FEATURES))  # all
 
     if args.train_only:
         # Load saved features
@@ -894,11 +989,15 @@ def main():
 
     if args.ablation:
         # Run all ablation configs
-        for config_name, groups in ABLATION_CONFIGS.items():
-            indices = []
-            for g in groups:
-                indices.extend(FEATURE_GROUPS[g])
-            indices.sort()
+        for config_name, config_val in ABLATION_CONFIGS.items():
+            # Support both group name lists and raw index lists
+            if config_val and isinstance(config_val[0], str):
+                indices = []
+                for g in config_val:
+                    indices.extend(FEATURE_GROUPS[g])
+                indices.sort()
+            else:
+                indices = sorted(config_val)
 
             print(f"\nTraining: {config_name} (features: {[FEATURE_NAMES[i] for i in indices]})")
             metrics, importances = train_cv(
@@ -909,7 +1008,7 @@ def main():
             all_results.append(summary)
 
         # Feature importance from full model
-        all_indices = list(range(15))
+        all_indices = list(range(NUM_FEATURES))
         print("\nTraining full model for feature importance...")
         _, full_importances = train_cv(
             all_conv_features, all_conv_data, all_search_data,

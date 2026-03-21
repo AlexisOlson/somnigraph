@@ -94,7 +94,7 @@ def _install_locomo_reranker():
     def _locomo_rerank(db, query, fts_ranked, vec_ranked, fts_scores,
                        vec_distances, theme_ranked, theme_overlap_map,
                        feedback_raw, hebb_data, ppr_cache):
-        """LoCoMo reranker: extract 15 features and predict."""
+        """LoCoMo reranker: extract 17 features and predict."""
         logger.debug("_locomo_rerank: query=%s candidates=%d",
                      query[:50], len(set(fts_ranked) | set(vec_ranked) | set(theme_ranked)))
         from locomo_bench.train_locomo_reranker import (
@@ -118,6 +118,9 @@ def _install_locomo_reranker():
                               vec_distances, theme_ranked, theme_overlap_map,
                               candidate_ids):
         from memory.reranker import _compute_proximity
+        from locomo_bench.train_locomo_reranker import (
+            _extract_entities, NUM_FEATURES,
+        )
         RRF_K = 60
 
         # Load memory metadata
@@ -125,33 +128,51 @@ def _install_locomo_reranker():
             SELECT id, content, themes, token_count, created_at
             FROM memories WHERE status = 'active'
         """).fetchall()
-        memories = {}
+
+        # First pass: collect speakers for entity extraction
+        all_speakers = set()
+        parsed_rows = []
         for r in rows:
             content = r["content"] or ""
+            import re as _re
+            sp_match = _re.match(r"^\[([^\]]+)\]", content)
+            speaker = sp_match.group(1).lower() if sp_match else ""
+            if speaker:
+                all_speakers.add(speaker)
+            parsed_rows.append((r, content, speaker))
+
+        memories = {}
+        for r, content, speaker in parsed_rows:
             themes_list = []
             if r["themes"]:
                 try:
                     themes_list = json.loads(r["themes"])
                 except json.JSONDecodeError:
                     pass
-            import re as _re
-            speaker = ""
-            sp_match = _re.match(r"^\[([^\]]+)\]", content)
-            if sp_match:
-                speaker = sp_match.group(1).lower()
             try:
                 from datetime import datetime, timezone
                 created = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
                 age_days = (datetime.now(timezone.utc) - created).total_seconds() / 86400
             except Exception:
                 age_days = 0.0
+
+            # Parse session from themes
+            session = None
+            for t in themes_list:
+                if isinstance(t, str) and t.startswith("session_"):
+                    session = t
+                    break
+
             memories[r["id"]] = {
+                "content": content,
                 "content_tokens": content.lower().split(),
                 "speaker": speaker,
                 "theme_tokens": {tok for t in themes_list for tok in str(t).lower().replace("-", " ").split()},
                 "theme_count": len(themes_list),
                 "token_count": r["token_count"] or len(content.split()),
                 "age_days": age_days,
+                "entities": _extract_entities(content, all_speakers),
+                "session": session,
             }
 
         # Ordinal map for neighbor density
@@ -161,6 +182,7 @@ def _install_locomo_reranker():
         query_tokens = set(query.lower().split())
         query_terms = [t for t in query.lower().split() if len(t) > 1]
         query_lower = query.lower()
+        query_entities = _extract_entities(query, all_speakers)
 
         # RRF scores for percentile
         rrf_scores = {}
@@ -174,12 +196,22 @@ def _install_locomo_reranker():
         all_rrf = sorted(rrf_scores.values())
         n_rrf = len(all_rrf)
 
+        # Session co-occurrence: top-20 RRF candidates
+        top20_rrf = sorted(candidate_ids, key=lambda m: rrf_scores.get(m, 0), reverse=True)[:20]
+        top20_set = set(top20_rrf)
+        from collections import defaultdict as _defaultdict
+        session_counts = _defaultdict(int)
+        for mid in top20_rrf:
+            mem = memories.get(mid)
+            if mem and mem.get("session"):
+                session_counts[mem["session"]] += 1
+
         candidate_ordinals = {mid: ordinal_map.get(mid, -999) for mid in candidate_ids}
         ordinal_set = set(candidate_ordinals.values())
 
         candidate_list = sorted(candidate_ids)
         import numpy as _np
-        features = _np.zeros((len(candidate_list), 15), dtype=_np.float32)
+        features = _np.zeros((len(candidate_list), NUM_FEATURES), dtype=_np.float32)
 
         for i, mid in enumerate(candidate_list):
             mem = memories.get(mid)
@@ -220,6 +252,12 @@ def _install_locomo_reranker():
             features[i, 12] = mem["token_count"]
             features[i, 13] = mem["age_days"]
             features[i, 14] = mem["theme_count"]
+
+            # Group E: Entity & session features
+            features[i, 15] = len(query_entities & mem.get("entities", set()))
+            mem_session = mem.get("session")
+            if mem_session and mid in top20_set:
+                features[i, 16] = session_counts.get(mem_session, 1) - 1
 
         # Predict with LoCoMo model (select feature columns)
         X = features[:, _locomo_feature_indices]
@@ -715,6 +753,8 @@ def report_locomo(records: list[dict], configs: list[str], recall_limit: int):
         total_n = total_mrr = 0
         total_recalls = defaultdict(int)
 
+        ADVERSARIAL_CAT = 5  # Excluded from OVERALL (no ground truth answer)
+
         for cat in sorted(cat_metrics):
             m = cat_metrics[cat]
             n = m["count"]
@@ -726,10 +766,12 @@ def report_locomo(records: list[dict], configs: list[str], recall_limit: int):
             for k in k_values:
                 r_at_k = m[f"r@{k}"] / n
                 row += f" {r_at_k:>7.1%}"
-                total_recalls[k] += m[f"r@{k}"]
             print(row)
-            total_n += n
-            total_mrr += m["mrr_sum"]
+            if cat != ADVERSARIAL_CAT:
+                total_n += n
+                total_mrr += m["mrr_sum"]
+                for k in k_values:
+                    total_recalls[k] += m[f"r@{k}"]
 
         if total_n:
             print("-" * 70)
@@ -737,17 +779,19 @@ def report_locomo(records: list[dict], configs: list[str], recall_limit: int):
             for k in k_values:
                 row += f" {total_recalls[k]/total_n:>7.1%}"
             print(row)
+            print("(excludes adversarial)")
 
     # Comparison summary
     if len(configs) > 1:
         print(f"\n{'=' * 90}")
-        print("Config Comparison (OVERALL)")
+        print("Config Comparison (OVERALL, excludes adversarial)")
         print(f"{'Config':<15} {'N':>5} {'MRR':>7}"
               + "".join(f" {'R@'+str(k):>7}" for k in k_values))
         print("-" * 70)
 
         for config_name in configs:
-            config_records = [r for r in records if r["config"] == config_name]
+            config_records = [r for r in records
+                              if r["config"] == config_name and r["category"] != ADVERSARIAL_CAT]
             if not config_records:
                 continue
             n = len(config_records)
