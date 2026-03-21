@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["openai", "sqlite-vec"]
+# dependencies = ["openai", "sqlite-vec", "numpy", "lightgbm"]
 # ///
 """Build unbiased ground truth for memory retrieval evaluation.
 
@@ -369,13 +369,32 @@ def main():
                         help="Skip query deduplication (judge all unique query strings)")
     parser.add_argument("--dedup-threshold", type=float, default=0.75,
                         help="Containment similarity threshold for query dedup (default: 0.75)")
+    parser.add_argument("--queries", type=str, default="",
+                        help="Path to JSON file with query allowlist. Accepts list of "
+                             "{query, vector_input} dicts or list of strings.")
     args = parser.parse_args()
 
     db = get_db()
-    queries = extract_queries(db)
-    print(f"Found {len(queries)} unique queries")
 
-    if not args.no_dedup:
+    if args.queries:
+        # Load query allowlist from file
+        with open(args.queries) as f:
+            query_data = json.load(f)
+        if isinstance(query_data, list):
+            if query_data and isinstance(query_data[0], str):
+                queries = [{"query": q, "count": 0, "vector_input": ""} for q in query_data]
+            else:
+                queries = query_data
+        elif isinstance(query_data, dict):
+            # Export-candidates format: {query: {vector_input, candidates}}
+            queries = [{"query": q, "count": 0, "vector_input": d.get("vector_input", "")}
+                       for q, d in query_data.items()]
+        print(f"Loaded {len(queries)} queries from {args.queries}")
+    else:
+        queries = extract_queries(db)
+        print(f"Found {len(queries)} unique queries")
+
+    if not args.no_dedup and not args.queries:
         queries = dedup_queries(queries, threshold=args.dedup_threshold)
 
     # --- Export candidates mode ---
