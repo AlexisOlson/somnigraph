@@ -16,7 +16,7 @@ See `docs/roadmap.md` for current research agenda and `STEWARDSHIP.md` for sessi
 
 ```
 docs/           — Narrative documentation (architecture, experiments, similar-systems)
-research/       — 68 source analyses (papers, benchmarks, repos)
+research/       — 73 source analyses (papers, benchmarks, repos)
 src/memory/     — 17 server modules
 src/memory_server.py — MCP entry point
 scripts/        — Sleep pipeline, tuning tools, ground truth
