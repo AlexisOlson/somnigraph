@@ -24,3 +24,28 @@ Reference for how production code (`~/.claude/servers/memory/`) was adapted duri
 - tune_gt.py: `SERVERS_DIR` → `REPO_ROOT / "src"`; `DATA_DIR` from `memory.constants`; `MEMORY_DB` → `DB_PATH` from `memory.db`; production-only constants (K_FTS, K_VEC, W_THEME, K_THEME, BM25_SUMMARY_WT, BM25_THEMES_WT) kept as local constants (not in somnigraph's constants.py — the reranker makes them irrelevant for live scoring)
 - reranker.py: new module for live feature extraction + prediction; `MODEL_PATH` constant added to `constants.py`; model loaded eagerly at server startup; `impl_recall()` branches on model availability
 - lightgbm + numpy moved from optional to main dependencies (reranker is the production scoring path)
+
+## Production unification (2026-03-20)
+
+Production (`~/.claude/servers/memory/`) and repo (`src/memory/`) were running different code. The 26-feature reranker was added to production but never synced to the repo (which had 18 features). This unification makes production run from the repo's code via a directory junction.
+
+**What changed:**
+- `reranker.py` rewritten to match production's 26-feature architecture: cached `_load_memory_meta()` (betweenness via Brandes, diversity score, burstiness, IDF stats, feedback timestamps, session retrievals), `_compute_proximity()` sliding-window min-span, `invalidate_cache()` called after remember/forget
+- 8 new features: query_coverage, proximity, query_idf_var, burstiness, betweenness, diversity_score, fb_time_weighted, session_recency
+- `rerank()` signature changed to take pre-computed data (feedback_raw, hebb_data, ppr_cache) instead of the old `extract_live_features()` + separate `rerank(model, features, ids)` pattern
+- `tools.py` builds feedback_raw, hebb_data, ppr_cache inline (matching production), removes the separate `_compute_ppr_for_reranker()` helper
+- `sync.py` added as backward-compat shim re-exporting from `events.py`
+- `train_reranker.py` expanded to 26 features, uses `_load_memory_meta()` from reranker module
+- `__init__.py` exports updated: `rerank`, `invalidate_cache` (was `load_reranker`, `get_reranker`, `extract_live_features`, `rerank`)
+
+**Production cutover:**
+- `settings.json` MCP server points at `~/Repos/Somnigraph/src/memory_server.py` with `SOMNIGRAPH_DATA_DIR=~/.claude/data`
+- `~/.claude/servers/memory/` → junction to `~/Repos/Somnigraph/src/memory/` (old code archived to `memory_archived/`)
+- Sleep scripts continue to work: `from memory_server import ...` resolves via the existing `memory_server.py` (unchanged), which re-exports from `memory.*` (now the repo via junction)
+- `from memory.sync import ...` resolves via the shim to `memory.events`
+- Personal data (theme_variants.json, content_phrases.json, known_phrases.json) exported from production's hardcoded dicts to `~/.claude/data/` JSON files
+
+**26-feature retrain results (1032 queries, 5-fold CV):**
+- NDCG@5k = 0.7958 (+6.17pp over formula, matching 18-feature performance)
+- query_idf_var is top new feature by importance; proximity contributes almost nothing (too sparse)
+- 955 improved queries, 58 regressed, 15 unchanged

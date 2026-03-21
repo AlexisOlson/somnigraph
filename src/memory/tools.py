@@ -34,7 +34,7 @@ from memory.session import detect_session_id, get_session_id
 from memory.scoring import (
     rrf_fuse, apply_hebbian, expand_via_ppr,
 )
-from memory.reranker import get_model as get_reranker_model, extract_live_features, rerank
+from memory.reranker import rerank as reranker_rerank, invalidate_cache as invalidate_reranker_cache
 from memory.stats import compute_stats
 
 
@@ -376,93 +376,11 @@ def impl_remember(
         )
         _log_event(db, new_id, "created", context={"source": source, "category": category})
         db.commit()
+        invalidate_reranker_cache()
 
         return f"Stored.\nID: {new_id}\nCategory: {category} | Priority: {priority} | Status: {status}"
     finally:
         db.close()
-
-
-def _compute_ppr_for_reranker(
-    db: sqlite3.Connection,
-    all_ids: set[str],
-    vec_ranked: dict[str, int],
-    fts_ranked: dict[str, int],
-    exclude_set: set[str],
-) -> dict[str, float]:
-    """Compute raw PPR scores for reranker features.
-
-    Uses the same graph walk as expand_via_ppr but returns raw scores
-    without mutating any score dict. Seeds are top candidates by RRF.
-    Contradiction-flagged edges are excluded.
-    """
-    from memory.scoring import personalized_pagerank
-    from memory.constants import (
-        RRF_K, RRF_VEC_WEIGHT, PPR_DAMPING, PPR_RERANKER_SEEDS,
-    )
-
-    if not all_ids:
-        return {}
-
-    # Compute basic RRF scores for seed selection
-    base_scores = {}
-    for mid in all_ids:
-        score = 0.0
-        if mid in vec_ranked:
-            score += RRF_VEC_WEIGHT / (RRF_K + vec_ranked[mid] + 1)
-        if mid in fts_ranked:
-            score += (1.0 - RRF_VEC_WEIGHT) / (RRF_K + fts_ranked[mid] + 1)
-        base_scores[mid] = score
-
-    if not base_scores:
-        return {}
-
-    seed_ids = sorted(base_scores, key=base_scores.get, reverse=True)[:PPR_RERANKER_SEEDS]
-    seed_set = set(seed_ids)
-    seed_weights = {sid: base_scores[sid] for sid in seed_ids}
-
-    # Build 2-hop subgraph, excluding contradiction-flagged edges
-    ph = ",".join("?" * len(seed_ids))
-    hop1_rows = db.execute(f"""
-        SELECT source_id, target_id, weight, flags
-        FROM memory_edges
-        WHERE source_id IN ({ph}) OR target_id IN ({ph})
-    """, seed_ids + seed_ids).fetchall()
-
-    hop1_neighbors = set()
-    hop1_clean = []
-    for edge in hop1_rows:
-        if edge["flags"] and "contradiction" in edge["flags"]:
-            continue
-        hop1_clean.append(edge)
-        hop1_neighbors.add(edge["source_id"])
-        hop1_neighbors.add(edge["target_id"])
-    hop1_neighbors -= seed_set
-
-    hop2_rows = []
-    if hop1_neighbors:
-        n_list = list(hop1_neighbors)
-        n_ph = ",".join("?" * len(n_list))
-        hop2_rows = db.execute(f"""
-            SELECT source_id, target_id, weight, flags
-            FROM memory_edges
-            WHERE source_id IN ({n_ph}) OR target_id IN ({n_ph})
-        """, n_list + n_list).fetchall()
-
-    hop2_clean = [e for e in hop2_rows
-                  if not (e["flags"] and "contradiction" in e["flags"])]
-    adj: dict[str, list[tuple[str, float]]] = {}
-    for edge in hop1_clean + hop2_clean:
-        src, tgt = edge["source_id"], edge["target_id"]
-        w = edge["weight"] if edge["weight"] is not None else 1.0
-        adj.setdefault(src, []).append((tgt, w))
-        adj.setdefault(tgt, []).append((src, w))
-
-    if not adj:
-        return {}
-
-    raw_ppr = personalized_pagerank(adj, seed_weights, damping=PPR_DAMPING)
-    return {mid: ps for mid, ps in raw_ppr.items()
-            if mid not in seed_set and mid not in exclude_set and ps > 0}
 
 
 def impl_recall(
@@ -560,6 +478,7 @@ def impl_recall(
         # --- Theme channel: rank active memories by theme overlap with query ---
         query_tokens = set(query.lower().split())
         theme_ranked: dict[str, int] = {}
+        theme_overlap_map: dict[str, int] = {}
         if query_tokens:
             theme_rows_all = db.execute(
                 "SELECT id, themes FROM memories WHERE status = 'active' AND themes IS NOT NULL AND themes != '[]'"
@@ -577,8 +496,9 @@ def impl_recall(
                 overlap = len(query_tokens & mem_theme_tokens)
                 if overlap > 0:
                     theme_overlaps.append((r["id"], overlap))
-            # Sort descending by overlap, assign ranks
-            theme_overlaps.sort(key=lambda x: x[1], reverse=True)
+                    theme_overlap_map[r["id"]] = overlap
+            # Sort descending by overlap, break ties by ID for determinism
+            theme_overlaps.sort(key=lambda x: (-x[1], x[0]))
             for rank, (mid, _) in enumerate(theme_overlaps):
                 theme_ranked[mid] = rank
 
@@ -594,36 +514,127 @@ def impl_recall(
             ).fetchall()
             all_ids = {r["id"] for r in active_rows}
 
-        # --- Scoring: reranker or formula ---
-        reranker_model = get_reranker_model()
+        # --- Try learned reranker first ---
+        sorted_ids = None
+        top_score = 0.0
         expansion_new = expansion_boosted = per_seed_cap_hits = 0
         total_cap_hit = False
 
-        if reranker_model is not None:
-            # Reranker path: compute raw PPR scores for features
-            ppr_scores = _compute_ppr_for_reranker(db, all_ids, vec_ranked, fts_ranked, exclude_set)
+        try:
+            # Build feedback_raw for reranker
+            fb_raw = {}
+            if all_ids:
+                fb_ph = ",".join("?" * len(all_ids))
+                fb_rows = db.execute(f"""
+                    SELECT memory_id, context FROM memory_events
+                    WHERE memory_id IN ({fb_ph}) AND event_type = 'feedback'
+                    ORDER BY created_at ASC
+                """, list(all_ids)).fetchall()
+                for r in fb_rows:
+                    try:
+                        ctx = json.loads(r["context"]) if r["context"] else {}
+                        if "utility" in ctx:
+                            mid_fb = r["memory_id"]
+                            if mid_fb not in fb_raw:
+                                fb_raw[mid_fb] = {"utilities": [], "count": 0}
+                            fb_raw[mid_fb]["utilities"].append(ctx["utility"])
+                            fb_raw[mid_fb]["count"] += 1
+                    except (json.JSONDecodeError, TypeError):
+                        pass
 
-            # Get themes_map for feature extraction — all active memories,
-            # not just FTS/vec candidates, to match training-time theme scanning
-            theme_rows = db.execute(
-                "SELECT id, themes FROM memories WHERE status = 'active'"
-            ).fetchall()
-            themes_map = {r["id"]: r["themes"] for r in theme_rows}
+            # Build hebb_data
+            lookback_30d = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            hebb_rows = db.execute("""
+                SELECT query, memory_id FROM memory_events
+                WHERE event_type = 'retrieved'
+                  AND query IS NOT NULL AND query != ''
+                  AND created_at > ?
+            """, (lookback_30d,)).fetchall()
+            hebb_mem_freq = {}
+            hebb_query_set = set()
+            for r in hebb_rows:
+                mid_h = r["memory_id"]
+                if mid_h not in hebb_mem_freq:
+                    hebb_mem_freq[mid_h] = set()
+                hebb_mem_freq[mid_h].add(r["query"])
+                hebb_query_set.add(r["query"])
+            hebb_data = {
+                "mem_freq": dict(hebb_mem_freq),
+                "total_queries": len(hebb_query_set),
+            }
 
-            # Extract features and predict
-            features, candidate_ids = extract_live_features(
-                db, vec_ranked, fts_ranked, fts_bm25_scores, vec_distances,
-                all_ids, ppr_scores, {}, themes_map, query,
+            # Compute PPR scores for this query (with contradiction edge filtering)
+            from memory.scoring import personalized_pagerank
+            from memory.constants import (
+                ADJACENCY_SEED_COUNT, PPR_DAMPING as _PPR_DAMPING,
             )
-            if len(candidate_ids) > 0:
-                rrf_scores = rerank(reranker_model, features, candidate_ids)
+            # Build seed weights from best-ranked candidates
+            def _rrf_quick(mid):
+                s = 0.0
+                if mid in vec_ranked:
+                    s += 1.0 / (7 + vec_ranked[mid] + 1)
+                if mid in fts_ranked:
+                    s += 1.0 / (8 + fts_ranked[mid] + 1)
+                return s
+            quick_scores = {mid: _rrf_quick(mid) for mid in all_ids}
+            seed_ids = sorted(quick_scores, key=quick_scores.get, reverse=True)[:ADJACENCY_SEED_COUNT]
+            seed_weights = {sid: quick_scores[sid] for sid in seed_ids if quick_scores[sid] > 0}
+
+            ppr_scores_for_query = {}
+            if seed_weights:
+                # Build 2-hop subgraph, excluding contradiction-flagged edges
+                ph = ",".join("?" * len(seed_ids))
+                hop1_rows = db.execute(f"""
+                    SELECT source_id, target_id, weight, flags FROM memory_edges
+                    WHERE source_id IN ({ph}) OR target_id IN ({ph})
+                """, seed_ids + seed_ids).fetchall()
+                hop1_neighbors = set()
+                hop1_clean = []
+                for e in hop1_rows:
+                    if e["flags"] and "contradiction" in e["flags"]:
+                        continue
+                    hop1_clean.append(e)
+                    hop1_neighbors.add(e["source_id"])
+                    hop1_neighbors.add(e["target_id"])
+                hop1_neighbors -= set(seed_ids)
+                hop2_rows = []
+                if hop1_neighbors:
+                    n_list = list(hop1_neighbors)
+                    n_ph = ",".join("?" * len(n_list))
+                    hop2_rows = db.execute(f"""
+                        SELECT source_id, target_id, weight, flags FROM memory_edges
+                        WHERE source_id IN ({n_ph}) OR target_id IN ({n_ph})
+                    """, n_list + n_list).fetchall()
+                hop2_clean = [e for e in hop2_rows
+                              if not (e["flags"] and "contradiction" in e["flags"])]
+                adj = {}
+                for e in hop1_clean + hop2_clean:
+                    src, tgt = e["source_id"], e["target_id"]
+                    w = e["weight"] if e["weight"] is not None else 1.0
+                    adj.setdefault(src, []).append((tgt, w))
+                    adj.setdefault(tgt, []).append((src, w))
+                ppr_scores_for_query = personalized_pagerank(adj, seed_weights, damping=_PPR_DAMPING)
+
+            ppr_cache = {(round(_PPR_DAMPING, 3), query): ppr_scores_for_query}
+
+            result = reranker_rerank(
+                db, query,
+                fts_ranked=fts_ranked, vec_ranked=vec_ranked,
+                fts_scores=fts_bm25_scores, vec_distances=vec_distances,
+                theme_ranked=theme_ranked, theme_overlap_map=theme_overlap_map,
+                feedback_raw=fb_raw, hebb_data=hebb_data,
+                ppr_cache=ppr_cache,
+            )
+            if result is not None:
+                sorted_ids, rrf_scores = result
+                top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
             else:
-                rrf_scores = {}
-            feedback_map = {}
-            sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
-            top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
-        else:
-            # Formula path
+                sorted_ids = None
+        except Exception:
+            sorted_ids = None  # fall back to legacy
+
+        # --- Legacy RRF pipeline (fallback) ---
+        if sorted_ids is None:
             rrf_scores, feedback_map, themes_map = rrf_fuse(
                 db, vec_ranked, fts_ranked, all_ids, boost_themes_list,
                 theme_ranked=theme_ranked)
@@ -1152,6 +1163,7 @@ def impl_forget(memory_id: str) -> str:
     _log_event(db, memory_id, "updated", context={"action": "deleted"})
     db.commit()
     db.close()
+    invalidate_reranker_cache()
 
     summary = mem["summary"] or mem["content"][:60]
     return f"Deleted: [{mem['category']}] {summary}\nID: {memory_id}"

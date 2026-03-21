@@ -24,7 +24,7 @@ The "What didn't work" sections of `docs/architecture.md` and `docs/experiments.
 
 The hand-tuned scoring formula (38 studies, 14 parameters) has been superseded by a learned LightGBM reranker (+5.7% NDCG@5k in 5-fold CV). The reranker is migrated to the repo (`src/memory/reranker.py`, `scripts/train_reranker.py`) and wired into live scoring with formula fallback.
 
-Current state: reranker trained on full v2+v3 GT (969 queries, NDCG=0.7971, +6.18pp over formula). GT judging complete (v2: 480q, v3: 489q, zero overlap). LambdaRank experiment completed — reaches parity when given full candidate pool + fine-grained labels, but doesn't beat pointwise. Two remaining improvement experiments: query features and raw-score features.
+Current state: production unified with repo (2026-03-20). 26-feature reranker (was 18) trained on 1032 queries (NDCG=0.7958, +6.17pp over formula). 8 new features: query_coverage, proximity, query_idf_var, burstiness, betweenness, diversity_score, fb_time_weighted, session_recency. Production runs from repo code via directory junction + env-configured DATA_DIR. LambdaRank experiment completed — reaches parity but doesn't beat pointwise. One remaining improvement experiment: raw-score features (query features experiment completed via the 8 new features).
 
 The utility calibration study is complete (per-query r=0.70, no self-reinforcement). Remaining Tier 1: counterfactual coverage check, sleep impact measurement.
 

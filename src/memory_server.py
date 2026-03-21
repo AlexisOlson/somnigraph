@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["sqlite-vec>=0.1.6", "openai>=2.0.0", "tiktoken>=0.7.0", "mcp[cli]>=1.2.0"]
+# dependencies = ["sqlite-vec>=0.1.6", "openai>=2.0.0", "tiktoken>=0.7.0", "mcp[cli]>=1.2.0", "lightgbm>=4.0"]
 # ///
 """
 Somnigraph Memory MCP Server — persistent memory with hybrid search.
@@ -15,7 +15,15 @@ Database: ~/.somnigraph/memory.db (override with SOMNIGRAPH_DATA_DIR)
 """
 
 import logging
+import os
 import sys
+
+# If SOMNIGRAPH_DATA_DIR isn't set (env passthrough failed), fall back to
+# the standard production location so the server always finds the real DB.
+if "SOMNIGRAPH_DATA_DIR" not in os.environ:
+    _default = os.path.join(os.path.expanduser("~"), ".claude", "data")
+    if os.path.isdir(_default):
+        os.environ["SOMNIGRAPH_DATA_DIR"] = _default
 
 from mcp.server.fastmcp import FastMCP
 

@@ -70,7 +70,7 @@ CATEGORY_MAP = {
     "reflection": 3, "entity": 4, "meta": 5,
 }
 
-# Feature names (order matters — matches extraction)
+# Feature names (order matters — matches extraction and live reranker)
 # No derived scores (fts_score, vec_score, etc.) — the model learns its own
 # transform of raw ranks. No binary in_fts/in_vec — redundant with rank != -1.
 FEATURE_NAMES = [
@@ -99,6 +99,18 @@ FEATURE_NAMES = [
     "edge_count",     # 15: number of edges
     "theme_count",    # 16: number of themes
     "confidence",     # 17: confidence score
+
+    # Extended features (Tier 1)
+    "query_coverage",   # 18: fraction of query terms found in content
+    "proximity",        # 19: inverse min-span of query terms in content
+    "query_idf_var",    # 20: IDF variance across query terms
+    "burstiness",       # 21: retrieval event burstiness (CoV^2 - 1)
+
+    # Extended features (Tier 2)
+    "betweenness",      # 22: betweenness centrality in memory graph
+    "diversity_score",  # 23: 1 - mean cosine sim to neighbors
+    "fb_time_weighted", # 24: exponentially time-weighted feedback mean
+    "session_recency",  # 25: queries ago since last co-retrieval in session
 ]
 
 
@@ -108,54 +120,13 @@ FEATURE_NAMES = [
 
 
 def load_memory_metadata(db) -> dict:
-    """Load per-memory metadata from DB for feature extraction."""
-    rows = db.execute("""
-        SELECT id, category, base_priority, created_at, token_count,
-               confidence, themes
-        FROM memories WHERE status = 'active'
-    """).fetchall()
+    """Load per-memory metadata from DB for feature extraction.
 
-    meta = {}
-    now = time.time()
-    for r in rows:
-        mid = r["id"]
-        # Age in days
-        try:
-            from datetime import datetime, timezone
-            created = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
-            age_days = (datetime.now(timezone.utc) - created).total_seconds() / 86400
-        except Exception:
-            age_days = 0.0
-
-        # Theme count
-        theme_count = 0
-        if r["themes"]:
-            try:
-                theme_count = len(json.loads(r["themes"]))
-            except Exception:
-                pass
-
-        meta[mid] = {
-            "category": CATEGORY_MAP.get(r["category"], 1),
-            "priority": r["base_priority"] or 5,
-            "age_days": age_days,
-            "token_count": r["token_count"] or 200,
-            "confidence": r["confidence"] if r["confidence"] is not None else 0.5,
-            "theme_count": theme_count,
-        }
-
-    # Edge counts
-    edge_rows = db.execute("""
-        SELECT source_id, target_id FROM memory_edges
-    """).fetchall()
-    edge_counts = defaultdict(int)
-    for r in edge_rows:
-        edge_counts[r["source_id"]] += 1
-        edge_counts[r["target_id"]] += 1
-    for mid in meta:
-        meta[mid]["edge_count"] = edge_counts.get(mid, 0)
-
-    return meta
+    Uses the reranker module's _load_memory_meta() which precomputes all
+    26 feature metadata (including betweenness, diversity, burstiness, etc.).
+    """
+    from memory.reranker import _load_memory_meta
+    return _load_memory_meta(db)
 
 
 def extract_features_for_query(
@@ -256,7 +227,43 @@ def extract_features_for_query(
             if total_pmi > 0:
                 hebbian_pmi_map[candidate] = total_pmi
 
+    # --- Query-level features ---
+    query_terms = [t for t in qtext.lower().split() if len(t) > 1]
+
+    idf_stats = memory_meta.get("__idf_stats__", {})
+    total_docs = idf_stats.get("total_docs", 1)
+    term_doc_freq = idf_stats.get("term_doc_freq", {})
+    query_idf_var = 0.0
+    if query_terms and term_doc_freq:
+        idfs = []
+        for term in query_terms:
+            df = term_doc_freq.get(term, 0)
+            idf = math.log((total_docs + 1) / (df + 1))
+            idfs.append(idf)
+        if len(idfs) > 1:
+            idf_mean = sum(idfs) / len(idfs)
+            query_idf_var = sum((x - idf_mean)**2 for x in idfs) / len(idfs)
+
+    # Session recency
+    session_retrievals = memory_meta.get("__session_retrievals__", {})
+    session_recency_map = {}
+    for sess_id, events in session_retrievals.items():
+        query_positions = [i for i, (q, _) in enumerate(events) if q == qtext]
+        if not query_positions:
+            continue
+        qpos = query_positions[-1]
+        for j in range(qpos - 1, -1, -1):
+            _, mid = events[j]
+            queries_ago = qpos - j
+            if mid not in session_recency_map or queries_ago < session_recency_map[mid]:
+                session_recency_map[mid] = queries_ago
+
+    now_ts = time.time()
+    fb_lambda = 0.01
+
     # --- Build feature matrix ---
+    from memory.reranker import _compute_proximity
+
     n_features = len(FEATURE_NAMES)
     candidate_list = sorted(candidate_ids)
     n_candidates = len(candidate_list)
@@ -310,6 +317,52 @@ def extract_features_for_query(
             features[i, 15] = 0
             features[i, 16] = 0
             features[i, 17] = 0.5
+
+        # Extended features (Tier 1)
+        if meta and query_terms:
+            content_set = set(meta.get("content_tokens", []))
+            matched = sum(1 for t in query_terms if t in content_set)
+            features[i, 18] = matched / len(query_terms)                     # query_coverage
+        else:
+            features[i, 18] = 0.0
+
+        if meta and len(query_terms) > 1:
+            features[i, 19] = _compute_proximity(query_terms, meta.get("content_tokens", []))
+        else:
+            features[i, 19] = 0.0
+
+        features[i, 20] = query_idf_var                                     # query_idf_var
+
+        if meta:
+            features[i, 21] = meta.get("burstiness", 0.0)                   # burstiness
+        else:
+            features[i, 21] = 0.0
+
+        # Extended features (Tier 2)
+        if meta:
+            features[i, 22] = meta.get("betweenness", 0.0)                  # betweenness
+            features[i, 23] = meta.get("diversity_score", 0.5)              # diversity_score
+        else:
+            features[i, 22] = 0.0
+            features[i, 23] = 0.5
+
+        if meta:
+            fb_ts = meta.get("fb_timestamps", [])
+            if fb_ts:
+                weighted_sum = 0.0
+                weight_sum = 0.0
+                for ts, util in fb_ts:
+                    age_fb = (now_ts - ts) / 86400.0
+                    w = math.exp(-fb_lambda * age_fb)
+                    weighted_sum += w * util
+                    weight_sum += w
+                features[i, 24] = weighted_sum / weight_sum if weight_sum > 0 else -1.0
+            else:
+                features[i, 24] = -1.0
+        else:
+            features[i, 24] = -1.0
+
+        features[i, 25] = session_recency_map.get(mid, -1)                  # session_recency
 
         # Label
         labels[i] = ground_truth_for_query.get(mid, 0.0)
@@ -1231,7 +1284,8 @@ def main():
         print("\nLoading memory metadata...")
         db = get_db()
         memory_meta = load_memory_metadata(db)
-        print(f"  {len(memory_meta)} active memories with metadata")
+        n_mems = sum(1 for k in memory_meta if not k.startswith("__"))
+        print(f"  {n_mems} active memories with metadata")
 
         print("\nExtracting features (full candidate pool)...")
         t0 = time.time()
