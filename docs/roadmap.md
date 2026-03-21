@@ -231,6 +231,8 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 9. **UCB retuning reassessment.** The ESS-corrected UCB exploration bonus (from the limit-parameter branch) needs joint retuning of UCB_COEFF and EWMA_ALPHA. However, if the reranker is the production scoring path, UCB only matters for the formula fallback. Decide whether retuning is worth the effort. Accept if: decision documented with reasoning.
 
+10. **Prospective indexing.** At write time (or during sleep REM), generate 2–3 hypothetical future recall queries for each memory and append them to the enriched text before embedding. This bridges the cue-trigger semantic disconnect — the reason queries fail when the question uses different language than the stored memory. Kumiho (arXiv:2603.17244) reports this eliminated the >6-month accuracy cliff on LoCoMo-Plus (37.5% → 84.4%), with independent partial reproduction by the benchmark authors. The cost is one LLM call per memory — already the pattern for Somnigraph's REM classification. Accept if: NDCG@5k improves on GT queries, or negative result documented with analysis of why the enriched embedding already captures this. See `research/sources/kumiho.md`.
+
 ### Tier 2: Deeper investigation (2-3 sessions each)
 
 10. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster metrics, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
@@ -249,7 +251,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ### Tier 3: New capabilities (3+ sessions each)
 
-17. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Accept if: temporal queries measurably improve.
+17. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Kumiho's event extraction (structured events with consequences appended to summaries at ingestion) provides immediate causal structure without waiting for sleep — worth considering as a write-time enrichment rather than deferring to sleep. Accept if: temporal queries measurably improve.
 
 18. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
 
@@ -323,6 +325,7 @@ What we can't measure yet and would need to build.
 - **Sleep ablation framework.** Can't isolate which sleep step (NREM edges, REM summaries, consolidation archival) helps or hurts. Need: per-step before/after measurement.
 - **Event log analysis toolkit.** 249K events, no query tools beyond raw SQL. Need: utilities for common queries ("which memories are never retrieved?", "feedback distribution by category", "retrieval latency percentiles").
 - **Regression test suite.** Changing `scoring.py` has no automated quality check. Need: lightweight metric validation on a fixed query set, runnable as a pre-commit check.
+- **Consolidation safety guards.** The sleep pipeline has no circuit breaker, no dry-run mode, no protection for high-confidence memories. As the system matures, automated consolidation needs safeguards: cap the fraction of memories archived per cycle, protect high-confidence/high-access memories from automated deprecation, preview consolidation actions before committing. Kumiho's Dream State (arXiv:2603.17244) implements all three with configurable thresholds. Need: circuit breaker (max archive ratio per sleep run), pinned-memory protection, dry-run mode for sleep pipeline.
 - **Snippet and prompt eval loop.** The CLAUDE.md snippet (Tier 1 instructions) and sleep pipeline prompts (NREM/REM) are tested manually. Anthropic's [Skill Creator](https://github.com/anthropics/skills) provides an agentic eval loop (executor/grader/comparator/analyzer agents, train/test split, iterative refinement) that could automate this. Write eval cases like "does a fresh Claude using only the snippet correctly call recall() with dual-input?" or "does NREM correctly classify this memory pair as contradicting?" and iterate prompts to 100% pass rate. Discovered via r/aimemory (u/m3umax uses 36 eval tests for their memory system instructions).
 
 ---

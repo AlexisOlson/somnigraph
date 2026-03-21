@@ -162,6 +162,49 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What's interesting for us**: The precomputed neighborhood pattern could optimize Somnigraph's per-query PPR expansion — compute during sleep, use as fast path, fall back to live expansion for fresh memories. The coherence drive (urgency signal for unresolved contradictions) could improve our contradiction handling. The energy budget is a thoughtful model for autonomous agent constraints, orthogonal to our scope but a good reference.
 
+### AgentWorkingMemory (AWM)
+
+**What it is**: A single-process TypeScript MCP server (SQLite + FTS5 + three local ONNX models) with write-time salience filtering, 10-phase retrieval, 7-phase sleep consolidation, and retraction with confidence contamination. All local — no API keys, no cloud calls. v0.5.x, actively used in Claude Code workflows.
+
+**What it does well**:
+- Write-time salience filtering is the standout design choice. Every incoming memory is scored on novelty (BM25 duplicate check, weight 0.45), surprise, causal depth, decision significance, and effort. 77% of events are rejected; the remaining 23% produce 100% recall accuracy on their A/B eval. This is a genuinely different philosophy from store-everything-and-rank — pool cleanliness as a retrieval quality lever.
+- Retraction with confidence contamination. When a memory is retracted, direct neighbors lose `0.1 × edge_weight` confidence. Shallow (depth 1) and safe, but closes a gap most systems have: wrong memories don't just get marked, they degrade trust in associated knowledge.
+- Supersession tracking. The `supersededBy` field with a 0.15× score multiplier distinguishes "wrong" from "outdated." Superseded memories are deprioritized, not hidden — preserving historical context. memv arrived at the same pattern independently.
+- Adaptive reranker blend. Cross-encoder weight scales with BM25 signal strength: `0.3 + 0.4 * (1 - bm25Max)`. When keywords match well, trust keywords; when weak, lean on the cross-encoder.
+- Abstention gate. If top-5 reranker scores have low variance (model can't discriminate), return empty rather than low-confidence results.
+- Honest documentation. The known-limitations.md candidly acknowledges multi-hop weakness (15.4% LoCoMo), salience filter bias toward coding, scale limitations, and several unimplemented metrics.
+
+**Where it falls short**:
+- No feedback loop beyond binary. Useful/not-useful signals adjust a confidence scalar. No per-query ratings, no EWMA, no exploration bonus, no feedback-informed reranking.
+- No learned reranker. The ms-marco-MiniLM cross-encoder scores generic passage relevance — it doesn't learn from the user's actual retrieval patterns. All scoring is hand-tuned heuristics.
+- All benchmarks are internal. Self-test, workday sim, A/B vs keyword baseline — no external benchmark (LoCoMo QA, LongMemEval, etc.). The 100% edge case and 100% A/B scores are testing their own pipeline against their own test cases.
+- Consolidation creates no summaries. The sleep cycle strengthens edges and prunes noise, but never synthesizes knowledge. No LLM-mediated classification, merging, or annotation.
+- Scale untested. The O(n²) pairwise cosine comparisons in clustering and redundancy pruning won't work beyond a few hundred memories.
+- 384d MiniLM embeddings are significantly less expressive than larger models.
+
+**What's interesting for us**: The write-time salience question is empirically testable — does Somnigraph's pool contain noise that measurably degrades retrieval as it grows? Measure NDCG@5k as a function of pool size to find out. Retraction confidence contamination is a clean mechanism we don't have. Supersession tracking independently validates the `superseded_by` idea from memv.
+
+### Kumiho
+
+**What it is**: A graph-native cognitive memory architecture (Neo4j + Redis) grounded in formal AGM belief revision semantics. The central formal contribution is a correspondence between the AGM belief revision framework and the operational semantics of a property graph memory system. Immutable revisions, mutable tag pointers, typed dependency edges, and URI-based addressing serve both cognitive memory and multi-agent asset management. Cloud-hosted core, open-source SDK/MCP/benchmarks. 56-page paper (arXiv:2603.17244, March 2026).
+
+**What it does well**:
+- Formal belief revision grounding. Proves satisfaction of AGM postulates K*2–K*6, Relevance, and Core-Retainment, with a principled rejection of Recovery. This isn't decorative — the proofs justify concrete design decisions (supersession over deletion, soft deprecation over hard delete, why contract-then-expand shouldn't be a no-op). The most rigorous formal treatment of belief revision in the agent memory literature.
+- Prospective indexing. At write time, generates hypothetical future scenarios where a memory might be relevant, indexed alongside the content. This bridges the cue-trigger semantic disconnect that makes queries fail when question language differs from stored content. Eliminated the >6-month accuracy cliff on LoCoMo-Plus (37.5% → 84.4%).
+- Event extraction. Structured events with consequences appended to summaries at ingestion time, preserving causal detail that narrative compression drops. Combined with prospective indexing, enables retrieval across 730-day gaps where neither keyword nor vector similarity alone would surface the memory.
+- Consolidation safety guards. Circuit breaker (max 50% deprecation per run), published-item protection, dry-run validation, cursor-based resumption, audit reports. The paper correctly identifies this as an engineering contribution, not a formal one, and is honest that compositional AGM preservation under batch operations is an open problem.
+- Commendable intellectual honesty. The paper questions its own LoCoMo-Plus scores (GPT-family alignment with benchmark construction), identifies K*7/K*8 as unproven, notes that retrieval ranking doesn't yet incorporate temporal recency, and the LoCoMo-Plus results were partially independently reproduced by the benchmark authors.
+
+**Where it falls short**:
+- No feedback loop. Retrieval doesn't learn from use. No mechanism for scoring adjustment based on retrieval outcomes.
+- No decay or forgetting beyond consolidation. Memories persist unless the Dream State LLM recommends deprecation. No time-based decay, no access-frequency-based scoring.
+- Proprietary core. The graph server is a cloud service. Independent reproduction requires their infrastructure or reimplementation.
+- Retrieval ranking doesn't incorporate temporal recency. In the practical evaluation, an old revision outranked the current revision due to keyword matching. Conflict resolution is delegated to the agent's prompt instructions.
+- CombMAX fusion is acknowledged as susceptible to poorly-calibrated retrievers producing inflated scores.
+- Heavy infrastructure (Neo4j + Redis + cloud service) vs SQLite-based systems.
+
+**What's interesting for us**: Prospective indexing is the most actionable idea — generating hypothetical recall queries at write/sleep time and appending them to the enriched embedding text. This addresses the same retrieval gap that enriched embeddings partially solve but goes further by imagining the question, not just describing the content. Event extraction at write time provides immediate causal structure without waiting for sleep. The consolidation safety guards (circuit breaker, dry-run, pinned protection) are practical engineering patterns worth adopting. The formal AGM vocabulary provides principled justification for design decisions Somnigraph already makes (forget-as-contraction, supersession, Recovery rejection). The supersession pattern converges with memv and AWM — three independent systems arriving at the same mechanism.
+
 ### Cognee
 
 **What it is**: A document-to-knowledge-graph system with LLM extraction, multi-backend storage, and 14 search types. The flagship retrieval mode (GRAPH_COMPLETION) seeds with vector search, projects through the graph, and scores triplets by importance.
@@ -310,17 +353,17 @@ These problems are unsolved across all systems we surveyed:
 
 Most systems either ignore contradictions or handle them poorly. Mem0 hard-deletes the old fact. Zep invalidates edges but requires extraction to detect the conflict. HippoRAG, GraphRAG, and Letta don't detect contradictions at all. Generative Agents stores conflicting facts without awareness. memv handles contradictions well at extraction time (predict-calibrate surfaces them, `superseded_by` chains preserve history) but cannot detect transitive contradictions (a child fact surviving when its parent is superseded). Engram has the most sophisticated approach: five-level graded tension classification (hard/temporal/contextual/soft/none) with distinct behaviors per level.
 
-Benchmark performance across all systems: 0.025–0.037 F1 on contradiction detection tasks. This isn't a tuning problem — it's a representation problem. Detecting that "we use REST" and "we migrated to GraphQL" are about the same claim requires understanding what a "claim" is, which current systems don't model.
+Benchmark performance across all systems: 0.025–0.037 F1 on contradiction detection tasks. This isn't a tuning problem — it's a representation problem. Detecting that "we use REST" and "we migrated to GraphQL" are about the same claim requires understanding what a "claim" is, which current systems don't model. Kumiho's AGM belief revision formalism provides the strongest theoretical treatment: `Supersedes` edges with tag re-pointing ensure only the current revision is authoritative, while preserving the full revision history. But the detection of *which* beliefs contradict remains LLM-dependent — the formal machinery handles what happens after detection, not the detection itself.
 
 ### Write-path quality
 
-Most systems accept whatever they're given. Mem0's InformationContent() gating is the closest to write-path quality control, but it only prevents destructive updates — it doesn't evaluate whether a new memory is worth storing. memv's predict-calibrate extraction is the notable exception: by predicting what a conversation should contain and extracting only the gaps, it filters at write time rather than relying on post-hoc consolidation. This is the most principled write-path quality approach in the corpus.
+Most systems accept whatever they're given. Mem0's InformationContent() gating is the closest to write-path quality control, but it only prevents destructive updates — it doesn't evaluate whether a new memory is worth storing. memv's predict-calibrate extraction is the notable exception: by predicting what a conversation should contain and extracting only the gaps, it filters at write time rather than relying on post-hoc consolidation. This is the most principled write-path quality approach in the corpus. AWM takes a different tack: a rule-based salience scorer (novelty × surprise × causal depth × effort) rejects 77% of writes at the door, claiming that pool cleanliness produces better retrieval than post-hoc ranking over a noisy store. The claimed result (23 of 100 events stored, 100% recall accuracy) is internally evaluated but the philosophy is testable.
 
 The result for most systems: low-value memories accumulate over time. Consolidation (where it exists) can clean up afterward, but preventing low-quality writes in the first place would be more efficient.
 
 ### Consolidation evaluation
 
-No benchmark exists for evaluating whether consolidation improved the memory store. GraphRAG's community reports have no ground truth for comparison. Generative Agents' reflections are evaluated by human judgment only. Somnigraph's sleep pipeline is evaluated manually.
+No benchmark exists for evaluating whether consolidation improved the memory store. GraphRAG's community reports have no ground truth for comparison. Generative Agents' reflections are evaluated by human judgment only. Somnigraph's sleep pipeline is evaluated manually. Kumiho's Dream State is the most carefully engineered consolidation system (safety guards, circuit breakers, audit reports), but the paper is honest that proving compositional preservation of AGM postulates under batch consolidation is an open problem — and no evaluation of whether consolidation actually improved retrieval quality is provided.
 
 Building a consolidation benchmark requires: a memory store with known quality issues, a ground-truth consolidation, and metrics that capture both compression and fidelity. This is an open research problem.
 
