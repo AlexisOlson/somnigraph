@@ -118,28 +118,12 @@ def compute_stats(db) -> str:
     last_sleep_row = db.execute(
         "SELECT completed_at FROM sleep_log ORDER BY completed_at DESC LIMIT 1"
     ).fetchone()
-    # Exclude memories created during or after the last sleep cycle — they
-    # haven't had a chance to be processed yet and aren't "missed".
-    # Use the earliest started_at from recent runs (within 2h of last completion)
-    # to catch multi-phase sleep cycles (deep→rem→deep→rem).
-    if last_sleep_row:
-        cutoff_row = db.execute(
-            "SELECT MIN(started_at) as earliest FROM sleep_log "
-            "WHERE completed_at > datetime(?, '-2 hours')",
-            (last_sleep_row["completed_at"],),
-        ).fetchone()
-        cutoff = cutoff_row["earliest"] if cutoff_row and cutoff_row["earliest"] else last_sleep_row["completed_at"]
-        unprocessed = db.execute(
-            "SELECT count(*) FROM memories WHERE status = 'active' "
-            "AND last_sleep_processed IS NULL "
-            "AND created_at < ?",
-            (cutoff,),
-        ).fetchone()[0]
-    else:
-        unprocessed = db.execute(
-            "SELECT count(*) FROM memories WHERE status = 'active' "
-            "AND last_sleep_processed IS NULL"
-        ).fetchone()[0]
+    # Count memories that haven't been through sleep yet (need processing).
+    # This includes memories created after the last sleep run.
+    unprocessed = db.execute(
+        "SELECT count(*) FROM memories WHERE status = 'active' "
+        "AND last_sleep_processed IS NULL"
+    ).fetchone()[0]
 
     # Confidence distribution
     conf_stats = db.execute("""
