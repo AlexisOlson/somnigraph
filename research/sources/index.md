@@ -15,9 +15,11 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Generative Agents](https://arxiv.org/abs/2304.03442) | generative-agents.md | Foundational work introducing memory stream + reflection + recursive planning for simulated agents (UIST 2023). The architecture all subsequent consolidation work builds on. |
 | [Hindsight (paper)](https://arxiv.org/abs/2512.12818) | hindsight-paper.md | Compositional memory with four epistemically-distinct networks and three primitives (Retain/Recall/Reflect), achieving 83.6% on LongMemEval with traceable evidence paths. |
 | [HippoRAG / HippoRAG 2](https://arxiv.org/abs/2405.14831) | hipporag.md | Neurobiologically-inspired retrieval using an open knowledge graph with Personalized PageRank for single-step multi-hop reasoning (NeurIPS 2024 / ICML 2025). |
+| [Kumiho: Graph-Native Cognitive Memory](https://arxiv.org/abs/2603.17244) | kumiho.md | Graph-native memory architecture (Neo4j + Redis) with formal AGM belief revision correspondence, prospective indexing, event extraction. 0.447 F1 on LoCoMo, 93.3% on LoCoMo-Plus (independently partially reproduced). 56-page paper from Kumiho Inc. |
 | [Mem0: Memory Layer for AI Agents](https://arxiv.org/abs/2504.19413) | mem0-paper.md | Extract-then-update memory pipeline with flat and graph-enhanced variants, achieving 68.44% on LoCoMo with 91% less latency than full-context baselines. |
 | [Mem-alpha](https://arxiv.org/abs/2509.25911) | mem-alpha.md | RL-trained (GRPO) memory management where a 4B model learns optimal store/update/delete policies, generalizing from 30K training to 400K+ token sequences. |
 | [Memory-R1](https://arxiv.org/abs/2508.19828) | memory-r1.md | Two-agent RL framework trained on only 152 QA pairs achieving SOTA on LoCoMo/MSC/LongMemEval, outperforming heuristic baselines and SFT from GPT-4o trajectories. |
+| [MSA: Memory Sparse Attention](https://doi.org/10.5281/zenodo.19103670) | msa.md | End-to-end trainable sparse attention layer with document-wise RoPE and KV cache compression, scaling to 100M tokens on 2×A800 GPUs with <9% degradation. Model-layer architecture, not an application-level memory system. |
 | [Memory-T1](https://arxiv.org/abs/2512.20092) | memory-t1.md | Coarse-to-fine temporal retrieval with GRPO-trained evidence selection and multi-level reward for multi-session temporal reasoning. |
 | [MemOS](https://arxiv.org/abs/2505.22101) | memos.md | Proposed memory OS with MemCube container abstraction wrapping heterogeneous memory types under unified scheduling and lifecycle management. |
 | [MT-DNC: Brain-Inspired Memory Transformation DNC](https://doi.org/10.3389/frai.2025.1635932) | mt-dnc.md | Extends the Differentiable Neural Computer by splitting memory into Working Memory and Long-Term Memory connected by a value-based transformation algorithm. |
@@ -55,9 +57,11 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 
 | Title | File | Summary |
 |-------|------|---------|
+| [AgentWorkingMemory](https://github.com/CompleteIdeas/agent-working-memory) | awm.md | TypeScript MCP server with write-time salience filtering (77% rejection), 10-phase retrieval (BM25 + vectors + cross-encoder rerank + beam-search graph walk), 7-phase sleep consolidation, staging buffer, retraction with confidence contamination. All-local ONNX models. |
 | [AI Smartness](https://github.com/VzKtS/ai-smartness) | ai-smartness.md | Rust-based multi-agent memory with SQLite, gossip propagation, and Claude Code hook integration. |
 | [Aurora](https://github.com/hamr0/aurora) | aurora.md | Code intelligence tool with ACT-R cognitive architecture, type-specific decay, chunk-type-aware hybrid retrieval (BM25 + ACT-R + semantic), and friction analysis. |
 | [Athena](https://github.com/winstonkoh87/Athena-Public) | athena.md | MCP server with Supabase/pgvector, Gemini embeddings, hybrid RAG with cross-encoder reranking. |
+| [claude-sleep](https://github.com/jesung/claude-sleep) | claude-sleep.md | Minimal consolidation pattern: daily markdown notes + hourly background Claude session rewrites curated MEMORY.md. Hook-driven, no retrieval pipeline. |
 | [Claude Cognitive](https://github.com/GMaN1911/claude-cognitive) | claude-cognitive.md | Attention-based context router injecting docs into Claude Code's system prompt via hooks. |
 | [Claude Total Memory](https://github.com/vbcherepanov/claude-total-memory) | claude-total-memory.md | Single-file MCP server with SQLite/FTS5 + optional ChromaDB and session transcript extraction. |
 | [Claudest](https://github.com/gupsammy/Claudest) | claudest.md | Zero-dependency Python plugin using SQLite/FTS5 with session import/sync hooks. |
