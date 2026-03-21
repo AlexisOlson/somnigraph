@@ -175,7 +175,7 @@ Seven systems surveyed in depth (62 total sources):
 | **A-Mem** | Zettelkasten | Multi-faceted embedding (+121% multi-hop) | 3 LLM calls/write, no forgetting |
 | **Cognee** | Document-to-graph | Triplet embeddings, usage frequency tracking | Batch-oriented, additive only |
 
-**Where Somnigraph is unique**: Closed feedback loop (no other system has one). Offline consolidation with per-memory LLM judgment. Adaptive scoring that evolves through use.
+**Where Somnigraph is unique**: Explicit feedback loop with measured GT correlation (r=0.70) — Ori-Mnemos v0.5.0 also closes a feedback loop via behavioral inference, but without GT validation. Offline consolidation with per-memory LLM judgment. Learned reranker (LightGBM, 26 features, +6.17pp NDCG).
 
 **Where others do better**: Real-time graph construction (Zep, Cognee). Entity resolution (Graphiti). Scale validation (HippoRAG, GraphRAG). Temporal reasoning (Zep's 4-timestamp model).
 

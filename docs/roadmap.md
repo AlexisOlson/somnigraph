@@ -12,7 +12,7 @@ Seven findings from 68 source analyses and 20+ tuning studies that would change 
 
 The retrieval feedback loop — where recalled memories receive explicit utility scores that reshape future scoring — is the dominant signal. Feature importance analysis (wm15): feedback accounts for 15–20% of AUC, but with a catch: it's only useful because the empirical Bayes Beta prior centers the scores. wm5 tested removal of the prior: `feedback_coeff` collapsed to near zero. Raw feedback is too noisy to help; the prior is the mechanism that makes it useful.
 
-No other surveyed system (Mem0, Zep/Graphiti, HippoRAG, GraphRAG, Generative Agents) has a closed feedback loop. This is the primary architectural differentiator.
+As of v0.5.0, Ori-Mnemos also closes a feedback loop — but via behavioral inference (inferred from citations, edits, re-recalls) rather than explicit grading. No other surveyed system has explicit per-query feedback with measured GT correlation (r=0.70). This remains the primary architectural differentiator, though the category is no longer unique.
 
 ### 2. Theme boost was compensating for missing graph traversal
 
@@ -180,6 +180,7 @@ The cliff detector (`apply_quality_floor` in `scoring.py`) becomes dead code. `C
 **Experiment:** Compute edge age distribution, fraction never updated since creation, and correlation between edge age and co-retrieval utility.
 **Effort:** 1 session.
 **Hypothesis:** Significant fraction of edges are never reinforced after creation. Some actively hurt retrieval by connecting unrelated memories.
+**Possible mechanism:** Turrigiano homeostatic scaling (Ori-Mnemos v0.5.0) — clamp per-node mean edge weight to a target by scaling all edges touching that node. This prevents accumulation without explicit pruning. See `research/sources/ori-mnemos.md` §9.1.
 
 ### Do memories converge to attractor states?
 
@@ -277,7 +278,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 - **No common personal memory retrieval benchmark.** LoCoMo is closest but tests conversation-level QA, not the memory→retrieval→feedback loop that somnigraph optimizes. Results aren't comparable.
 - **No consolidation benchmark exists.** No system measures this — it's an open research problem (see `architecture.md` § Open Problems).
-- **Feedback loop can't be compared.** No other system has one.
+- **Feedback loop comparison is limited.** Ori-Mnemos (v0.5.0) has behavioral inference feedback but no published GT correlation. Direct comparison would require running both systems on the same benchmark with the same GT — neither system supports this out of the box.
 
 ### Proposed benchmarking experiments
 

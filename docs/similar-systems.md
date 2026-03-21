@@ -28,7 +28,7 @@ AI memory systems cluster into three approaches:
 
 **Platform-first**: Build a unified memory + toolkit layer that multiple AI agents can share, with integrations across dozens of apps as the differentiator. RedPlanet CORE is the exemplar. Broad but shallow on memory quality — retrieval doesn't learn from use.
 
-Somnigraph doesn't fit neatly into any of these. It stores discrete memories (like extract-and-store), builds a graph of relationships between them (like graph-based), and shapes retrieval through a feedback loop (unlike any of them). The sleep pipeline adds offline consolidation that none of the others attempt at this level.
+Somnigraph doesn't fit neatly into any of these. It stores discrete memories (like extract-and-store), builds a graph of relationships between them (like graph-based), and shapes retrieval through a feedback loop (shared with Ori-Mnemos, though via different mechanisms). The sleep pipeline adds offline consolidation that none of the others attempt at this level.
 
 ---
 
@@ -184,6 +184,31 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What's interesting for us**: The write-time salience question is empirically testable — does Somnigraph's pool contain noise that measurably degrades retrieval as it grows? Measure NDCG@5k as a function of pool size to find out. Retraction confidence contamination is a clean mechanism we don't have. Supersession tracking independently validates the `superseded_by` idea from memv.
 
+### Ori-Mnemos
+
+**What it is**: A TypeScript MCP server using markdown vault files as memory, wiki-link graph edges, local embeddings (all-MiniLM-L6-v2), and ACT-R cognitive decay. Three metabolic vault zones (self/notes/ops) with different decay rates. v0.5.0 added three learning layers (Q-values, co-occurrence edges, LinUCB stage selection) and recursive sub-question decomposition via LLM. Zero cloud, zero database (SQLite for metadata only, content in `.md` files). Apache-2.0. Marketed as "Recursive Memory Harness" (RMH), citing the MIT CSAIL RLM paper (arXiv:2512.24601) as inspiration — the connection is philosophical (recursion applied to retrieval), not mechanical.
+
+**What it does well**:
+- Three-layer retrieval learning closes the feedback loop without explicit user grading. Layer 1: Q-values via EMA with behavioral reward inference (forward citations +1.0, downstream creation +0.6, dead ends −0.15, all exposure-corrected). Layer 2: co-occurrence edges with NPMI, Ebbinghaus decay, and Turrigiano homeostatic scaling. Layer 3: LinUCB contextual bandits learn which pipeline stages to run per query type.
+- Turrigiano homeostatic scaling on co-occurrence edges (per-node mean weight clamped to 0.5) is a principled anti-rich-get-richer mechanism with solid neuroscience grounding (Turrigiano & Nelson 2004). No other system in our corpus addresses this problem at the mechanism level.
+- Graph algorithm sophistication: full PageRank, PPR (α=0.45 for explore, 0.85 for flat), Louvain communities, betweenness centrality, Tarjan articulation-point protection for graph-critical nodes.
+- Dampening pipeline with ablation-validated impact: gravity dampening (halve score for high cosine + zero keyword overlap, −0.256 P@5), hub dampening (penalize top-10% degree, −0.104 P@5), resolution boost (1.25× for actionable note types, −0.144 P@5).
+- Recursive sub-question decomposition: LLM identifies retrieval gaps, generates 1–3 sub-questions, re-seeds from vault, convergence detection at <15% new notes per pass. Graceful degradation without LLM.
+- Local-only embeddings, no API keys, no cloud dependencies.
+
+**Where it falls short**:
+- No offline consolidation. Session-end batch updates are online learning, not LLM-mediated consolidation. No NREM-style merging, no REM-style gap analysis.
+- No contradiction/revision tracking. No temporal validity fields, no supersession chains.
+- No typed edge metadata. Wiki-links are untyped; co-occurrence edges have NPMI weight but no semantic linking_context.
+- Behavioral reward signals are unmeasured against ground truth. The three learning layers are architecturally sound but their actual correlation with retrieval relevance is unknown.
+- Markdown-as-database introduces O(n) filesystem reads per query for BM25 indexing.
+- 384-dim MiniLM embeddings are significantly less expressive than larger models.
+- Benchmark comparison with Mem0 is asymmetric: 90% R@5 vs 29% on HotpotQA compares recursive multi-pass with LLM calls against single-pass vector search. On LoCoMo, Ori (37.69) is essentially at parity with Mem0 (38.72) on single-hop.
+
+**What we took**: The enriched embedding pattern (embed content + metadata, not just content). Graph topology as a decay protection mechanism (Tarjan articulation points).
+
+**What's interesting for us**: Turrigiano homeostatic scaling directly addresses our Hebbian PMI rich-get-richer problem and false bridge ratchet (open problems in `roadmap.md`). Forward-citation detection (did the agent cite a recalled memory in subsequent `remember()` content?) is a supplementary feedback signal capturable without burdening the agent. Gravity dampening (penalize high-cosine + zero-keyword-overlap results) is a testable hypothesis about a failure mode we haven't measured.
+
 ### Kumiho
 
 **What it is**: A graph-native cognitive memory architecture (Neo4j + Redis) grounded in formal AGM belief revision semantics. The central formal contribution is a correspondence between the AGM belief revision framework and the operational semantics of a property graph memory system. Immutable revisions, mutable tag pointers, typed dependency edges, and URI-based addressing serve both cognitive memory and multi-agent asset management. Cloud-hosted core, open-source SDK/MCP/benchmarks. 56-page paper (arXiv:2603.17244, March 2026).
@@ -327,11 +352,11 @@ A summary of borrowed ideas, attributed to their source:
 
 ### What Somnigraph does differently
 
-**Feedback loop.** No other system in our corpus closes the retrieval-feedback loop. Mem0 tracks nothing about retrieval quality. Zep builds a graph but doesn't learn which edges are useful. HippoRAG doesn't even record what was retrieved. Somnigraph's `recall_feedback()` creates a gradient signal that reshapes scoring, adjusts decay rates, strengthens/weakens edges, and enriches themes. This is the primary differentiator.
+**Explicit feedback loop with measured precision.** Ori-Mnemos (v0.5.0) now closes a retrieval-feedback loop via behavioral inference — three learning layers that infer reward from downstream actions (citations, edits, re-recalls). However, the two approaches differ fundamentally: Somnigraph's `recall_feedback()` is explicit (agent grades results, per-query Spearman r=0.70 with ground truth) while Ori's is implicit (behavioral signals, correlation with GT unmeasured). Explicit feedback creates a gradient signal that reshapes scoring, adjusts decay rates, strengthens/weakens edges, and enriches themes. No other system provides both explicit per-query grading and measured GT correlation. This remains the primary architectural differentiator, though no longer unique as a category.
 
-**Offline consolidation with LLM judgment.** Generative Agents has reflection, but it's online (triggered during conversation). GraphRAG has community summarization, but it's one-shot. Somnigraph runs three-phase consolidation offline, with an LLM making per-memory and per-cluster decisions about what to merge, archive, rewrite, or annotate. The `annotate` action (preserving temporal arcs without merging) doesn't exist in any other system we surveyed.
+**Offline consolidation with LLM judgment.** Generative Agents has reflection, but it's online (triggered during conversation). GraphRAG has community summarization, but it's one-shot. Ori-Mnemos does session-end batch updates (online learning), but no LLM-mediated consolidation. Somnigraph runs three-phase consolidation offline, with an LLM making per-memory and per-cluster decisions about what to merge, archive, rewrite, or annotate. The `annotate` action (preserving temporal arcs without merging) doesn't exist in any other system we surveyed.
 
-**Adaptive scoring.** Most systems have fixed scoring functions. Somnigraph's scoring adapts through feedback (memories that prove useful score higher), co-retrieval (memories retrieved together develop affinity), and edge weight evolution (graph connections strengthen or weaken based on endpoint utility). The scoring pipeline isn't a static algorithm — it's a learning system.
+**Adaptive scoring with learned reranker.** Most systems have fixed scoring functions. Somnigraph's LightGBM reranker learns from 1032 GT queries with 26 features (+6.17pp NDCG over formula). Ori-Mnemos adapts via Q-value reranking (fixed lambda-blend formula, not learned). The distinction: Somnigraph learns the scoring function itself from labeled data; Ori learns per-note quality estimates that feed a hand-designed scoring function.
 
 ### What others do better
 
