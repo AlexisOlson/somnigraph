@@ -1,6 +1,6 @@
 # Similar Systems
 
-An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (73 sources), see `research/sources/index.md`.
+An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (80 sources), see `research/sources/index.md`.
 
 ## Contents
 

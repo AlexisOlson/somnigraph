@@ -4,7 +4,7 @@ Loads a trained LightGBM model and precomputes per-memory metadata.
 Provides rerank() as a drop-in replacement for the RRF+UCB+Hebbian+PPR pipeline.
 Falls back to None if model not found (caller should use legacy pipeline).
 
-26 features (0-17 base, 18-25 extended):
+31 features (0-17 base, 18-25 extended, 26-30 tier 3):
   0-6:   retrieval signals (fts_rank, vec_rank, theme_rank, ppr_score, fts_bm25, vec_dist, theme_overlap)
   7-9:   feedback signals (fb_last, fb_mean, fb_count)
   10:    graph signal (hebbian_pmi)
@@ -14,6 +14,9 @@ Falls back to None if model not found (caller should use legacy pipeline).
   22-23: graph structure (betweenness, diversity_score)
   24:    feedback temporal (fb_time_weighted)
   25:    session (session_recency)
+  26-27: query-level (query_length, candidate_pool_size)
+  28-29: normalized scores (fts_bm25_norm, vec_dist_norm)
+  30:    memory metadata (decay_rate)
 """
 
 import json
@@ -26,7 +29,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from memory.constants import MODEL_PATH, PPR_DAMPING
+from memory.constants import (
+    CATEGORY_DECAY_RATES,
+    DEFAULT_DECAY_RATE,
+    MODEL_PATH,
+    PPR_DAMPING,
+)
 
 logger = logging.getLogger("claude-memory")
 
@@ -52,6 +60,8 @@ FEATURE_NAMES = [
     "query_coverage", "proximity", "query_idf_var", "burstiness",
     # Extended features (Tier 2)
     "betweenness", "diversity_score", "fb_time_weighted", "session_recency",
+    # Extended features (Tier 3 — query-level and normalization)
+    "query_length", "candidate_pool_size", "fts_bm25_norm", "vec_dist_norm", "decay_rate",
 ]
 
 # Cache for model + metadata
@@ -111,7 +121,7 @@ def _load_memory_meta(db):
     now_dt = datetime.now(timezone.utc)
     rows = db.execute("""
         SELECT id, category, base_priority, created_at, token_count,
-               confidence, themes, content, summary
+               confidence, themes, content, summary, decay_rate
         FROM memories WHERE status = 'active'
     """).fetchall()
 
@@ -146,6 +156,7 @@ def _load_memory_meta(db):
             "theme_count": theme_count,
             "content_text": content_text.lower(),
             "content_tokens": content_text.lower().split(),
+            "decay_rate": r["decay_rate"] if r["decay_rate"] is not None else CATEGORY_DECAY_RATES.get(r["category"], DEFAULT_DECAY_RATE),
         }
 
     # Edge counts + adjacency
@@ -384,6 +395,12 @@ def rerank(
     if not candidate_ids:
         return []
 
+    pool_size = len(candidate_ids)
+
+    # Per-query max for normalized score features
+    max_fts = max(fts_scores.values()) if fts_scores else 0.0
+    max_vec = max(vec_distances.values()) if vec_distances else 0.0
+
     # Hebbian PMI
     hebbian_pmi_map = {}
     if hebb_data and hebb_data.get("total_queries", 0) >= 5:
@@ -424,6 +441,7 @@ def rerank(
 
     # Query-level features
     query_terms = [t for t in query.lower().split() if len(t) > 1]
+    q_len = len(query_terms)
 
     idf_stats = memory_meta.get("__idf_stats__", {})
     total_docs = idf_stats.get("total_docs", 1)
@@ -456,11 +474,11 @@ def rerank(
     now_ts = time.time()
     fb_lambda = 0.01
 
-    # Build feature matrix (26 features, matching FEATURE_NAMES order)
+    # Build feature matrix (31 features, matching FEATURE_NAMES order)
     candidate_list = sorted(candidate_ids)
     n = len(candidate_list)
     # Use list-of-lists to avoid numpy dependency at prediction time
-    features = [[0.0] * 26 for _ in range(n)]
+    features = [[0.0] * 31 for _ in range(n)]
 
     for i, mid in enumerate(candidate_list):
         f = features[i]
@@ -542,6 +560,13 @@ def rerank(
             f[24] = -1.0
 
         f[25] = session_recency_map.get(mid, -1)            # session_recency
+
+        # Tier 3
+        f[26] = q_len                                            # query_length
+        f[27] = pool_size                                        # candidate_pool_size
+        f[28] = (fts_scores.get(mid, 0.0) / max_fts) if max_fts > 0 else 0.0  # fts_bm25_norm
+        f[29] = (vec_distances.get(mid, 0.0) / max_vec) if max_vec > 0 else 0.0  # vec_dist_norm
+        f[30] = m.get("decay_rate", DEFAULT_DECAY_RATE) if m else DEFAULT_DECAY_RATE  # decay_rate
 
     # Predict using Booster (list-of-lists input, no numpy needed)
     preds = model.predict(features)

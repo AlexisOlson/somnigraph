@@ -59,7 +59,7 @@ from tune_gt import (
     get_db,
 )
 
-from memory.constants import DATA_DIR
+from memory.constants import CATEGORY_DECAY_RATES, DATA_DIR, DEFAULT_DECAY_RATE
 FEATURES_PATH = DATA_DIR / "tuning_studies" / "reranker_features.pkl"
 MODEL_PATH = DATA_DIR / "tuning_studies" / "reranker_model.pkl"
 GT_PATH = DATA_DIR / "tuning_studies" / "gt_calibrated.json"
@@ -111,6 +111,13 @@ FEATURE_NAMES = [
     "diversity_score",  # 23: 1 - mean cosine sim to neighbors
     "fb_time_weighted", # 24: exponentially time-weighted feedback mean
     "session_recency",  # 25: queries ago since last co-retrieval in session
+
+    # Extended features (Tier 3 — query-level and normalization)
+    "query_length",         # 26: number of query terms (complexity proxy)
+    "candidate_pool_size",  # 27: total candidates after PPR expansion
+    "fts_bm25_norm",        # 28: per-query normalized BM25 score (0-1)
+    "vec_dist_norm",        # 29: per-query normalized vector distance (0-1)
+    "decay_rate",           # 30: memory decay rate (0 = permanent)
 ]
 
 
@@ -227,8 +234,15 @@ def extract_features_for_query(
             if total_pmi > 0:
                 hebbian_pmi_map[candidate] = total_pmi
 
+    pool_size = len(candidate_ids)
+
+    # Per-query max for normalized score features
+    max_fts_score = max(fts_score_map.values()) if fts_score_map else 0.0
+    max_vec_score = max(vec_score_map.values()) if vec_score_map else 0.0
+
     # --- Query-level features ---
     query_terms = [t for t in qtext.lower().split() if len(t) > 1]
+    q_len = len(query_terms)
 
     idf_stats = memory_meta.get("__idf_stats__", {})
     total_docs = idf_stats.get("total_docs", 1)
@@ -363,6 +377,13 @@ def extract_features_for_query(
             features[i, 24] = -1.0
 
         features[i, 25] = session_recency_map.get(mid, -1)                  # session_recency
+
+        # Extended features (Tier 3)
+        features[i, 26] = q_len                                               # query_length
+        features[i, 27] = pool_size                                            # candidate_pool_size
+        features[i, 28] = (fts_score_map.get(mid, 0.0) / max_fts_score) if max_fts_score > 0 else 0.0  # fts_bm25_norm
+        features[i, 29] = (vec_score_map.get(mid, 0.0) / max_vec_score) if max_vec_score > 0 else 0.0  # vec_dist_norm
+        features[i, 30] = meta.get("decay_rate", DEFAULT_DECAY_RATE) if meta else DEFAULT_DECAY_RATE  # decay_rate
 
         # Label
         labels[i] = ground_truth_for_query.get(mid, 0.0)

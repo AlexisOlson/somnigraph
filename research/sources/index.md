@@ -69,6 +69,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [cognee](https://github.com/topoteretes/cognee) | cognee.md | Production knowledge engine converting raw data into knowledge graphs with pluggable backends. |
 | [CortexGraph](https://github.com/prefrontal-systems/cortexgraph) | cortexgraph.md | MCP server with Ebbinghaus-style forgetting curves, consolidation, and Obsidian vault promotion. |
 | [Daem0n-MCP](https://github.com/DasBluEyedDevil/Daem0n-MCP) | daem0n.md | Async MCP memory/decision system with Qdrant vectors, Leiden community detection, and E2B sandboxing. |
+| [DiffMem](https://github.com/Growth-Kinetics/DiffMem) | diffmem.md | Git-native memory backend using Markdown files and a multi-turn LLM agent that explores git history via shell commands for retrieval -- no vectors, no BM25, no database. Powers Annabelle WhatsApp bot. |
 | [Ember MCP](https://github.com/Arkya-AI/ember-mcp) | ember-mcp.md | Async MCP server using FAISS vectors with Voronoi cell spatial partitioning. |
 | [Empirica](https://github.com/Nubaeon/empirica) | empirica.md | Epistemic middleware with git-notes storage, optional Qdrant vectors, and calibration tracking. |
 | [Engram](https://github.com/Harshitk-cp/engram) | engram.md | Go HTTP API with PostgreSQL/pgvector implementing multi-system cognitive memory with consolidation and decay. |
@@ -83,6 +84,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [memsearch](https://github.com/zilliztech/memsearch) | memsearch.md | Milvus-backed MCP server with markdown source of truth and watchdog file monitoring. |
 | [MSAM](https://github.com/jadenschwab/msam) | msam.md | REST API server with four cognitive streams, ACT-R activation scoring, and sleep consolidation. |
 | [Neuroca](https://github.com/Modern-Prometheus-AI/Neuroca) | neuroca.md | Multi-tiered memory (STM/MTM/LTM) with biological inspiration; alpha status, predominantly AI-generated. |
+| [NornicDB](https://github.com/orneryd/NornicDB) | nornicdb.md | Go graph database with Neo4j Bolt/Cypher compatibility, three-tier biological decay with promotion, HNSW + BM25 + RRF fusion + cross-encoder reranking + MMR diversity, Auto-TLP relationship discovery, Kalman temporal tracking. |
 | [OmniMemory](https://github.com/OmniNode-ai/omnimemory) | omnimemory.md | Enterprise multi-backend memory subsystem (Qdrant + Memgraph + PostgreSQL + Valkey) with ONEX 4-node architecture, lifecycle state machine, PII detection, and intent event sourcing. |
 | [RedPlanet CORE](https://github.com/RedPlanetHQ/core) | redplanet-core.md | Self-hosted digital brain platform with Neo4j knowledge graph (4-node model: episodes, statements, entities, compacted sessions), 12 statement aspects (Voice/Graph split), 200+ app integrations, 88.24% claimed LoCoMo accuracy. |
 | [OpenClaw Memory](https://github.com/gavdalf/openclaw-memory) | openclaw.md | Pure Bash/shell memory using markdown logs, LLM-driven consolidation via cron, and inotify watching. |
