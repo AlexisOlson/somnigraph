@@ -33,8 +33,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-# Setup: add src/ to path for memory package imports
+# Setup: add src/ and scripts/ to path for memory and locomo_bench imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from locomo_bench.config import CATEGORY_NAMES, BenchConfig
 from locomo_bench.evaluate import (
@@ -114,6 +115,8 @@ def run_conversation(
     config: BenchConfig,
     run_dir: Path,
     question_limit: int = 0,
+    results_path: Path | None = None,
+    done_keys: set | None = None,
 ) -> list[dict]:
     """Run the full pipeline for one conversation."""
     conv_dir = run_dir / f"conv_{conv_idx}"
@@ -154,7 +157,11 @@ def run_conversation(
 
     # Phase 2: Evaluate each question
     results = []
+    _done = done_keys or set()
     for q_idx, q in enumerate(conv_questions):
+        if (q["conv_id"], q["question"]) in _done:
+            continue
+
         try:
             result = _evaluate_question(q, dia_map, config, q_idx)
             results.append(result)
@@ -171,7 +178,7 @@ def run_conversation(
 
         except Exception as e:
             logger.error("  Error on question %d: %s", q_idx, e)
-            results.append({
+            result = {
                 "conv_id": conv_idx,
                 "category": q["category"],
                 "question": q["question"],
@@ -184,7 +191,13 @@ def run_conversation(
                 "match_ratio": 0.0,
                 "retrieval_hit": False,
                 "retrieved_count": 0,
-            })
+            }
+            results.append(result)
+
+        # Write incrementally
+        if results_path:
+            with open(results_path, "a") as f:
+                f.write(json.dumps(result) + "\n")
 
         if (q_idx + 1) % 20 == 0:
             correct = sum(1 for r in results if r.get("judge_label") == "CORRECT")
@@ -224,11 +237,14 @@ def _evaluate_question(
         question, context, category, gold, config, seed=seed,
     )
 
-    # Judge
-    judgment = judge_answer(question, gold, generated, category, config)
-
     # Token F1
     f1 = token_f1(generated, gold)
+
+    # Judge (skip if --no-judge)
+    if config.no_judge:
+        judgment = {"label": "PENDING", "reasoning": "", "method": "skipped", "match_ratio": 0.0}
+    else:
+        judgment = judge_answer(question, gold, generated, category, config)
 
     return {
         "conv_id": q["conv_id"],
@@ -280,6 +296,8 @@ def main():
                         help="Conversation indices (default: all 10)")
     parser.add_argument("--resume", action="store_true",
                         help="Resume from checkpoint")
+    parser.add_argument("--run-dir", type=str,
+                        help="Resume into existing run directory (implies --resume)")
     parser.add_argument("--limit", type=int, default=0,
                         help="Max questions per conversation (0=all)")
 
@@ -302,9 +320,15 @@ def main():
     parser.add_argument("--skip-adversarial", action="store_true",
                         help="Skip category 5 (match CORE methodology)")
 
+    # Reranker options
+    parser.add_argument("--locomo-reranker", action="store_true",
+                        help="Use LoCoMo-specific reranker instead of production")
+
     # Ablation options
     parser.add_argument("--feedback-loop", action="store_true",
                         help="Two-pass: run, feed scores back, re-run")
+    parser.add_argument("--no-judge", action="store_true",
+                        help="Skip judging (reader + retrieval only, batch judge later)")
 
     args = parser.parse_args()
 
@@ -323,11 +347,21 @@ def main():
         skip_adversarial=args.skip_adversarial,
         use_feedback_loop=args.feedback_loop,
         resume=args.resume,
+        no_judge=args.no_judge,
     )
 
-    # Create run directory
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = config.base_dir / f"run_{run_id}"
+    # Install LoCoMo reranker if requested
+    if args.locomo_reranker:
+        from locomo_bench.eval_retrieval import _install_locomo_reranker
+        _install_locomo_reranker()
+
+    # Create or reuse run directory
+    if args.run_dir:
+        run_dir = Path(args.run_dir)
+        config.resume = True
+    else:
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = config.base_dir / f"run_{run_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # Save config
@@ -390,18 +424,9 @@ def main():
             conv_idx, conversations, all_turns, all_questions,
             config, run_dir,
             question_limit=args.limit,
+            results_path=results_path,
+            done_keys=done_keys,
         )
-
-        # Filter out already-done (resume support)
-        new_results = [
-            r for r in results
-            if (r["conv_id"], r["question"]) not in done_keys
-        ]
-
-        # Append to results file
-        with open(results_path, "a") as f:
-            for r in new_results:
-                f.write(json.dumps(r) + "\n")
 
         all_results.extend(results)
 

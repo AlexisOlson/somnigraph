@@ -259,6 +259,65 @@ def _install_locomo_reranker():
             if mem_session and mid in top20_set:
                 features[i, 16] = session_counts.get(mem_session, 1) - 1
 
+            # Group F: has_temporal_expr (17), entity_density (18)
+            from locomo_bench.train_locomo_reranker import _count_temporal_exprs
+            features[i, 17] = _count_temporal_exprs(content)
+            features[i, 18] = len(mem.get("entities", set())) / max(mem["token_count"], 1)
+
+        # Second pass: features that depend on top-10 RRF
+        top10_rrf = sorted(candidate_ids, key=lambda m: rrf_scores.get(m, 0), reverse=True)[:10]
+        top10_set = set(top10_rrf)
+
+        # theme_complementarity (21): query coverage not already in top-10
+        top10_query_coverage = set()
+        for t10_mid in top10_rrf:
+            t10_mem = memories.get(t10_mid)
+            if t10_mem:
+                top10_query_coverage |= set(query_terms) & set(t10_mem["content_tokens"])
+
+        # centroid_distance (24): load embeddings from DB via rowid map
+        from memory.vectors import deserialize_f32
+        emb_rows = db.execute("""
+            SELECT m.memory_id, v.embedding
+            FROM memory_rowid_map m
+            JOIN memory_vec v ON v.rowid = m.rowid
+        """).fetchall()
+        all_embs = {r["memory_id"]: deserialize_f32(r["embedding"]) for r in emb_rows}
+
+        top10_embs = []
+        candidate_embs = {}
+        for mid in candidate_list:
+            emb = all_embs.get(mid)
+            if emb is not None:
+                candidate_embs[mid] = emb
+                if mid in top10_set:
+                    top10_embs.append(emb)
+
+        centroid = None
+        if top10_embs:
+            import numpy as _np2
+            centroid = _np2.mean(top10_embs, axis=0)
+            centroid_norm = float(_np2.linalg.norm(centroid)) + 1e-9
+
+        for i, mid in enumerate(candidate_list):
+            mem = memories.get(mid)
+            if not mem:
+                continue
+
+            # theme_complementarity (21)
+            if query_terms:
+                content_set = set(mem["content_tokens"])
+                my_coverage = set(query_terms) & content_set
+                novel = my_coverage - top10_query_coverage
+                features[i, 21] = len(novel) / len(query_terms)
+
+            # centroid_distance (24)
+            emb = candidate_embs.get(mid)
+            if emb is not None and centroid is not None:
+                emb_norm = float(_np.linalg.norm(emb)) + 1e-9
+                cos_sim = float(_np.dot(emb, centroid) / (emb_norm * centroid_norm))
+                features[i, 24] = 1.0 - cos_sim
+
         # Predict with LoCoMo model (select feature columns)
         X = features[:, _locomo_feature_indices]
         preds = _locomo_model.predict(X)

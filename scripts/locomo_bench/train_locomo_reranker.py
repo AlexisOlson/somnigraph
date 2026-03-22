@@ -1339,13 +1339,23 @@ def main():
                         help="Seed features for forward stepwise (by name)")
     parser.add_argument("--exclude", type=str, nargs="+",
                         help="Features to exclude from selection (by name)")
+    parser.add_argument("--feature-names", type=str, nargs="+",
+                        help="Explicit feature names to use (overrides --features/--config)")
 
     args = parser.parse_args()
 
     t_start = time.time()
 
     # Determine feature indices
-    if args.config:
+    if args.feature_names:
+        feature_indices = []
+        for name in args.feature_names:
+            if name not in FEATURE_NAMES:
+                print(f"Unknown feature: {name}. Available: {FEATURE_NAMES}")
+                sys.exit(1)
+            feature_indices.append(FEATURE_NAMES.index(name))
+        feature_indices.sort()
+    elif args.config:
         config_val = ABLATION_CONFIGS[args.config]
         if config_val and isinstance(config_val[0], str):
             feature_indices = []

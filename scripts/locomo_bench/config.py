@@ -39,6 +39,9 @@ class BenchConfig:
     # Resume
     resume: bool = False
 
+    # Skip judging (generate answers only, batch judge later)
+    no_judge: bool = False
+
 
 CATEGORY_NAMES = {
     1: "single-hop",
