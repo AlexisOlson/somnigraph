@@ -42,13 +42,13 @@ This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet
 
 ### 4. End-to-end LoCoMo QA benchmark
 
-Port RedPlanet CORE's LoCoMo evaluation harness to Python and run against Somnigraph. CORE claims 85% end-to-end QA accuracy; our current LoCoMo number (R@10 = 67.3%) measures retrieval recall only — different metric, not comparable. This bridges the gap: same benchmark, same metric, apples-to-apples comparison.
+LoCoMo end-to-end QA pipeline is built and producing results. Initial run: **85.1% overall accuracy** (Opus judge), beating Mem0 (66.88 J), Mem0g (68.44 J), and full-context baseline (72.90 J) on the same benchmark. See `docs/locomo-benchmark.md` for full results.
 
-**What to build:** Python adapter with three steps: (1) ingestion feeding LoCoMo dialog turns into `remember()`, (2) QA pipeline doing `recall()` → LLM generate → LLM judge, (3) optional sleep pass between ingestion and evaluation. Run with/without sleep and with/without feedback loop to isolate contributions. See `docs/roadmap.md` § Comparative benchmarking for full analysis of CORE's harness and implementation notes.
+Current state: 12-feature LoCoMo reranker (forward stepwise, NDCG@10-optimized), GPT-4.1-mini reader. Infrastructure supports `--no-judge` for cheap reader runs + batch judging, `--run-dir` for resume, `--locomo-reranker` for LoCoMo-specific model. GPT-5.4-mini tested as reader — reasoning model hurts factual extraction (-6.6pp vs 4.1-mini).
 
-**Why now:** The reranker and scoring pipeline are stable enough to benchmark. This is the first opportunity to put a number next to another system on a shared benchmark — and to measure whether the feedback loop and sleep consolidation actually help on standardized QA, not just our internal GT.
+Remaining: sleep pass ablation (with/without sleep between ingestion and evaluation), feedback loop ablation, document findings in experiments.md.
 
-*Move this down when*: initial benchmark run is complete and results are documented, regardless of outcome. Move up if external interest in comparative numbers increases.
+*Move this down when*: ablations are complete and findings documented. Move up if external interest in comparative numbers increases.
 
 ### 5. ~~Migration completion~~ *Self-terminated*
 

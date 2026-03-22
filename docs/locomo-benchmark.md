@@ -100,18 +100,28 @@ The new features contribute: session_cooccurrence is the 8th most important feat
 - **D (12-14)**: Metadata — token_count, age_days, theme_count
 - **E (15-16)**: Entity & session — entity_overlap, session_cooccurrence
 
-**Deployed model** uses `no_C_pruned` config (11 features: A + B\proximity + D\age_days,theme_count + E).
+**Deployed model** superseded by Level 3 (forward stepwise, 12 features).
 
 **Scripts:**
 ```bash
 # Full ablation (train + evaluate all feature group combinations)
 uv run scripts/locomo_bench/train_locomo_reranker.py --ablation
 
-# Save model with specific config
-uv run scripts/locomo_bench/train_locomo_reranker.py --train-only --config no_C_pruned --save-model
+# Forward stepwise feature selection
+uv run scripts/locomo_bench/train_locomo_reranker.py --train-only --select forward --n-estimators 200
 
-# Run eval with LoCoMo reranker (end-to-end via impl_recall pipeline)
+# Save model with explicit feature set
+uv run scripts/locomo_bench/train_locomo_reranker.py --train-only --save-model --n-estimators 800 \
+  --feature-names vec_rank query_coverage fts_rank speaker_match token_count \
+  has_temporal_expr vec_dist centroid_distance theme_complementarity query_length \
+  session_cooccurrence entity_density
+
+# Run retrieval eval with LoCoMo reranker
 uv run scripts/locomo_bench/eval_retrieval.py --dataset locomo --configs bare locomo_reranker --conversations 0 1 2 3 4 5 6 7 8 9
+
+# Run end-to-end QA
+uv run scripts/locomo_bench/run.py --prompt-mode somnigraph --reader-model gpt-4.1-mini --skip-adversarial --locomo-reranker
+uv run scripts/locomo_bench/run.py --prompt-mode somnigraph --reader-model gpt-4.1-mini --skip-adversarial --locomo-reranker --no-judge  # reader only, batch judge later
 ```
 
 **Ablation results (leave-one-conv-out CV, 10-fold):**
@@ -165,6 +175,83 @@ no_C_pruned      1977   0.532   39.1%   62.3%   70.7%   79.6%   86.3%
 ```
 
 token_count (#1) makes sense — longer turns contain more information, more likely to be evidence. session_cooccurrence (#8) validates the hypothesis that evidence clusters within conversation sessions.
+
+### Level 3 — Forward Stepwise Feature Selection (2026-03-21)
+
+NDCG@10-optimized forward stepwise selection over 25 candidate features (Groups A-G, including inter-passage and embedding diversity features). Leave-one-conversation-out CV, n_estimators=200.
+
+**Selected features (12):** vec_rank, query_coverage, fts_rank, speaker_match, token_count, has_temporal_expr, vec_dist, centroid_distance, theme_complementarity, query_length, session_cooccurrence, entity_density.
+
+```
+Config              N     MRR  NDCG@10     R@1     R@3     R@5    R@10    R@20
+-----------------------------------------------------------------------------------
+bare_rrf         1977   0.370    0.372   27.1%   40.2%   46.1%   55.9%   65.9%
+reranker         1977   0.557    0.579   42.6%   63.3%   71.6%   80.0%   86.7%
+```
+
+**Feature importance (gain):**
+```
+  [G] centroid_distance   :   1034.8
+  [D] token_count         :   1009.5
+  [A] vec_rank            :    979.0
+  [A] vec_dist            :    794.6
+  [B] query_coverage      :    792.1
+  [F] entity_density      :    784.2
+  [A] fts_rank            :    703.3
+  [B] query_length        :    491.2
+  [E] session_cooccurrence:    433.1
+  [F] theme_complementarity:    167.7
+  [F] has_temporal_expr   :    133.2
+  [B] speaker_match       :     66.3
+```
+
+centroid_distance (Group G, 2nd-pass embedding diversity) leads — validates the inter-passage hypothesis from v2. New feature groups F and G contribute 4 of 12 selected features.
+
+**New feature groups:**
+- **F (17-21)**: Inter-passage — has_temporal_expr, entity_density, topk_session_frac, entity_bridge_count, theme_complementarity
+- **G (22-24)**: Set diversity — mmr_redundancy, unique_token_frac, centroid_distance
+
+## End-to-End QA Results
+
+### Run 1 — GPT-4.1-mini reader (2026-03-21)
+
+First end-to-end QA run. LoCoMo reranker (12 features, Level 3), GPT-4.1-mini reader, skip adversarial.
+
+```
+Judge             N    single-hop  temporal  multi-hop  open-domain  OVERALL
+──────────────────────────────────────────────────────────────────────────────
+GPT-4.1-mini   1540      84.0%      87.5%     72.9%      91.8%       88.3%
+Opus 4.6       1540      80.9%      84.4%     61.5%      89.5%       85.1%
+```
+
+Opus is 3.2pp stricter than GPT-4.1-mini across the board. Both numbers beat every published system on Overall J (Mem0g: 68.44, Mem0: 66.88, Full-context: 72.90).
+
+**Per-conversation accuracy (Opus judge):**
+```
+Conv  0: 84.9%    Conv  5: 82.1%
+Conv  1: 90.1%    Conv  6: 86.0%
+Conv  2: 90.8%    Conv  7: 87.4%
+Conv  3: 78.4%    Conv  8: 84.6%
+Conv  4: 83.7%    Conv  9: 86.7%
+```
+
+### Reader model comparison: GPT-4.1-mini vs GPT-5.4-mini
+
+GPT-5.4-mini (reasoning model) tested as reader on conversations 0-4. Same LoCoMo reranker, Opus judge.
+
+```
+Conv    4.1-mini    5.4-mini    Delta
+────────────────────────────────────────
+  0      84.9%       80.9%     -4.0pp
+  1      90.1%       85.2%     -4.9pp
+  2      90.8%       86.2%     -4.6pp
+  3      78.4%       74.4%     -4.0pp
+  4      83.7%       71.3%    -12.4pp
+────────────────────────────────────────
+0-4      85.1%       78.5%     -6.6pp
+```
+
+**Finding:** Reasoning models hurt factual QA extraction. GPT-5.4-mini computes dates instead of quoting the context — e.g., answering "8 July 2023" (calculated) vs. "Last Friday before 15 July 2023" (extracted from context). The temporal category shows the most failures. For memory QA, a direct extraction model (4.1-mini) outperforms a reasoning model (5.4-mini) because the task is retrieval + quotation, not inference.
 
 ## Reference: Published LoCoMo QA Scores
 
