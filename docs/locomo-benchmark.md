@@ -165,3 +165,63 @@ no_C_pruned      1977   0.532   39.1%   62.3%   70.7%   79.6%   86.3%
 ```
 
 token_count (#1) makes sense — longer turns contain more information, more likely to be evidence. session_cooccurrence (#8) validates the hypothesis that evidence clusters within conversation sessions.
+
+## Reference: Published LoCoMo QA Scores
+
+End-to-end QA accuracy (F1, BLEU-1, LLM-as-a-Judge) from the Mem0 paper (Table 1, arXiv:2504.19413v1). These measure answer quality, not retrieval recall — the metric our Level 0-2 results above don't yet capture.
+
+```
+                    Single Hop          Multi-Hop           Open Domain         Temporal
+Method           F1    B1     J      F1    B1     J      F1    B1     J      F1    B1     J
+─────────────────────────────────────────────────────────────────────────────────────────────
+LoCoMo          25.02 19.75   –     12.04 11.16   –     40.36 29.05   –     18.41 14.77   –
+ReadAgent        9.15  6.48   –      5.31  5.12   –      9.67  7.66   –     12.60  8.87   –
+MemoryBank       5.00  4.77   –      5.56  5.94   –      6.61  5.16   –      9.68  6.99   –
+MemGPT          26.65 17.72   –      9.15  7.44   –     41.04 34.34   –     25.52 19.44   –
+A-Mem           27.02 20.09   –     12.14 12.00   –     44.65 37.06   –     45.85 36.67   –
+A-Mem*          20.76 14.90  39.79   9.22  8.81  18.85  33.34 27.58  54.05  35.40 31.08  49.91
+LangMem         35.51 26.86  62.23  26.04 22.32  47.92  40.91 33.63  71.12  30.75 25.84  23.43
+Zep             35.74 23.30  61.70  19.37 14.82  41.35  49.56 38.92  76.60  42.00 34.53  49.31
+OpenAI          34.30 23.72  63.79  20.09 15.42  42.92  39.31 31.16  62.29  14.04 11.25  21.71
+Mem0            38.72 27.13  67.13  28.64 21.58  51.15  47.65 38.72  72.93  48.93 40.51  55.51
+Mem0g           38.09 26.03  65.71  24.32 18.82  47.19  49.27 40.30  75.71  51.55 40.28  58.13
+─────────────────────────────────────────────────────────────────────────────────────────────
+Ori Mnemos      37.69  –      –     29.31  –      –       –     –      –       –     –      –
+```
+
+*A-Mem\* = re-run with temperature 0 for judge. Mem0g = Mem0 + graph memory (Neo4j). Ori Mnemos numbers from their README (GPT-4.1-mini generation, BM25 + embedding + PageRank fusion). Adversarial category excluded from all — no ground truth.*
+
+**Key observations:**
+- Everyone clusters in the 35-39 F1 range for single-hop. The field is saturated on easy questions.
+- Multi-hop separates the systems: Mem0 leads at 28.64 F1, Ori slightly ahead at 29.31.
+- Temporal is the biggest gap: Mem0g 58.13 J vs. MemoryBank 6.99 B1. Systems without temporal modeling collapse.
+- Open-domain: Zep wins on J (76.60) despite losing overall. Graph traversal helps for broad queries.
+- The full-context baseline (LoCoMo paper) scores 72.9% overall — higher than every specialized system. Context management > memory tools for most questions.
+
+### Overall J scores and latency (Table 2)
+
+Aggregate LLM-as-a-Judge scores and latency from the same paper. This is the single-number comparison target for our end-to-end QA benchmark.
+
+```
+Method              Tokens   Search p50/p95   Total p50/p95    Overall J
+──────────────────────────────────────────────────────────────────────────
+RAG K=1, 256          256    0.251 / 0.710    0.745 / 1.628    50.15
+RAG K=2, 256          256    0.255 / 0.699    0.802 / 1.907    60.97
+Full-context       26,031        –     –      9.870 / 17.117   72.90
+──────────────────────────────────────────────────────────────────────────
+A-Mem               2,520    0.668 / 1.485    1.410 / 4.374    48.38
+LangMem               127   17.99  / 59.82   18.53  / 60.40   58.10
+Zep                 3,911    0.513 / 0.778    1.292 / 2.926    65.99
+OpenAI              4,437        –     –      0.466 / 0.889    52.90
+Mem0                1,764    0.148 / 0.200    0.708 / 1.440    66.88
+Mem0g               3,616    0.476 / 0.657    1.091 / 2.590    68.44
+```
+
+*RAG rows are the best-performing chunk sizes at K=1 and K=2. Full table in the paper sweeps 128–8192 tokens.*
+
+**Key observations:**
+- RAG K=2 at 256 tokens (60.97 J) nearly matches specialized systems with zero memory infrastructure. The bar for "better than naive RAG" is higher than it looks.
+- Full-context (72.90 J) remains unbeaten. Every memory system trades accuracy for token efficiency.
+- Mem0's speed advantage is real: 148ms search p50 vs. Zep's 513ms. But Zep's richer retrieval buys 65.99 → only 0.89 J behind Mem0.
+- LangMem's latency (18s p50) is an outlier — likely LLM calls in the retrieval path.
+- Token budget varies 10x across systems (127 to 4,437). Our `recall(limit=N)` parameter controls this directly.

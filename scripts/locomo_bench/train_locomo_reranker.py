@@ -5,9 +5,11 @@
 """
 Train a LoCoMo-specific LightGBM reranker and run ablation experiments.
 
-Extracts 17 features designed for fresh LoCoMo DBs (no feedback, no edges,
-no Hebbian — those are all dead on benchmark data). Uses leave-one-conversation-out
-cross-validation (10-fold, one fold per conversation).
+Extracts 25 features designed for fresh LoCoMo DBs (no feedback, no edges,
+no Hebbian — those are all dead on benchmark data). Groups A-E (17 features) are
+v2 baseline; Group F (5 features) adds temporal, entity density, and inter-passage
+features; Group G (3 features) adds embedding-based set diversity (MMR, unique tokens,
+centroid distance). Uses leave-one-conversation-out CV (10-fold, one per conversation).
 
 Usage:
   uv run scripts/locomo_bench/train_locomo_reranker.py --ablation
@@ -42,6 +44,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from memory.constants import BM25_SUMMARY_WT, BM25_THEMES_WT, DATA_DIR
 from memory.reranker import _compute_proximity
+from memory.vectors import deserialize_f32
 
 BENCHMARK_DIR = DATA_DIR / "benchmark"
 
@@ -69,6 +72,25 @@ def _extract_entities(text: str, speakers: set[str]) -> set[str]:
             if lower not in _ENTITY_STOPWORDS and lower not in speakers:
                 entities.add(lower)
     return entities
+
+
+_TEMPORAL_PATTERN = re.compile(
+    r'\b(?:'
+    r'(?:January|February|March|April|May|June|July|August|September|October|November|December'
+    r'|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b'
+    r'|20\d{2}'
+    r'|yesterday|today|tomorrow'
+    r'|(?:last|next|this)\s+(?:week|month|year|summer|winter|spring|fall)'
+    r'|\d{1,2}/\d{1,2}(?:/\d{2,4})?'
+    r'|\d{1,2}\s+(?:days?|weeks?|months?|years?)\s+ago'
+    r')',
+    re.IGNORECASE,
+)
+
+
+def _count_temporal_exprs(text: str) -> int:
+    """Count temporal expressions in text (dates, relative time, years)."""
+    return len(_TEMPORAL_PATTERN.findall(text))
 FEATURES_PATH = BENCHMARK_DIR / "locomo_features.pkl"
 MODEL_PATH = BENCHMARK_DIR / "locomo_reranker_model.pkl"
 
@@ -105,9 +127,19 @@ FEATURE_NAMES = [
     # Group E
     "entity_overlap",       # 15: Shared named entities between query and candidate
     "session_cooccurrence", # 16: Other top-20 RRF candidates in same session
+    # Group F: Inter-passage and structural features
+    "has_temporal_expr",    # 17: Count of temporal expressions in content
+    "entity_density",       # 18: Named entities per token (entity-richness)
+    "topk_session_frac",    # 19: Fraction of top-10 RRF sharing this session (2nd pass)
+    "entity_bridge_count",  # 20: Entities shared with other top-10, not query (2nd pass)
+    "theme_complementarity",# 21: Query coverage not already in top-10 (2nd pass)
+    # Group G: Set diversity features (2nd pass, embedding-based)
+    "mmr_redundancy",       # 22: Max embedding similarity to other top-10 candidates
+    "unique_token_frac",    # 23: Fraction of tokens unique to this candidate vs top-10
+    "centroid_distance",    # 24: Embedding distance from centroid of top-10
 ]
 
-NUM_FEATURES = len(FEATURE_NAMES)  # 17
+NUM_FEATURES = len(FEATURE_NAMES)  # 25
 
 FEATURE_GROUPS = {
     "A": list(range(0, 5)),
@@ -115,6 +147,8 @@ FEATURE_GROUPS = {
     "C": list(range(9, 12)),
     "D": list(range(12, 15)),
     "E": list(range(15, 17)),
+    "F": list(range(17, 22)),
+    "G": list(range(22, 25)),
 }
 
 _ALL_INDICES = list(range(NUM_FEATURES))
@@ -138,6 +172,16 @@ ABLATION_CONFIGS = {
     # Dead feature pruning (proximity=6, age_days=13, theme_count=14)
     "pruned": [i for i in _ALL_INDICES if i not in (6, 13, 14)],
     "no_C_pruned": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14)],
+    # Group F ablations
+    "F_only": ["F"],
+    "G_only": ["G"],
+    "no_F": ["A", "B", "C", "D", "E", "G"],
+    "no_G": ["A", "B", "C", "D", "E", "F"],
+    "no_FG": ["A", "B", "C", "D", "E"],
+    "no_C_pruned_F": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14, 22, 23, 24)],  # best v2 + F
+    "no_C_pruned_G": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14, 17, 18, 19, 20, 21)],  # best v2 + G
+    "no_C_pruned_FG": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14)],  # best v2 + F + G
+    "all_v3": ["A", "B", "C", "D", "E", "F", "G"],
 }
 
 RRF_K = 60  # Standard RRF constant
@@ -188,8 +232,11 @@ def load_conversation_data(conv_idx: int) -> dict | None:
     db = get_db()
 
     rows = db.execute("""
-        SELECT id, content, themes, token_count, created_at, summary
-        FROM memories WHERE status = 'active'
+        SELECT m.id, m.content, m.themes, m.token_count, m.created_at, m.summary,
+               v.embedding
+        FROM memories m
+        LEFT JOIN memory_vec v ON v.rowid = m.rowid
+        WHERE m.status = 'active'
     """).fetchall()
 
     # First pass: collect all speakers for entity extraction
@@ -236,6 +283,15 @@ def load_conversation_data(conv_idx: int) -> dict | None:
                 session = t
                 break
 
+        token_count = r["token_count"] or len(content.split())
+        entities = _extract_entities(content, all_speakers)
+        # Parse embedding
+        emb = None
+        if r["embedding"]:
+            try:
+                emb = np.array(deserialize_f32(r["embedding"]), dtype=np.float32)
+            except Exception:
+                pass
         memories[mid] = {
             "content": content,
             "content_lower": content_lower,
@@ -244,11 +300,15 @@ def load_conversation_data(conv_idx: int) -> dict | None:
             "themes_list": themes_list,
             "theme_tokens": theme_tokens,
             "theme_count": len(themes_list),
-            "token_count": r["token_count"] or len(content.split()),
+            "token_count": token_count,
             "age_days": age_days,
             "created_at": r["created_at"],
-            "entities": _extract_entities(content, all_speakers),
+            "entities": entities,
             "session": session,
+            "embedding": emb,
+            # Group F pre-computed
+            "temporal_expr_count": _count_temporal_exprs(content),
+            "entity_density": len(entities) / max(token_count, 1),
         }
 
     db.close()
@@ -539,8 +599,113 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
             if mem_session and mid in top20_set:
                 features[i, 16] = session_counts.get(mem_session, 1) - 1  # session_cooccurrence
 
+            # Group F: First-pass features (independent per candidate)
+            features[i, 17] = mem.get("temporal_expr_count", 0)           # has_temporal_expr
+            features[i, 18] = mem.get("entity_density", 0.0)             # entity_density
+
             # Label: binary
             labels[i] = 1.0 if mid in evidence_mids else 0.0
+
+        # Group F: Second-pass features (inter-passage, based on top-10 RRF)
+        top10_rrf = sorted(candidate_list,
+                           key=lambda m: rrf_scores.get(m, 0), reverse=True)[:10]
+        top10_set = set(top10_rrf)
+
+        # Collect top-10 sessions, entities, and covered query terms
+        top10_sessions = defaultdict(int)
+        top10_entities = set()
+        top10_query_coverage = set()
+        for mid in top10_rrf:
+            mem = memories.get(mid)
+            if not mem:
+                continue
+            if mem.get("session"):
+                top10_sessions[mem["session"]] += 1
+            top10_entities |= mem.get("entities", set())
+            content_set = set(mem["content_tokens"])
+            top10_query_coverage |= (set(query_terms) & content_set)
+
+        for i, mid in enumerate(candidate_list):
+            mem = memories.get(mid)
+            if mem is None:
+                continue
+
+            # topk_session_frac: fraction of top-10 sharing this session
+            mem_session = mem.get("session")
+            if mem_session and len(top10_rrf) > 0:
+                # Count others in top-10 with same session (exclude self)
+                same = top10_sessions.get(mem_session, 0)
+                if mid in top10_set:
+                    same = max(same - 1, 0)
+                features[i, 19] = same / len(top10_rrf)                   # topk_session_frac
+
+            # entity_bridge_count: entities shared with other top-10, NOT with query
+            mem_entities = mem.get("entities", set())
+            shared_with_topk = mem_entities & (top10_entities - query_entities)
+            features[i, 20] = len(shared_with_topk)                       # entity_bridge_count
+
+            # theme_complementarity: query terms this memory covers that top-10 don't
+            if query_terms:
+                content_set = set(mem["content_tokens"])
+                my_coverage = set(query_terms) & content_set
+                novel = my_coverage - top10_query_coverage
+                features[i, 21] = len(novel) / len(query_terms)           # theme_complementarity
+
+        # Group G: Set diversity features (embedding-based, 2nd pass)
+        # Collect top-10 embeddings and token sets
+        top10_embeddings = []
+        top10_all_tokens = set()
+        for mid in top10_rrf:
+            mem = memories.get(mid)
+            if not mem:
+                continue
+            if mem.get("embedding") is not None:
+                top10_embeddings.append(mem["embedding"])
+            top10_all_tokens |= set(mem["content_tokens"])
+
+        # Compute centroid of top-10 embeddings
+        centroid = None
+        if top10_embeddings:
+            centroid = np.mean(top10_embeddings, axis=0)
+            centroid /= np.linalg.norm(centroid) + 1e-9  # normalize
+
+        for i, mid in enumerate(candidate_list):
+            mem = memories.get(mid)
+            if mem is None or mem.get("embedding") is None:
+                continue
+            emb = mem["embedding"]
+            emb_norm = np.linalg.norm(emb)
+            if emb_norm < 1e-9:
+                continue
+
+            # mmr_redundancy: max cosine similarity to other top-10 candidates
+            max_sim = 0.0
+            for other_emb in top10_embeddings:
+                sim = float(np.dot(emb, other_emb) / (emb_norm * (np.linalg.norm(other_emb) + 1e-9)))
+                if sim > max_sim:
+                    max_sim = sim
+            features[i, 22] = max_sim                                     # mmr_redundancy
+
+            # unique_token_frac: fraction of this candidate's tokens not in other top-10
+            mem_tokens = set(mem["content_tokens"])
+            if mem_tokens:
+                unique = mem_tokens - top10_all_tokens
+                # If this candidate IS in top-10, exclude self from the comparison
+                if mid in top10_set:
+                    # Recompute: other top-10 tokens minus this candidate
+                    other_tokens = set()
+                    for other_mid in top10_rrf:
+                        if other_mid != mid:
+                            other_mem = memories.get(other_mid)
+                            if other_mem:
+                                other_tokens |= set(other_mem["content_tokens"])
+                    unique = mem_tokens - other_tokens
+                features[i, 23] = len(unique) / len(mem_tokens)           # unique_token_frac
+
+            # centroid_distance: cosine distance from centroid of top-10
+            if centroid is not None:
+                cos_sim = float(np.dot(emb, centroid) / (emb_norm + 1e-9))
+                features[i, 24] = 1.0 - cos_sim                          # centroid_distance
 
         all_features.append(features)
         all_labels.append(labels)
@@ -570,7 +735,7 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
 
 
 def compute_metrics(ranked_mids: list[str], evidence_mids: set[str]) -> dict:
-    """Compute R@k and MRR for a single query."""
+    """Compute R@k, MRR, and NDCG@10 for a single query."""
     first_hit = None
     for i, mid in enumerate(ranked_mids):
         if mid in evidence_mids:
@@ -581,6 +746,17 @@ def compute_metrics(ranked_mids: list[str], evidence_mids: set[str]) -> dict:
     for k in [1, 3, 5, 10, 20]:
         top_k = set(ranked_mids[:k])
         metrics[f"r@{k}"] = 1.0 if (top_k & evidence_mids) else 0.0
+
+    # NDCG@10
+    dcg = 0.0
+    for i, mid in enumerate(ranked_mids[:10]):
+        if mid in evidence_mids:
+            dcg += 1.0 / np.log2(i + 2)  # i+2 because rank is 1-indexed
+    # Ideal: all evidence in top positions
+    ideal_hits = min(len(evidence_mids), 10)
+    idcg = sum(1.0 / np.log2(i + 2) for i in range(ideal_hits))
+    metrics["ndcg@10"] = dcg / idcg if idcg > 0 else 0.0
+
     return metrics
 
 
@@ -780,6 +956,7 @@ def summarize_metrics(metrics: list[dict], label: str) -> dict:
         "label": label,
         "n": n,
         "mrr": sum(m["mrr"] for m in metrics) / n,
+        "ndcg@10": sum(m.get("ndcg@10", 0) for m in metrics) / n,
     }
     for k in [1, 3, 5, 10, 20]:
         key = f"r@{k}"
@@ -792,15 +969,15 @@ def print_results_table(results: list[dict]):
     if not results:
         return
 
-    header = f"{'Config':<15} {'N':>5} {'MRR':>7} {'R@1':>7} {'R@3':>7} {'R@5':>7} {'R@10':>7} {'R@20':>7}"
-    print(f"\n{'=' * 75}")
+    header = f"{'Config':<15} {'N':>5} {'MRR':>7} {'NDCG@10':>8} {'R@1':>7} {'R@3':>7} {'R@5':>7} {'R@10':>7} {'R@20':>7}"
+    print(f"\n{'=' * 83}")
     print("LoCoMo Reranker Ablation Results (Leave-One-Conv-Out CV)")
-    print(f"{'=' * 75}")
+    print(f"{'=' * 83}")
     print(header)
-    print("-" * 75)
+    print("-" * 83)
 
     for r in results:
-        row = f"{r['label']:<15} {r['n']:>5} {r['mrr']:>7.3f}"
+        row = f"{r['label']:<15} {r['n']:>5} {r['mrr']:>7.3f} {r.get('ndcg@10', 0):>8.3f}"
         for k in [1, 3, 5, 10, 20]:
             row += f" {r.get(f'r@{k}', 0):>7.1%}"
         print(row)
@@ -808,11 +985,11 @@ def print_results_table(results: list[dict]):
     # Delta from bare RRF (first row)
     if len(results) > 1:
         base = results[0]
-        print("-" * 75)
+        print("-" * 83)
         print("Delta vs bare RRF:")
         for r in results[1:]:
             row = f"  {r['label']:<13}"
-            row += f" {'':>5} {r['mrr'] - base['mrr']:>+7.3f}"
+            row += f" {'':>5} {r['mrr'] - base['mrr']:>+7.3f} {r.get('ndcg@10', 0) - base.get('ndcg@10', 0):>+8.3f}"
             for k in [1, 3, 5, 10, 20]:
                 delta = r.get(f"r@{k}", 0) - base.get(f"r@{k}", 0)
                 row += f" {delta:>+7.1%}"
@@ -841,6 +1018,292 @@ def print_importance_table(importances: np.ndarray, feature_indices: list[int]):
 
 
 # ---------------------------------------------------------------------------
+# Feature selection
+# ---------------------------------------------------------------------------
+
+# Dead features (always excluded from selection)
+_DEAD_FEATURES = {6, 13, 14}  # proximity, age_days, theme_count
+
+
+def _cv_score(all_conv_features, all_conv_data, all_search_data,
+              feature_indices, n_estimators=500):
+    """Quick CV score (NDCG@10) for a feature set."""
+    if not feature_indices:
+        return 0.0
+    metrics, _ = train_cv(all_conv_features, all_conv_data, all_search_data,
+                          sorted(feature_indices), n_estimators)
+    if not metrics:
+        return 0.0
+    return np.mean([m["ndcg@10"] for m in metrics])
+
+
+def select_correlation_filter(all_conv_features, threshold=0.85):
+    """Remove features highly correlated with a better feature (by univariate gain).
+
+    Returns list of surviving feature indices.
+    """
+    # Concatenate all features
+    X = np.concatenate([fd["features"] for fd in all_conv_features], axis=0)
+    y = np.concatenate([fd["labels"] for fd in all_conv_features], axis=0)
+
+    candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
+
+    # Compute pairwise correlations
+    X_sub = X[:, candidates]
+    corr = np.corrcoef(X_sub.T)
+
+    # Compute univariate importance (variance of feature weighted by label)
+    importances = {}
+    for ci, fi in enumerate(candidates):
+        pos_mask = y > 0
+        if pos_mask.sum() > 0 and (~pos_mask).sum() > 0:
+            # Simple: difference in means between positive and negative
+            importances[fi] = abs(X[pos_mask, fi].mean() - X[~pos_mask, fi].mean())
+        else:
+            importances[fi] = 0.0
+
+    # Greedily remove correlated features (keep the more important one)
+    removed = set()
+    for ci in range(len(candidates)):
+        if candidates[ci] in removed:
+            continue
+        for cj in range(ci + 1, len(candidates)):
+            if candidates[cj] in removed:
+                continue
+            if abs(corr[ci, cj]) > threshold:
+                fi, fj = candidates[ci], candidates[cj]
+                drop = fj if importances.get(fi, 0) >= importances.get(fj, 0) else fi
+                removed.add(drop)
+
+    survivors = [i for i in candidates if i not in removed]
+
+    print(f"\n{'=' * 60}")
+    print(f"Correlation Filter (threshold={threshold})")
+    print(f"{'=' * 60}")
+    print(f"Candidates: {len(candidates)} (excluding {len(_DEAD_FEATURES)} dead)")
+    print(f"Removed: {len(removed)} correlated features")
+    for r in sorted(removed):
+        # Find what it was correlated with
+        ri = candidates.index(r)
+        correlated_with = []
+        for ci, fi in enumerate(candidates):
+            if fi != r and fi not in removed and abs(corr[ri, ci]) > threshold:
+                correlated_with.append(f"{FEATURE_NAMES[fi]} (r={corr[ri, ci]:.2f})")
+        print(f"  Dropped {FEATURE_NAMES[r]:25s} correlated with: {', '.join(correlated_with)}")
+    print(f"Survivors ({len(survivors)}): {[FEATURE_NAMES[i] for i in survivors]}")
+    return survivors
+
+
+def select_forward_stepwise(all_conv_features, all_conv_data, all_search_data,
+                            candidates=None, n_estimators=500, seed=None):
+    """Greedy forward selection: add the feature that most improves CV MRR.
+
+    If seed is provided (list of feature indices), start with those features
+    already selected and build from there.
+    """
+    if candidates is None:
+        candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
+
+    selected = list(seed) if seed else []
+    remaining = [i for i in candidates if i not in selected]
+    best_score = 0.0
+    history = []
+
+    print(f"\n{'=' * 60}")
+    print("Forward Stepwise Selection")
+    print(f"{'=' * 60}")
+    if selected:
+        print(f"Seed: {[FEATURE_NAMES[i] for i in selected]}")
+        best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                               selected, n_estimators)
+        print(f"Seed NDCG@10: {best_score:.4f}")
+    print(f"Candidate pool: {len(remaining)} features")
+
+    step = 0
+    while remaining:
+        step += 1
+        best_feat = None
+        best_new_score = best_score
+
+        for feat in remaining:
+            trial = selected + [feat]
+            score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                              trial, n_estimators)
+            if score > best_new_score:
+                best_new_score = score
+                best_feat = feat
+
+        if best_feat is None:
+            print(f"  Step {step}: no improvement, stopping")
+            break
+
+        delta = best_new_score - best_score
+        selected.append(best_feat)
+        remaining.remove(best_feat)
+        best_score = best_new_score
+        history.append((best_feat, best_score, delta))
+        print(f"  Step {step}: +{FEATURE_NAMES[best_feat]:25s} NDCG@10={best_score:.4f} (+{delta:.4f})")
+
+    print(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
+    print(f"Final NDCG@10: {best_score:.4f}")
+    return selected, history
+
+
+def select_backward_elimination(all_conv_features, all_conv_data, all_search_data,
+                                candidates=None, n_estimators=500):
+    """Greedy backward elimination: remove the feature whose removal hurts least."""
+    if candidates is None:
+        candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
+
+    selected = list(candidates)
+    best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                           selected, n_estimators)
+    history = []
+
+    print(f"\n{'=' * 60}")
+    print("Backward Elimination")
+    print(f"{'=' * 60}")
+    print(f"Starting with {len(selected)} features, NDCG@10={best_score:.4f}")
+
+    step = 0
+    while len(selected) > 1:
+        step += 1
+        best_drop = None
+        best_new_score = -1.0
+
+        for feat in selected:
+            trial = [f for f in selected if f != feat]
+            score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                              trial, n_estimators)
+            if score > best_new_score:
+                best_new_score = score
+                best_drop = feat
+
+        if best_new_score < best_score:
+            print(f"  Step {step}: any removal hurts, stopping")
+            break
+
+        delta = best_new_score - best_score
+        selected.remove(best_drop)
+        best_score = best_new_score
+        history.append((best_drop, best_score, delta))
+        print(f"  Step {step}: -{FEATURE_NAMES[best_drop]:25s} NDCG@10={best_score:.4f} ({delta:+.4f})")
+
+    print(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
+    print(f"Final NDCG@10: {best_score:.4f}")
+    return selected, history
+
+
+def select_permutation_importance(all_conv_features, all_conv_data, all_search_data,
+                                  candidates=None, n_estimators=500, n_repeats=5):
+    """Rank features by permutation importance (CV MRR drop when shuffled)."""
+    if candidates is None:
+        candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
+
+    # Train with all candidates
+    baseline_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                               candidates, n_estimators)
+
+    print(f"\n{'=' * 60}")
+    print("Permutation Importance")
+    print(f"{'=' * 60}")
+    print(f"Baseline NDCG@10 (all {len(candidates)} features): {baseline_score:.4f}")
+    print(f"Shuffling each feature {n_repeats}x...")
+
+    importances = {}
+    for feat in candidates:
+        drops = []
+        for rep in range(n_repeats):
+            # Shuffle this feature across all conversations
+            shuffled = []
+            for fd in all_conv_features:
+                fd_copy = {
+                    "features": fd["features"].copy(),
+                    "labels": fd["labels"],
+                    "query_ids": fd["query_ids"],
+                    "memory_ids": fd["memory_ids"],
+                    "feature_names": fd["feature_names"],
+                }
+                rng = np.random.RandomState(42 + rep)
+                rng.shuffle(fd_copy["features"][:, feat])
+                shuffled.append(fd_copy)
+
+            score = _cv_score(shuffled, all_conv_data, all_search_data,
+                              candidates, n_estimators)
+            drops.append(baseline_score - score)
+
+        mean_drop = np.mean(drops)
+        std_drop = np.std(drops)
+        importances[feat] = (mean_drop, std_drop)
+
+    # Sort by importance (biggest drop = most important)
+    ranked = sorted(importances.items(), key=lambda x: -x[1][0])
+    print(f"\n{'Feature':30s} {'NDCG Drop':>10s} {'Std':>8s} {'Signal?':>8s}")
+    print("-" * 60)
+    for feat, (drop, std) in ranked:
+        signal = "YES" if drop > std else ("maybe" if drop > 0 else "no")
+        print(f"  {FEATURE_NAMES[feat]:28s} {drop:>+10.4f} {std:>8.4f} {signal:>8s}")
+
+    return ranked
+
+
+def select_mrmr(all_conv_features, top_k=15):
+    """Minimum Redundancy Maximum Relevance feature selection."""
+    X = np.concatenate([fd["features"] for fd in all_conv_features], axis=0)
+    y = np.concatenate([fd["labels"] for fd in all_conv_features], axis=0)
+
+    candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
+
+    # Relevance: mutual information approximation (F-statistic as proxy)
+    relevance = {}
+    for fi in candidates:
+        pos_mask = y > 0
+        if pos_mask.sum() > 0 and (~pos_mask).sum() > 0:
+            pos_mean = X[pos_mask, fi].mean()
+            neg_mean = X[~pos_mask, fi].mean()
+            pooled_var = X[:, fi].var() + 1e-9
+            relevance[fi] = abs(pos_mean - neg_mean) / np.sqrt(pooled_var)
+        else:
+            relevance[fi] = 0.0
+
+    # Greedy mRMR selection
+    selected = []
+    remaining = list(candidates)
+
+    print(f"\n{'=' * 60}")
+    print(f"mRMR Selection (top {top_k})")
+    print(f"{'=' * 60}")
+
+    for step in range(min(top_k, len(candidates))):
+        best_feat = None
+        best_score = -float("inf")
+
+        for feat in remaining:
+            rel = relevance[feat]
+            # Redundancy: mean absolute correlation with already selected
+            if selected:
+                red = np.mean([abs(np.corrcoef(X[:, feat], X[:, s])[0, 1])
+                               for s in selected])
+            else:
+                red = 0.0
+            score = rel - red
+            if score > best_score:
+                best_score = score
+                best_feat = feat
+
+        if best_feat is None:
+            break
+
+        selected.append(best_feat)
+        remaining.remove(best_feat)
+        print(f"  {step+1:2d}. {FEATURE_NAMES[best_feat]:25s} "
+              f"rel={relevance[best_feat]:.3f} mrmr={best_score:.3f}")
+
+    print(f"\nSelected ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
+    return selected
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -852,7 +1315,7 @@ def main():
                         default=list(range(10)),
                         help="Conversation indices (default: 0-9)")
     parser.add_argument("--features", nargs="+",
-                        choices=["A", "B", "C", "D", "E"],
+                        choices=list(FEATURE_GROUPS.keys()),
                         help="Feature groups to use (default: all)")
     parser.add_argument("--config", type=str,
                         choices=list(ABLATION_CONFIGS.keys()),
@@ -867,6 +1330,15 @@ def main():
                         help="Save final model trained on all data")
     parser.add_argument("--n-estimators", type=int, default=500,
                         help="Max boosting rounds (default: 500)")
+    parser.add_argument("--select", type=str, nargs="?", const="all",
+                        choices=["all", "corr", "forward", "backward", "permutation", "mrmr"],
+                        help="Run feature selection: all (runs all methods), corr (correlation filter), "
+                             "forward (stepwise forward), backward (stepwise backward), "
+                             "permutation (permutation importance), mrmr (min-redundancy max-relevance)")
+    parser.add_argument("--seed-features", type=str, nargs="+",
+                        help="Seed features for forward stepwise (by name)")
+    parser.add_argument("--exclude", type=str, nargs="+",
+                        help="Features to exclude from selection (by name)")
 
     args = parser.parse_args()
 
@@ -978,6 +1450,47 @@ def main():
     total_pos = sum(int(np.sum(fd["labels"] > 0)) for fd in all_conv_features)
     print(f"Total: {total_pairs} pairs, {total_pos} positive "
           f"({100*total_pos/max(total_pairs,1):.1f}%)")
+
+    # Feature selection mode
+    if args.select:
+        if args.exclude:
+            for name in args.exclude:
+                if name not in FEATURE_NAMES:
+                    print(f"ERROR: unknown feature '{name}'. Available: {FEATURE_NAMES}")
+                    return
+                _DEAD_FEATURES.add(FEATURE_NAMES.index(name))
+            print(f"Excluding: {args.exclude}")
+
+        methods = (["corr", "forward", "backward", "permutation", "mrmr"]
+                   if args.select == "all" else [args.select])
+
+        for method in methods:
+            if method == "corr":
+                select_correlation_filter(all_conv_features)
+            elif method == "forward":
+                seed_indices = None
+                if args.seed_features:
+                    seed_indices = []
+                    for name in args.seed_features:
+                        if name not in FEATURE_NAMES:
+                            print(f"ERROR: unknown feature '{name}'. Available: {FEATURE_NAMES}")
+                            return
+                        seed_indices.append(FEATURE_NAMES.index(name))
+                select_forward_stepwise(all_conv_features, all_conv_data,
+                                        all_search_data, n_estimators=args.n_estimators,
+                                        seed=seed_indices)
+            elif method == "backward":
+                select_backward_elimination(all_conv_features, all_conv_data,
+                                            all_search_data, n_estimators=args.n_estimators)
+            elif method == "permutation":
+                select_permutation_importance(all_conv_features, all_conv_data,
+                                              all_search_data, n_estimators=args.n_estimators)
+            elif method == "mrmr":
+                select_mrmr(all_conv_features)
+
+        elapsed = time.time() - t_start
+        print(f"\nFeature selection completed in {elapsed:.1f}s")
+        return
 
     all_results = []
 
