@@ -23,6 +23,9 @@ class BenchConfig:
     # Categories
     skip_adversarial: bool = False  # CORE skips cat 5; we report both
 
+    # Ground truth
+    use_corrected_gt: bool = True  # Judge against audit-corrected GT (report both)
+
     # Ablations
     run_sleep: bool = False  # NREM between ingest and eval
     use_feedback_loop: bool = False  # two-pass recall with feedback

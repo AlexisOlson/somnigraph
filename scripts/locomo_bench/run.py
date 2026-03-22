@@ -38,6 +38,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from locomo_bench.config import CATEGORY_NAMES, BenchConfig
+from locomo_bench.corrected_gt import (
+    get_corrected_answer,
+    get_error_type,
+    load_corrections,
+)
 from locomo_bench.evaluate import (
     generate_answer,
     judge_answer,
@@ -117,6 +122,7 @@ def run_conversation(
     question_limit: int = 0,
     results_path: Path | None = None,
     done_keys: set | None = None,
+    corrections: dict | None = None,
 ) -> list[dict]:
     """Run the full pipeline for one conversation."""
     conv_dir = run_dir / f"conv_{conv_idx}"
@@ -163,7 +169,7 @@ def run_conversation(
             continue
 
         try:
-            result = _evaluate_question(q, dia_map, config, q_idx)
+            result = _evaluate_question(q, dia_map, config, q_idx, corrections)
             results.append(result)
 
             label = result.get("judge_label", "?")
@@ -213,11 +219,26 @@ def _evaluate_question(
     dia_map: dict,
     config: BenchConfig,
     seed: int,
+    corrections: dict | None = None,
 ) -> dict:
-    """Evaluate a single question: retrieve -> generate -> judge."""
+    """Evaluate a single question: retrieve -> generate -> judge.
+
+    If corrections are provided and this question has a corrected GT,
+    judges against both original and corrected GT. The corrected judgment
+    is stored in corrected_* fields; original in judge_*.
+    """
     question = q["question"]
     gold = str(q["answer"])
     category = q["category"]
+    conv_idx = q["conv_id"]
+    qa_idx = q.get("qa_idx", -1)
+
+    # Look up corrected GT
+    corrected_gold = None
+    gt_error_type = None
+    if corrections and qa_idx >= 0:
+        corrected_gold = get_corrected_answer(corrections, conv_idx, qa_idx)
+        gt_error_type = get_error_type(corrections, conv_idx, qa_idx)
 
     # Retrieve
     memory_ids, context = recall_memories(question, config)
@@ -225,41 +246,76 @@ def _evaluate_question(
     # Check if evidence was retrieved
     evidence_mids = set()
     for eid in q.get("evidence", []):
-        key = (q["conv_id"], eid)
+        key = (conv_idx, eid)
         if key in dia_map:
             full_id = dia_map[key]
             short_id = full_id[:8]
             evidence_mids.add(short_id)
     retrieval_hit = bool(evidence_mids & set(memory_ids[:config.reader_top_k]))
 
-    # Generate answer
+    # Generate answer (always uses original GT — only matters for somnigraph
+    # mode adversarial multiple-choice formatting)
     generated = generate_answer(
         question, context, category, gold, config, seed=seed,
     )
 
-    # Token F1
+    # Token F1 against original GT
     f1 = token_f1(generated, gold)
 
-    # Judge (skip if --no-judge)
-    if config.no_judge:
-        judgment = {"label": "PENDING", "reasoning": "", "method": "skipped", "match_ratio": 0.0}
-    else:
-        judgment = judge_answer(question, gold, generated, category, config)
-
-    return {
-        "conv_id": q["conv_id"],
+    # Build base result
+    result = {
+        "conv_id": conv_idx,
+        "qa_idx": qa_idx,
         "category": category,
         "question": question,
         "ground_truth": gold,
         "generated_answer": generated,
-        "judge_label": judgment["label"],
-        "judge_reasoning": judgment["reasoning"],
-        "judge_method": judgment.get("method", ""),
         "f1": round(f1, 4),
-        "match_ratio": round(judgment.get("match_ratio", 0.0), 4),
         "retrieval_hit": retrieval_hit,
         "retrieved_count": len(memory_ids),
     }
+
+    # Add corrected GT metadata
+    if corrected_gold:
+        result["corrected_gt"] = corrected_gold
+        result["gt_error_type"] = gt_error_type
+        result["corrected_f1"] = round(token_f1(generated, corrected_gold), 4)
+
+    # Judge (skip if --no-judge)
+    if config.no_judge:
+        result.update({
+            "judge_label": "PENDING",
+            "judge_reasoning": "",
+            "judge_method": "skipped",
+            "match_ratio": 0.0,
+        })
+        if corrected_gold:
+            result.update({
+                "corrected_label": "PENDING",
+                "corrected_reasoning": "",
+            })
+        return result
+
+    # Judge against original GT
+    judgment = judge_answer(question, gold, generated, category, config)
+    result.update({
+        "judge_label": judgment["label"],
+        "judge_reasoning": judgment["reasoning"],
+        "judge_method": judgment.get("method", ""),
+        "match_ratio": round(judgment.get("match_ratio", 0.0), 4),
+    })
+
+    # Judge against corrected GT (separate LLM call, only for affected questions)
+    if corrected_gold:
+        corrected_judgment = judge_answer(
+            question, corrected_gold, generated, category, config,
+        )
+        result.update({
+            "corrected_label": corrected_judgment["label"],
+            "corrected_reasoning": corrected_judgment["reasoning"],
+        })
+
+    return result
 
 
 def _rebuild_dia_map(conv_dir: Path) -> dict:
@@ -329,6 +385,8 @@ def main():
                         help="Two-pass: run, feed scores back, re-run")
     parser.add_argument("--no-judge", action="store_true",
                         help="Skip judging (reader + retrieval only, batch judge later)")
+    parser.add_argument("--no-corrected-gt", action="store_true",
+                        help="Skip corrected GT judging (original GT only)")
 
     args = parser.parse_args()
 
@@ -348,6 +406,7 @@ def main():
         use_feedback_loop=args.feedback_loop,
         resume=args.resume,
         no_judge=args.no_judge,
+        use_corrected_gt=not args.no_corrected_gt,
     )
 
     # Install LoCoMo reranker if requested
@@ -364,6 +423,16 @@ def main():
         run_dir = config.base_dir / f"run_{run_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    # Load GT corrections
+    corrections = None
+    if config.use_corrected_gt:
+        try:
+            corrections = load_corrections()
+            logger.info("Loaded %d GT corrections (will report both original and corrected)",
+                        len(corrections))
+        except FileNotFoundError:
+            logger.warning("Corrected GT file not found, using original GT only")
+
     # Save config
     config_dict = {
         "model_reader": config.model_reader,
@@ -373,6 +442,7 @@ def main():
         "reader_top_k": config.reader_top_k,
         "skip_adversarial": config.skip_adversarial,
         "use_feedback_loop": config.use_feedback_loop,
+        "use_corrected_gt": config.use_corrected_gt,
     }
     with open(run_dir / "config.json", "w") as f:
         json.dump(config_dict, f, indent=2)
@@ -426,6 +496,7 @@ def main():
             question_limit=args.limit,
             results_path=results_path,
             done_keys=done_keys,
+            corrections=corrections,
         )
 
         all_results.extend(results)

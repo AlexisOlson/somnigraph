@@ -36,6 +36,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [BEAM: Beyond a Million Tokens](https://arxiv.org/abs/2510.27246) | beam.md | 100 conversations spanning 100K-10M tokens with 2,000 validated questions across 10 memory abilities, plus LIGHT retrieval framework (ICLR 2026). |
 | [Evo-Memory](https://arxiv.org/abs/2511.20857) | evomemory.md | Streaming benchmark restructuring static datasets into sequential task streams to evaluate experience reuse, comparing 10+ memory methods. |
 | [LoCoMo](https://arxiv.org/abs/2402.17753) | locomo.md | Long Conversation Memory benchmark with 10 conversations (~300 turns), five reasoning types, and LLM-as-Judge evaluation (ACL 2024). |
+| [LoCoMo Audit](https://github.com/dial481/locomo-audit) | locomo-audit.md | Independent audit finding 99 score-corrupting GT errors (6.4%), 62.81% judge false-acceptance on vague answers, 10.67pp prompt confound, 93.57% theoretical ceiling. |
 | [LoCoMo-Plus](https://arxiv.org/abs/2602.10715) | locomo-plus.md | Extension testing implicit cognitive memory (causal, state, goal, value constraints) with cue-trigger semantic disconnect. |
 | [LongMemEval](https://arxiv.org/abs/2410.10813) | longmemeval.md | 500 curated questions testing five memory abilities across scalable histories up to 1.5M tokens (ICLR 2025). |
 | [MemoryAgentBench](https://arxiv.org/abs/2507.05257) | memoryagentbench.md | Four core memory competencies evaluated via incremental multi-turn interactions at 124K-1.44M tokens (ICLR 2026). |

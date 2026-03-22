@@ -70,11 +70,12 @@ def extract_questions(conversations: list[dict]) -> list[dict]:
     """Extract all QA pairs with evidence pointers."""
     questions = []
     for conv_idx, conv in enumerate(conversations):
-        for qa in conv["qa"]:
+        for qa_idx, qa in enumerate(conv["qa"]):
             evidence = qa.get("evidence", [])
             answer = qa.get("answer", qa.get("adversarial_answer", ""))
             questions.append({
                 "conv_id": conv_idx,
+                "qa_idx": qa_idx,
                 "question": qa["question"],
                 "answer": answer,
                 "evidence": evidence,
