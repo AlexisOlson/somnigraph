@@ -90,11 +90,13 @@ src/
 └── memory/
     ├── constants.py     # All tuning parameters, organized by validation tier
     ├── db.py            # SQLite connection, schema, migrations
-    ├── scoring.py       # Post-RRF scoring pipeline (feedback, PPR, Hebbian)
+    ├── reranker.py      # LightGBM feature extraction and prediction (26 features)
+    ├── scoring.py       # Post-RRF scoring pipeline (feedback, PPR, Hebbian) — formula fallback
     ├── write.py         # Memory creation with deduplication and privacy stripping
     ├── graph.py         # Edge creation, PPR graph expansion
     ├── decay.py         # Per-category exponential decay, dormancy, shadow load
     ├── events.py        # Event logging (recall, feedback, consolidation)
+    ├── sync.py          # Backward-compat shim re-exporting from events.py
     ├── session.py       # Session tracking and context
     ├── fts.py           # FTS5 indexing and query sanitization
     ├── vectors.py       # sqlite-vec operations, vector math

@@ -214,7 +214,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ### Tier 1: Unblocked by GT completion (1 session each)
 
-1. **~~Re-tune constants on real GT.~~** *(Superseded by reranker.)* The hand-tuned formula was replaced by a learned LightGBM reranker that achieved +5.7% NDCG@5k over the formula in 5-fold CV. The tuning studies (wm24–wm34) produced the ground truth and evaluation infrastructure that made the reranker possible. Remaining reranker improvement experiments: raw scores as features (fts_bm25, vec_dist), query-dependent features, and LambdaRank (optimizes NDCG directly instead of pointwise MSE). See `architecture.md` § The reranker.
+1. **~~Re-tune constants on real GT.~~** *(Superseded by reranker.)* The hand-tuned formula was replaced by a learned LightGBM reranker that achieved +5.7% NDCG@5k over the formula in 5-fold CV. The tuning studies (wm24–wm34) produced the ground truth and evaluation infrastructure that made the reranker possible. All three improvement experiments are now complete: LambdaRank (#7, parity), query features (#8, 8 features integrated), raw-score features (fts_bm25_norm, vec_dist_norm added in 31-feature batch). See `architecture.md` § The reranker.
 
 2. **Feedback loop health check.** *(Complete — answered by utility calibration study.)* Per-query Spearman r = 0.70 confirms feedback tracks relevance. See experiment #4 and `experiments.md` § Utility calibration study.
 
@@ -228,7 +228,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 7. **~~Reranker improvement: LambdaRank.~~** *(Parity, not improvement.)* Initial negative result (-1.5pp) had two fixable causes: GT-only training pool and coarse quantile bins. With full candidate pool (`--neg-ratio 0`) and 100-level direct scaling (`--lr-levels 100`), LambdaRank reaches parity (0.8099 vs pointwise 0.8127 on 500q). Two-stage (MSE->LambdaRank) also ties at 0.8119. At 500-849 queries, the objective doesn't differentiate. Pointwise remains the production model. See `experiments.md` § Improvement experiments.
 
-8. **Reranker improvement: query features.** Add query-dependent features (query token count, query specificity, category distribution of candidates). Currently the model sees each candidate independently; query-level features could help it calibrate predictions across different query types. Accept if: NDCG@5k improves, or negative result documented.
+8. **~~Reranker improvement: query features.~~** *(Complete.)* 8 query-dependent features added (query_coverage, proximity, query_idf_var, burstiness, betweenness, diversity_score, fb_time_weighted, session_recency). Integrated during production unification (2026-03-20). query_idf_var is the top new feature by importance. 5 more features added in 31-feature batch (query_length, candidate_pool_size, fts_bm25_norm, vec_dist_norm, decay_rate), pending retrain.
 
 9. **UCB retuning reassessment.** The ESS-corrected UCB exploration bonus (from the limit-parameter branch) needs joint retuning of UCB_COEFF and EWMA_ALPHA. However, if the reranker is the production scoring path, UCB only matters for the formula fallback. Decide whether retuning is worth the effort. Accept if: decision documented with reasoning.
 
@@ -236,62 +236,56 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ### Tier 2: Deeper investigation (2-3 sessions each)
 
-10. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster metrics, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
+11. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster metrics, identify failure modes. Accept if: failure patterns documented in `experiments.md`.
 
-11. **Generalization study.** Train/test split on GT (tune constants on half, evaluate on other half). Accept if: constants stable across splits (or instability documented as finding).
+12. **Generalization study.** Train/test split on GT (tune constants on half, evaluate on other half). Accept if: constants stable across splits (or instability documented as finding).
 
-12. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
+13. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
 
-13. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
+14. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
 
-14. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: NDCG delta under paraphrase computed.
+15. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: NDCG delta under paraphrase computed.
 
-15. **Embedding staleness detection.** For each memory, compare theme set at embedding time vs. current. Flag high-drift memories, re-embed them, measure retrieval quality change. Quantifies the representation bifurcation problem. Accept if: drift distribution documented, re-embedding impact measured.
+16. **Embedding staleness detection.** For each memory, compare theme set at embedding time vs. current. Flag high-drift memories, re-embed them, measure retrieval quality change. Quantifies the representation bifurcation problem. Accept if: drift distribution documented, re-embedding impact measured.
 
-16. **Graph null models.** Compare current graph against similarity-only, edge-shuffled, edge-type-restricted, and temporal-only variants. Tests whether graph structure adds real signal or just correlates with similarity. Accept if: retrieval quality delta per variant measured.
+17. **Graph null models.** Compare current graph against similarity-only, edge-shuffled, edge-type-restricted, and temporal-only variants. Tests whether graph structure adds real signal or just correlates with similarity. Accept if: retrieval quality delta per variant measured.
 
 ### Tier 3: New capabilities (3+ sessions each)
 
-17. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Kumiho's event extraction (structured events with consequences appended to summaries at ingestion) provides immediate causal structure without waiting for sleep — worth considering as a write-time enrichment rather than deferring to sleep. Accept if: temporal queries measurably improve.
+18. **Event-time implementation + evaluation.** Schema change, LLM extraction at write time, temporal filtering in recall. Kumiho's event extraction (structured events with consequences appended to summaries at ingestion) provides immediate causal structure without waiting for sleep — worth considering as a write-time enrichment rather than deferring to sleep. Accept if: temporal queries measurably improve.
 
-18. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
+19. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
 
-19. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
+20. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
 
-20. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
+21. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
 
-21. **startup_load subsystem measurement.** Quantify how much apparent memory competence comes from preload vs. explicit retrieval. Tests the cache-vs-recall ambiguity by comparing sessions with and without preload. Accept if: preload contribution isolated and documented.
+22. **startup_load subsystem measurement.** Quantify how much apparent memory competence comes from preload vs. explicit retrieval. Tests the cache-vs-recall ambiguity by comparing sessions with and without preload. Accept if: preload contribution isolated and documented.
 
 ---
 
 ## Comparative benchmarking
 
-`similar-systems.md` compares features. This section asks: where can we put numbers next to other systems?
+`similar-systems.md` compares features. This section tracks where we have numbers next to other systems.
 
-### What's measurable now
+### LoCoMo end-to-end QA *(Complete)*
+
+Built and run. **85.1% overall accuracy** (Opus judge), beating Mem0 (66.88 J), Mem0g (68.44 J), and full-context baseline (72.90 J). See `docs/locomo-benchmark.md` for full results, per-category breakdown, and reference tables from the Mem0 paper.
+
+Pipeline: ingest LoCoMo conversations → recall with LoCoMo-specific reranker (12 features, forward stepwise) → GPT-4.1-mini reader → LLM judge. Ported from RedPlanet CORE's benchmark harness. All 10 conversations, 1540 non-adversarial questions.
+
+**Known limitations:** LoCoMo's GT has a 6.4% error rate (corrected GT vendored from locomo-audit). The LLM judge is generous — Opus is 3.2pp stricter than GPT-4.1-mini. GPT-5.4-mini (reasoning model) is -6.6pp worse as reader because it computes dates instead of quoting context.
+
+**Remaining:** Rerun with corrected GT, sleep/feedback ablations to isolate contributions.
+
+### What's measurable but unmeasured
 
 - **Contradiction detection:** All systems 0.025–0.037 F1. Somnigraph's NREM catches adjacent contradictions only — likely in the same range. No formal measurement yet.
-- **Graph traversal:** HippoRAG's BFS→PPR ablation shows Recall@2 drops from 40.9 to 25.4. Somnigraph uses novelty-scored one-hop expansion (better than BFS, likely worse than PPR). No direct comparison.
 - **Latency:** Mem0 reports p95 1.44s. Somnigraph's latency is unmeasured but likely comparable (same underlying stack: SQLite + embedding API call).
-
-### What's not measurable (and why)
-
-- **No common personal memory retrieval benchmark.** LoCoMo is closest but tests conversation-level QA, not the memory→retrieval→feedback loop that somnigraph optimizes. Results aren't comparable.
-- **No consolidation benchmark exists.** No system measures this — it's an open research problem (see `architecture.md` § Open Problems).
-- **Feedback loop comparison is limited.** Ori-Mnemos (v0.5.0) has behavioral inference feedback but no published GT correlation. Direct comparison would require running both systems on the same benchmark with the same GT — neither system supports this out of the box.
+- **Consolidation:** No system benchmarks this. It's an open research problem (see `architecture.md` § Open Problems).
 
 ### Proposed benchmarking experiments
 
-- **LoCoMo end-to-end QA eval.** Port RedPlanet CORE's benchmark harness ([RedPlanetHQ/core-benchmark](https://github.com/RedPlanetHQ/core-benchmark)) to Python and run against Somnigraph. Their pipeline: ingest LoCoMo conversations → search memory → LLM generates answer → LLM judges CORRECT/WRONG. CORE claims 85% overall (88.24% in README, 85% in benchmark repo — discrepancy unexplained). Key implementation notes from analyzing their harness:
-  - GPT-4.1 for both answer generation and evaluation (generous prompt: "as long as it touches on the same topic")
-  - Category 5 (adversarial) skipped entirely
-  - Default retrieval limit=20, returns episodes + facts with validAt timestamps
-  - Code as shipped only runs conversation 1 (`if (i === 0)` guard in both ingest and eval loops) — they presumably ran all 10 manually
-  - Heuristic fallback (30% word overlap) if LLM judge fails
-  - Our existing LoCoMo benchmark measures retrieval recall (R@10 = 67.3%); this measures end-to-end QA accuracy — different metric, not directly comparable
-  - **Somnigraph advantages to test:** feedback loop (run a first pass, feed back scores, re-run), hybrid RRF vs their multi-strategy routing, sleep consolidation between ingestion and evaluation
-  - **Build:** Python adapter with three steps: (1) ingestion script feeding LoCoMo turns into `remember()`, (2) QA script doing `recall()` → generate → judge, (3) optional sleep pass between ingestion and evaluation to measure consolidation impact
-  - Effort: 2–3 sessions. Run with and without sleep, with and without feedback loop, to isolate contributions.
 - **Contradiction detection rate** on the real corpus: manually annotate ~50 known contradictions, measure NREM's detection rate. Effort: 1 session.
 - **Latency profiling:** p50/p95/p99 for `recall()` at current corpus size. Effort: trivial (instrument one session).
 

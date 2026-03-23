@@ -20,15 +20,15 @@ The "What didn't work" sections of `docs/architecture.md` and `docs/experiments.
 
 *Move this down when*: never. This is an invariant, not a work item — it applies to everything above and below it.
 
-### 2. Retrieval quality: reranker deployment + iteration
+### 2. Retrieval quality: reranker iteration
 
-The hand-tuned scoring formula (38 studies, 14 parameters) has been superseded by a learned LightGBM reranker (+5.7% NDCG@5k in 5-fold CV). The reranker is migrated to the repo (`src/memory/reranker.py`, `scripts/train_reranker.py`) and wired into live scoring with formula fallback.
+LightGBM pointwise reranker is live in production, running from repo code via directory junction. The hand-tuned scoring formula is preserved as fallback but no longer used.
 
-Current state: production unified with repo (2026-03-20). 26-feature reranker (was 18) trained on 1032 queries (NDCG=0.7958, +6.17pp over formula). 8 new features: query_coverage, proximity, query_idf_var, burstiness, betweenness, diversity_score, fb_time_weighted, session_recency. Production runs from repo code via directory junction + env-configured DATA_DIR. LambdaRank experiment completed — reaches parity but doesn't beat pointwise. One remaining improvement experiment: raw-score features (query features experiment completed via the 8 new features).
+Current state: 26-feature model trained on 1032 queries (NDCG=0.7958, +6.17pp over formula). 5 new features defined but not yet trained (query_length, candidate_pool_size, fts_bm25_norm, vec_dist_norm, decay_rate — bringing the total to 31). All three improvement experiments are complete: LambdaRank (parity, not improvement), query features (8 features integrated), raw-score features (fts_bm25_norm and vec_dist_norm added as the 31-feature batch). Utility calibration study confirmed no self-reinforcement (per-query r=0.70).
 
-The utility calibration study is complete (per-query r=0.70, no self-reinforcement). Remaining Tier 1: counterfactual coverage check, sleep impact measurement.
+Remaining: retrain with 31 features, document improvement experiment findings in `docs/experiments.md`, counterfactual coverage check, sleep impact measurement.
 
-*Move this down when*: reranker is verified in live scoring, at least one improvement experiment is completed, and findings are documented in `docs/experiments.md`.
+*Move this down when*: 31-feature retrain is complete and findings documented.
 
 ### 3. Documentation quality *(maintenance)*
 
@@ -42,17 +42,15 @@ This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet
 
 ### 4. End-to-end LoCoMo QA benchmark
 
-LoCoMo end-to-end QA pipeline is built and producing results. Initial run: **85.1% overall accuracy** (Opus judge), beating Mem0 (66.88 J), Mem0g (68.44 J), and full-context baseline (72.90 J) on the same benchmark. See `docs/locomo-benchmark.md` for full results.
+LoCoMo end-to-end QA pipeline is built and producing results. **85.1% overall accuracy** (Opus judge), beating Mem0 (66.88 J), Mem0g (68.44 J), and full-context baseline (72.90 J) on the same benchmark. See `docs/locomo-benchmark.md` for full results.
 
-Current state: 12-feature LoCoMo reranker (forward stepwise, NDCG@10-optimized), GPT-4.1-mini reader. Infrastructure supports `--no-judge` for cheap reader runs + batch judging, `--run-dir` for resume, `--locomo-reranker` for LoCoMo-specific model. GPT-5.4-mini tested as reader — reasoning model hurts factual extraction (-6.6pp vs 4.1-mini).
+Current state: 12-feature LoCoMo reranker (forward stepwise, NDCG@10-optimized), GPT-4.1-mini reader. Two-phase expansion fixed (train/eval mismatch was degrading results — now improves R@10 by +1.3pp, MRR by +0.060). Corrected GT vendored from locomo-audit (6.4% of LoCoMo-10 questions have wrong golden answers, creating a 93.57% ceiling). Dual judging (original + corrected GT) is wired in. 5 new reranker features defined (31 total, pending retrain).
 
-Remaining: sleep pass ablation (with/without sleep between ingestion and evaluation), feedback loop ablation, document findings in experiments.md.
+Known benchmark limitations: LoCoMo's LLM judge accepts 62.81% of intentionally vague wrong answers. Opus is 3.2pp stricter than GPT-4.1-mini as judge.
+
+Remaining: rerun with corrected GT, retrain LoCoMo reranker with 31 features, sleep pass ablation, feedback loop ablation, document findings in experiments.md.
 
 *Move this down when*: ablations are complete and findings documented. Move up if external interest in comparative numbers increases.
-
-### 5. ~~Migration completion~~ *Self-terminated*
-
-All phases complete. Packaging verified (wheel includes memory_server.py). This priority is done.
 
 ## Decision framework
 
@@ -71,7 +69,6 @@ This is short by design. The decision framework is the priority list — this ju
 - Feature branches, not direct commits to main
 - Review diffs together before merging
 - Documentation ships with code in the same branch (not separate PRs)
-- When migrating from production (`~/.claude/servers/memory/`), note what changed and why — don't silently adapt
 - The README's CLAUDE.md snippet should be tested by actually using it (the dogfood test)
 
 ## The CLAUDE.md snippet
