@@ -59,6 +59,14 @@ _locomo_model = None
 _locomo_feature_indices = None
 _locomo_feature_names = None
 
+_expansion_flags: dict[str, bool] = {}
+_n_seeds: int = 10
+
+
+def enable_expansion(**kwargs):
+    """Enable specific expansion methods for two-phase reranking."""
+    _expansion_flags.update(kwargs)
+
 
 def _install_locomo_reranker():
     """Load LoCoMo reranker model and monkey-patch memory.reranker.rerank."""
@@ -119,14 +127,18 @@ def _install_locomo_reranker():
                               candidate_ids):
         from memory.reranker import _compute_proximity
         from locomo_bench.train_locomo_reranker import (
-            _extract_entities, NUM_FEATURES,
+            _extract_entities, NUM_FEATURES, _count_temporal_exprs,
         )
+        import numpy as _np
         RRF_K = 60
 
-        # Load memory metadata
+        # Load memory metadata (including embeddings for phase 2 vec scoring)
         rows = db.execute("""
-            SELECT id, content, themes, token_count, created_at
-            FROM memories WHERE status = 'active'
+            SELECT m.id, m.content, m.themes, m.token_count, m.created_at,
+                   v.embedding
+            FROM memories m
+            LEFT JOIN memory_vec v ON v.rowid = m.rowid
+            WHERE m.status = 'active'
         """).fetchall()
 
         # First pass: collect speakers for entity extraction
@@ -163,6 +175,13 @@ def _install_locomo_reranker():
                     session = t
                     break
 
+            emb = None
+            if r["embedding"]:
+                try:
+                    from memory.vectors import deserialize_f32 as _deser_init
+                    emb = _np.array(_deser_init(r["embedding"]), dtype=_np.float32)
+                except Exception:
+                    pass
             memories[r["id"]] = {
                 "content": content,
                 "content_tokens": content.lower().split(),
@@ -173,6 +192,7 @@ def _install_locomo_reranker():
                 "age_days": age_days,
                 "entities": _extract_entities(content, all_speakers),
                 "session": session,
+                "embedding": emb,
             }
 
         # Ordinal map for neighbor density
@@ -210,7 +230,6 @@ def _install_locomo_reranker():
         ordinal_set = set(candidate_ordinals.values())
 
         candidate_list = sorted(candidate_ids)
-        import numpy as _np
         features = _np.zeros((len(candidate_list), NUM_FEATURES), dtype=_np.float32)
 
         for i, mid in enumerate(candidate_list):
@@ -260,7 +279,6 @@ def _install_locomo_reranker():
                 features[i, 16] = session_counts.get(mem_session, 1) - 1
 
             # Group F: has_temporal_expr (17), entity_density (18)
-            from locomo_bench.train_locomo_reranker import _count_temporal_exprs
             features[i, 17] = _count_temporal_exprs(content)
             features[i, 18] = len(mem.get("entities", set())) / max(mem["token_count"], 1)
 
@@ -295,9 +313,8 @@ def _install_locomo_reranker():
 
         centroid = None
         if top10_embs:
-            import numpy as _np2
-            centroid = _np2.mean(top10_embs, axis=0)
-            centroid_norm = float(_np2.linalg.norm(centroid)) + 1e-9
+            centroid = _np.mean(top10_embs, axis=0)
+            centroid_norm = float(_np.linalg.norm(centroid)) + 1e-9
 
         for i, mid in enumerate(candidate_list):
             mem = memories.get(mid)
@@ -318,13 +335,345 @@ def _install_locomo_reranker():
                 cos_sim = float(_np.dot(emb, centroid) / (emb_norm * centroid_norm))
                 features[i, 24] = 1.0 - cos_sim
 
-        # Predict with LoCoMo model (select feature columns)
+        # Group H: Phase sentinels for phase 1
+        for i in range(len(candidate_list)):
+            features[i, 25] = -1    # entity_fts_rank sentinel
+            features[i, 26] = -1    # sub_query_hit_count sentinel
+            features[i, 27] = 0.0   # seed_keyword_overlap
+            features[i, 28] = 0     # phase = 0
+
+        # --- Phase 1 prediction ---
         X = features[:, _locomo_feature_indices]
         preds = _locomo_model.predict(X)
 
-        scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
+        # If no expansion flags, return phase 1 results directly
+        if not any(_expansion_flags.values()):
+            scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
+            scores_dict = {mid: float(s) for mid, s in scored}
+            sorted_ids = [mid for mid, _ in scored]
+            return sorted_ids, scores_dict
+
+        # --- Phase 2: expand using phase 1 top-K as seeds ---
+        from locomo_bench.expansion import (
+            ExpansionContext, run_expansions,
+            compute_entity_fts_ranks, compute_sub_query_hits,
+            compute_seed_keyword_overlap,
+        )
+        from memory.embeddings import embed_text as _embed
+        from memory.fts import sanitize_fts_query as _sanitize_fts2
+        from memory.constants import BM25_SUMMARY_WT as _BM25_S, BM25_THEMES_WT as _BM25_T
+        from memory.vectors import deserialize_f32 as _deser
+
+        phase1_scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
+        top_seeds = [mid for mid, _ in phase1_scored[:_n_seeds]]
+
+        # Copies to avoid corrupting phase 1 data
+        exp_fts_ranked = dict(fts_ranked)
+        exp_vec_ranked = dict(vec_ranked)
+        exp_vec_distances = dict(vec_distances)
+        exp_fts_scores = dict(fts_scores)
+        q_emb = _np.array(_embed(query), dtype=_np.float32)
+
+        exp_ctx = ExpansionContext(
+            db=db,
+            question=query,
+            query_embedding=q_emb.tolist(),
+            seeds=list(top_seeds),
+            existing_ids=set(candidate_ids),
+            fts_ranked=exp_fts_ranked,
+            vec_ranked=exp_vec_ranked,
+            vec_distances=exp_vec_distances,
+            fts_scores=exp_fts_scores,
+            all_speakers=all_speakers,
+        )
+        exp_result = run_expansions(exp_ctx, _expansion_flags)
+        expanded_ids = candidate_ids | exp_result.all_new_ids
+
+        # Load metadata for new candidates
+        new_ids = expanded_ids - set(memories.keys())
+        if new_ids:
+            for new_id in new_ids:
+                r = db.execute("""
+                    SELECT m.id, m.content, m.themes, m.token_count, m.created_at,
+                           v.embedding
+                    FROM memories m
+                    LEFT JOIN memory_vec v ON v.rowid = m.rowid
+                    WHERE m.id = ? AND m.status = 'active'
+                """, (new_id,)).fetchone()
+                if not r:
+                    expanded_ids.discard(new_id)
+                    continue
+                content = r["content"] or ""
+                sp_match = _re.match(r"^\[([^\]]+)\]", content)
+                speaker = sp_match.group(1).lower() if sp_match else ""
+                themes_list = []
+                if r["themes"]:
+                    try:
+                        themes_list = json.loads(r["themes"])
+                    except json.JSONDecodeError:
+                        pass
+                try:
+                    from datetime import datetime as _dt2, timezone as _tz2
+                    created = _dt2.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+                    age_days = (_dt2.now(_tz2.utc) - created).total_seconds() / 86400
+                except Exception:
+                    age_days = 0.0
+                session = None
+                for t in themes_list:
+                    if isinstance(t, str) and t.startswith("session_"):
+                        session = t
+                        break
+                token_count = r["token_count"] or len(content.split())
+                entities = _extract_entities(content, all_speakers)
+                emb = None
+                if r["embedding"]:
+                    try:
+                        emb = _np.array(_deser(r["embedding"]), dtype=_np.float32)
+                    except Exception:
+                        pass
+                memories[new_id] = {
+                    "content": content,
+                    "content_tokens": content.lower().split(),
+                    "speaker": speaker,
+                    "theme_tokens": {tok for t in themes_list for tok in str(t).lower().replace("-", " ").split()},
+                    "theme_count": len(themes_list),
+                    "token_count": token_count,
+                    "age_days": age_days,
+                    "entities": entities,
+                    "session": session,
+                    "embedding": emb,
+                }
+
+            sorted_mids = sorted(memories.keys(), key=lambda m: memories[m]["age_days"], reverse=True)
+            ordinal_map = {mid: i for i, mid in enumerate(sorted_mids)}
+
+        # Retrieval scores for expanded candidates
+        max_vec_rank = max(exp_vec_ranked.values()) if exp_vec_ranked else 0
+        max_fts_rank = max(exp_fts_ranked.values()) if exp_fts_ranked else 0
+        q_norm = float(_np.linalg.norm(q_emb))
+
+        for new_id in (expanded_ids - set(exp_fts_ranked.keys()) - set(exp_vec_ranked.keys())):
+            mem = memories.get(new_id)
+            if not mem:
+                continue
+            if new_id not in exp_vec_distances and mem.get("embedding") is not None:
+                emb = mem["embedding"]
+                emb_norm = float(_np.linalg.norm(emb))
+                if emb_norm > 0 and q_norm > 0:
+                    cos_dist = 1.0 - float(_np.dot(q_emb, emb) / (q_norm * emb_norm))
+                    exp_vec_distances[new_id] = cos_dist
+                    max_vec_rank += 1
+                    exp_vec_ranked[new_id] = max_vec_rank
+            if new_id not in exp_fts_ranked:
+                _fts_q2 = _sanitize_fts2(query)
+                if _fts_q2:
+                    try:
+                        rowid_row = db.execute(
+                            "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?",
+                            (new_id,),
+                        ).fetchone()
+                        if rowid_row:
+                            fts_check = db.execute(
+                                f"SELECT bm25(memory_fts, {_BM25_S}, {_BM25_T}) as score "
+                                f"FROM memory_fts WHERE memory_fts MATCH ? AND rowid = ?",
+                                (_fts_q2, rowid_row["rowid"]),
+                            ).fetchone()
+                            if fts_check:
+                                exp_fts_scores[new_id] = fts_check["score"]
+                                max_fts_rank += 1
+                                exp_fts_ranked[new_id] = max_fts_rank
+                    except Exception:
+                        pass
+
+        # Expanded RRF scores
+        exp_rrf_scores = {}
+        for mid in expanded_ids:
+            score = 0.0
+            if mid in exp_fts_ranked:
+                score += 1.0 / (RRF_K + exp_fts_ranked[mid])
+            if mid in exp_vec_ranked:
+                score += 1.0 / (RRF_K + exp_vec_ranked[mid])
+            exp_rrf_scores[mid] = score
+
+        # Compute Group H features
+        entity_fts_ranks = compute_entity_fts_ranks(db, query, all_speakers, expanded_ids)
+        sub_query_hits = compute_sub_query_hits(db, query, all_speakers, expanded_ids)
+        seed_keyword_overlaps = compute_seed_keyword_overlap(db, query, top_seeds, expanded_ids)
+
+        # Build phase 2 feature matrix
+        exp_candidate_list = sorted(expanded_ids)
+        n2 = len(exp_candidate_list)
+        features2 = _np.zeros((n2, NUM_FEATURES), dtype=_np.float32)
+
+        exp_all_rrf = sorted(exp_rrf_scores.values())
+        n_exp_rrf = len(exp_all_rrf)
+        exp_top20 = sorted(expanded_ids, key=lambda m: exp_rrf_scores.get(m, 0), reverse=True)[:20]
+        exp_top20_set = set(exp_top20)
+        exp_session_counts = _defaultdict(int)
+        for mid in exp_top20:
+            mem = memories.get(mid)
+            if mem and mem.get("session"):
+                exp_session_counts[mem["session"]] += 1
+
+        exp_candidate_ordinals = {mid: ordinal_map.get(mid, -999) for mid in expanded_ids}
+        exp_ordinal_set = set(exp_candidate_ordinals.values())
+
+        for i, mid in enumerate(exp_candidate_list):
+            mem = memories.get(mid)
+            if not mem:
+                continue
+            fts_r = exp_fts_ranked.get(mid, -1)
+            vec_r = exp_vec_ranked.get(mid, -1)
+
+            features2[i, 0] = fts_r
+            features2[i, 1] = vec_r
+            features2[i, 2] = exp_fts_scores.get(mid, 0.0)
+            features2[i, 3] = exp_vec_distances.get(mid, 0.0)
+            features2[i, 4] = theme_overlap_map.get(mid, 0)
+            if query_terms:
+                content_set = set(mem["content_tokens"])
+                matched = sum(1 for t in query_terms if t in content_set)
+                features2[i, 5] = matched / len(query_terms)
+            if len(query_terms) > 1:
+                features2[i, 6] = _compute_proximity(query_terms, mem["content_tokens"])
+            if mem["speaker"] and mem["speaker"] in query_lower:
+                features2[i, 7] = 1.0
+            features2[i, 8] = len(query_terms)
+            if fts_r >= 0 and vec_r >= 0:
+                features2[i, 9] = abs(fts_r - vec_r)
+            else:
+                features2[i, 9] = 9999
+            my_ord = exp_candidate_ordinals.get(mid, -999)
+            if my_ord >= 0:
+                features2[i, 10] = sum(1 for o in exp_ordinal_set if o != my_ord and abs(o - my_ord) <= 2)
+            rrf_s = exp_rrf_scores.get(mid, 0.0)
+            if n_exp_rrf > 1:
+                features2[i, 11] = sum(1 for s in exp_all_rrf if s <= rrf_s) / n_exp_rrf
+            features2[i, 12] = mem["token_count"]
+            features2[i, 13] = mem["age_days"]
+            features2[i, 14] = mem["theme_count"]
+            features2[i, 15] = len(query_entities & mem.get("entities", set()))
+            mem_session = mem.get("session")
+            if mem_session and mid in exp_top20_set:
+                features2[i, 16] = exp_session_counts.get(mem_session, 1) - 1
+            features2[i, 17] = _count_temporal_exprs(mem["content"])
+            features2[i, 18] = len(mem.get("entities", set())) / max(mem["token_count"], 1)
+
+            # Group H: real values
+            features2[i, 25] = entity_fts_ranks.get(mid, -1)
+            features2[i, 26] = sub_query_hits.get(mid, 0)
+            features2[i, 27] = seed_keyword_overlaps.get(mid, 0.0)
+            features2[i, 28] = 1
+
+        # Group F second-pass (inter-passage based on expanded top-10)
+        exp_top10 = sorted(exp_candidate_list, key=lambda m: exp_rrf_scores.get(m, 0), reverse=True)[:10]
+        exp_top10_set = set(exp_top10)
+        exp_top10_sessions = _defaultdict(int)
+        exp_top10_entities = set()
+        exp_top10_query_coverage = set()
+        for mid in exp_top10:
+            mem = memories.get(mid)
+            if not mem:
+                continue
+            if mem.get("session"):
+                exp_top10_sessions[mem["session"]] += 1
+            exp_top10_entities |= mem.get("entities", set())
+            content_set = set(mem["content_tokens"])
+            exp_top10_query_coverage |= (set(query_terms) & content_set)
+
+        # Load embeddings for Group G computation
+        exp_top10_embeddings = []
+        candidate_embs2 = {}
+        for mid in exp_candidate_list:
+            mem = memories.get(mid)
+            if not mem:
+                continue
+            emb = mem.get("embedding")
+            if emb is None:
+                # Try loading from DB
+                vec_row = db.execute(
+                    "SELECT v.embedding FROM memory_vec v "
+                    "JOIN memory_rowid_map m ON v.rowid = m.rowid "
+                    "WHERE m.memory_id = ?", (mid,)
+                ).fetchone()
+                if vec_row and vec_row["embedding"]:
+                    try:
+                        emb = _np.array(_deser(vec_row["embedding"]), dtype=_np.float32)
+                    except Exception:
+                        pass
+            if emb is not None:
+                candidate_embs2[mid] = emb
+                if mid in exp_top10_set:
+                    exp_top10_embeddings.append(emb)
+
+        exp_top10_all_tokens = set()
+        for mid in exp_top10:
+            mem = memories.get(mid)
+            if mem:
+                exp_top10_all_tokens |= set(mem["content_tokens"])
+
+        exp_centroid = None
+        if exp_top10_embeddings:
+            exp_centroid = _np.mean(exp_top10_embeddings, axis=0)
+            exp_centroid_norm = float(_np.linalg.norm(exp_centroid)) + 1e-9
+
+        for i, mid in enumerate(exp_candidate_list):
+            mem = memories.get(mid)
+            if not mem:
+                continue
+
+            mem_session = mem.get("session")
+            if mem_session and len(exp_top10) > 0:
+                same = exp_top10_sessions.get(mem_session, 0)
+                if mid in exp_top10_set:
+                    same = max(same - 1, 0)
+                features2[i, 19] = same / len(exp_top10)
+            mem_entities = mem.get("entities", set())
+            shared_with_topk = mem_entities & (exp_top10_entities - query_entities)
+            features2[i, 20] = len(shared_with_topk)
+            if query_terms:
+                content_set = set(mem["content_tokens"])
+                my_coverage = set(query_terms) & content_set
+                novel = my_coverage - exp_top10_query_coverage
+                features2[i, 21] = len(novel) / len(query_terms)
+
+            emb = candidate_embs2.get(mid)
+            if emb is not None and exp_centroid is not None:
+                emb_norm = float(_np.linalg.norm(emb)) + 1e-9
+                cos_sim = float(_np.dot(emb, exp_centroid) / (emb_norm * exp_centroid_norm))
+                features2[i, 24] = 1.0 - cos_sim
+
+            # mmr_redundancy and unique_token_frac
+            if emb is not None:
+                max_sim = 0.0
+                for other_emb in exp_top10_embeddings:
+                    sim = float(_np.dot(emb, other_emb) / ((float(_np.linalg.norm(emb)) + 1e-9) * (float(_np.linalg.norm(other_emb)) + 1e-9)))
+                    if sim > max_sim:
+                        max_sim = sim
+                features2[i, 22] = max_sim
+
+            mem_tokens = set(mem["content_tokens"])
+            if mem_tokens:
+                if mid in exp_top10_set:
+                    other_tokens = set()
+                    for other_mid in exp_top10:
+                        if other_mid != mid:
+                            other_mem = memories.get(other_mid)
+                            if other_mem:
+                                other_tokens |= set(other_mem["content_tokens"])
+                    unique = mem_tokens - other_tokens
+                else:
+                    unique = mem_tokens - exp_top10_all_tokens
+                features2[i, 23] = len(unique) / len(mem_tokens)
+
+        # Phase 2 prediction
+        X2 = features2[:, _locomo_feature_indices]
+        preds2 = _locomo_model.predict(X2)
+
+        scored = sorted(zip(exp_candidate_list, preds2), key=lambda x: -x[1])
         scores_dict = {mid: float(s) for mid, s in scored}
         sorted_ids = [mid for mid, _ in scored]
+
         return sorted_ids, scores_dict
 
     memory.reranker.rerank = _locomo_rerank
@@ -976,6 +1325,22 @@ def main():
                         help="Token budget for impl_recall")
     parser.add_argument("--output", type=str, default=None,
                         help="Output JSONL path")
+    parser.add_argument("--expand-entity-focus", action="store_true",
+                        help="Entity-focused FTS expansion")
+    parser.add_argument("--expand-multi-query", action="store_true",
+                        help="Multi-query decomposition expansion")
+    parser.add_argument("--expand-keyword", action="store_true",
+                        help="Keyword expansion from seeds")
+    parser.add_argument("--expand-session", action="store_true",
+                        help="Session co-occurrence expansion")
+    parser.add_argument("--expand-entity-bridge", action="store_true",
+                        help="Entity bridge expansion")
+    parser.add_argument("--expand-rocchio", action="store_true",
+                        help="Rocchio PRF vector centroid blend")
+    parser.add_argument("--expand-all", action="store_true",
+                        help="Enable all expansion methods")
+    parser.add_argument("--n-seeds", type=int, default=10,
+                        help="Number of phase 1 seeds for phase 2 expansion (default: 10)")
 
     args = parser.parse_args()
 
@@ -983,6 +1348,23 @@ def main():
                         datefmt="%H:%M:%S")
 
     limits = args.recall_limits or [args.recall_limit]
+
+    # Enable expansion methods
+    expand_methods = {
+        "entity_focus": args.expand_all or args.expand_entity_focus,
+        "multi_query": args.expand_all or args.expand_multi_query,
+        "keyword": args.expand_all or args.expand_keyword,
+        "session": args.expand_all or args.expand_session,
+        "entity_bridge": args.expand_all or args.expand_entity_bridge,
+        "rocchio": args.expand_all or args.expand_rocchio,
+    }
+    active_methods = [m for m, v in expand_methods.items() if v]
+    if active_methods:
+        enable_expansion(**expand_methods)
+        logger.info("Expansion methods enabled: %s", ", ".join(active_methods))
+
+    global _n_seeds
+    _n_seeds = args.n_seeds
 
     benchmark_dir = Path.home() / ".somnigraph" / "benchmark"
     snapshot_path = benchmark_dir / "production_snapshot.db"
