@@ -234,6 +234,8 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 10. **Prospective indexing.** At write time (or during sleep REM), generate 2–3 hypothetical future recall queries for each memory and append them to the enriched text before embedding. This bridges the cue-trigger semantic disconnect — the reason queries fail when the question uses different language than the stored memory. Kumiho (arXiv:2603.17244) reports this eliminated the >6-month accuracy cliff on LoCoMo-Plus (37.5% → 84.4%), with independent partial reproduction by the benchmark authors. The cost is one LLM call per memory — already the pattern for Somnigraph's REM classification. Accept if: NDCG@5k improves on GT queries, or negative result documented with analysis of why the enriched embedding already captures this. See `research/sources/kumiho.md`.
 
+21. **Expansion method ablation (LoCoMo).** 3 of 6 expansion methods are nearly dead: rocchio (0% fire rate), multi_query (2%), entity_focus (4%). Session (100%), keyword (95%), entity_bridge (96%) do all the work. Run `--expand-all` with only the 3 active methods vs all 6 to confirm the dead methods add no signal, then remove them. Also test individual method contribution by dropping one active method at a time. Accept if: per-method R@10 delta measured, dead methods confirmed removable or revived.
+
 ### Tier 2: Deeper investigation (2-3 sessions each)
 
 11. **Query difficulty clustering.** Cluster 1,047 GT queries by type, measure per-cluster metrics, identify failure modes. Accept if: failure patterns documented in `experiments.md`.

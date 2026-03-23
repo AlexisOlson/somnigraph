@@ -210,6 +210,45 @@ centroid_distance (Group G, 2nd-pass embedding diversity) leads — validates th
 **New feature groups:**
 - **F (17-21)**: Inter-passage — has_temporal_expr, entity_density, topk_session_frac, entity_bridge_count, theme_complementarity
 - **G (22-24)**: Set diversity — mmr_redundancy, unique_token_frac, centroid_distance
+- **H (25-31)**: Phase-aware — entity_fts_rank, sub_query_hit_count, seed_keyword_overlap, phase, expansion_method_count, phase1_rrf_score, is_seed (sentinels in phase 1, real values in phase 2)
+
+### Two-Phase Expansion (2026-03-22)
+
+Train/eval mismatch fix: original candidates lacked embeddings in phase 2 (vec-dependent features were wrong), temporal feature used a different regex than training. After fix, expansion improves all metrics instead of degrading.
+
+Conversations 0-4, baseline (no expansion):
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20
+----------------------------------------------------------------------
+single-hop        141   0.632   51.8%   70.9%   78.7%   87.2%   90.1%
+temporal          156   0.722   62.2%   80.8%   84.6%   87.2%   91.7%
+multi-hop          44   0.378   27.3%   40.9%   47.7%   61.4%   75.0%
+open-domain       418   0.665   57.2%   72.0%   79.2%   85.2%   89.5%
+adversarial       237   0.582   48.9%   65.0%   69.6%   75.1%   79.7%
+----------------------------------------------------------------------
+OVERALL           759   0.654   55.5%   71.8%   78.4%   84.6%   89.2%
+(excludes adversarial)
+```
+
+With `--expand-all` (conversations 0-4):
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20
+----------------------------------------------------------------------
+single-hop        141   0.696   58.9%   76.6%   83.7%   88.7%   92.2%
+temporal          156   0.792   73.7%   82.1%   85.9%   88.5%   92.9%
+multi-hop          44   0.407   29.5%   45.5%   61.4%   70.5%   77.3%
+open-domain       418   0.703   62.2%   76.3%   80.4%   85.9%   90.4%
+adversarial       237   0.618   53.6%   66.7%   73.0%   78.1%   81.0%
+----------------------------------------------------------------------
+OVERALL           759   0.703   62.1%   75.8%   81.0%   86.0%   90.5%
+(excludes adversarial)
+```
+
+**Delta (expand-all vs baseline):** MRR +0.049, R@1 +6.6pp, R@3 +4.0pp, R@5 +2.6pp, R@10 +1.4pp, R@20 +1.3pp. Multi-hop R@10 +9.1pp (61.4% → 70.5%). Expansion helps across every category and metric.
+
+**Note:** Entity bridge extraction has a stopword leak — sentence-initial words ("Hey", "But", "Cool") and I-contractions ("I'm", "I've") pass the capitalization heuristic. Fix applied but model was trained with noisy entities; retrain needed to measure clean impact.
+
+**Pending (overnight run):** Retrain with entity fix + 3 new Group H features (expansion_method_count, phase1_rrf_score, is_seed) + theme_overlap fix for expanded candidates. Forward stepwise, backward elimination, and old-15 baseline compared across all 10 conversations, both with and without expansion. Results in `~/.somnigraph/benchmark/overnight/`.
 
 ## End-to-End QA Results
 

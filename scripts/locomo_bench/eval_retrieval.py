@@ -336,11 +336,14 @@ def _install_locomo_reranker():
                 features[i, 24] = 1.0 - cos_sim
 
         # Group H: Phase sentinels for phase 1
-        for i in range(len(candidate_list)):
+        for i, mid in enumerate(candidate_list):
             features[i, 25] = -1    # entity_fts_rank sentinel
             features[i, 26] = -1    # sub_query_hit_count sentinel
             features[i, 27] = 0.0   # seed_keyword_overlap
             features[i, 28] = 0     # phase = 0
+            features[i, 29] = 0     # expansion_method_count
+            features[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score
+            features[i, 31] = 0     # is_seed
 
         # --- Phase 1 prediction ---
         X = features[:, _locomo_feature_indices]
@@ -366,6 +369,7 @@ def _install_locomo_reranker():
 
         phase1_scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
         top_seeds = [mid for mid, _ in phase1_scored[:_n_seeds]]
+        top_seeds_set = set(top_seeds)
 
         # Copies to avoid corrupting phase 1 data
         exp_fts_ranked = dict(fts_ranked)
@@ -387,6 +391,7 @@ def _install_locomo_reranker():
             all_speakers=all_speakers,
         )
         exp_result = run_expansions(exp_ctx, _expansion_flags)
+        exp_method_counts = exp_result.method_counts()
         expanded_ids = candidate_ids | exp_result.all_new_ids
 
         # Load metadata for new candidates
@@ -446,6 +451,15 @@ def _install_locomo_reranker():
 
             sorted_mids = sorted(memories.keys(), key=lambda m: memories[m]["age_days"], reverse=True)
             ordinal_map = {mid: i for i, mid in enumerate(sorted_mids)}
+
+        # Recompute theme_overlap for expanded candidates not in original map
+        for mid in expanded_ids:
+            if mid not in theme_overlap_map:
+                mem = memories.get(mid)
+                if mem:
+                    overlap = len(query_tokens & mem["theme_tokens"])
+                    if overlap > 0:
+                        theme_overlap_map[mid] = overlap
 
         # Retrieval scores for expanded candidates
         max_vec_rank = max(exp_vec_ranked.values()) if exp_vec_ranked else 0
@@ -564,6 +578,9 @@ def _install_locomo_reranker():
             features2[i, 26] = sub_query_hits.get(mid, 0)
             features2[i, 27] = seed_keyword_overlaps.get(mid, 0.0)
             features2[i, 28] = 1
+            features2[i, 29] = exp_method_counts.get(mid, 0)
+            features2[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score (0 if new)
+            features2[i, 31] = 1.0 if mid in top_seeds_set else 0.0
 
         # Group F second-pass (inter-passage based on expanded top-10)
         exp_top10 = sorted(exp_candidate_list, key=lambda m: exp_rrf_scores.get(m, 0), reverse=True)[:10]

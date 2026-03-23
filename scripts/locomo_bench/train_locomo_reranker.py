@@ -5,17 +5,24 @@
 """
 Train a LoCoMo-specific LightGBM reranker and run ablation experiments.
 
-Extracts 25 features designed for fresh LoCoMo DBs (no feedback, no edges,
+Extracts 29 features designed for fresh LoCoMo DBs (no feedback, no edges,
 no Hebbian — those are all dead on benchmark data). Groups A-E (17 features) are
 v2 baseline; Group F (5 features) adds temporal, entity density, and inter-passage
 features; Group G (3 features) adds embedding-based set diversity (MMR, unique tokens,
-centroid distance). Uses leave-one-conversation-out CV (10-fold, one per conversation).
+centroid distance); Group H (4 features) adds phase-aware features for two-phase
+retrieval (entity_fts_rank, sub_query_hit_count, seed_keyword_overlap, phase).
+
+With --two-phase, generates two rows per (query, candidate): phase 0 with Group H
+sentinels, and phase 1 with real values after candidate expansion. The model learns
+phase-dependent splits (e.g., "if phase >= 1 AND entity_fts_rank < 10, boost").
 
 Usage:
   uv run scripts/locomo_bench/train_locomo_reranker.py --ablation
   uv run scripts/locomo_bench/train_locomo_reranker.py --features A B
   uv run scripts/locomo_bench/train_locomo_reranker.py --extract-only
+  uv run scripts/locomo_bench/train_locomo_reranker.py --extract-only --two-phase
   uv run scripts/locomo_bench/train_locomo_reranker.py --train-only --ablation
+  uv run scripts/locomo_bench/train_locomo_reranker.py --train-only --shap-by-phase
   uv run scripts/locomo_bench/train_locomo_reranker.py --save-model
 """
 
@@ -137,9 +144,17 @@ FEATURE_NAMES = [
     "mmr_redundancy",       # 22: Max embedding similarity to other top-10 candidates
     "unique_token_frac",    # 23: Fraction of tokens unique to this candidate vs top-10
     "centroid_distance",    # 24: Embedding distance from centroid of top-10
+    # Group H: Phase-aware features (populated in phase 2, sentinel -1/0 in phase 1)
+    "entity_fts_rank",      # 25: Rank in entity-focused FTS (-1 if not found)
+    "sub_query_hit_count",  # 26: How many decomposed sub-queries matched this candidate
+    "seed_keyword_overlap", # 27: Fraction of distinctive seed keywords in this candidate
+    "phase",                # 28: Retrieval phase (0 = initial, 1 = after seed expansion)
+    "expansion_method_count",# 29: How many expansion methods found this candidate (0 in phase 1)
+    "phase1_rrf_score",     # 30: Raw RRF score from phase 1 pool (0 if new in phase 2)
+    "is_seed",              # 31: Binary: was this a top-K seed for expansion? (0 in phase 1)
 ]
 
-NUM_FEATURES = len(FEATURE_NAMES)  # 25
+NUM_FEATURES = len(FEATURE_NAMES)  # 32
 
 FEATURE_GROUPS = {
     "A": list(range(0, 5)),
@@ -149,6 +164,7 @@ FEATURE_GROUPS = {
     "E": list(range(15, 17)),
     "F": list(range(17, 22)),
     "G": list(range(22, 25)),
+    "H": list(range(25, 32)),
 }
 
 _ALL_INDICES = list(range(NUM_FEATURES))
@@ -182,6 +198,10 @@ ABLATION_CONFIGS = {
     "no_C_pruned_G": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14, 17, 18, 19, 20, 21)],  # best v2 + G
     "no_C_pruned_FG": [i for i in _ALL_INDICES if i not in (6, 9, 10, 11, 13, 14)],  # best v2 + F + G
     "all_v3": ["A", "B", "C", "D", "E", "F", "G"],
+    # Group H ablations (two-phase features)
+    "H_only": ["H"],
+    "no_H": ["A", "B", "C", "D", "E", "F", "G"],
+    "all_v4": ["A", "B", "C", "D", "E", "F", "G", "H"],
 }
 
 RRF_K = 60  # Standard RRF constant
@@ -428,8 +448,16 @@ def run_searches(conv_data: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def extract_features(conv_data: dict, search_data: dict) -> dict:
+def extract_features(conv_data: dict, search_data: dict,
+                     two_phase: bool = False, n_seeds: int = 10) -> dict:
     """Extract features for all (query, candidate) pairs in a conversation.
+
+    If two_phase=True, generates two rows per (query, candidate): phase 0
+    with Group H sentinels, and phase 1 with real entity_fts_rank,
+    sub_query_hit_count, seed_keyword_overlap after expansion.
+
+    n_seeds: number of phase 1 top-ranked candidates used as seeds for
+    phase 2 expansion (default 10, aligns with R@10 saturation point).
 
     Returns dict with features, labels, query_ids, memory_ids arrays.
     """
@@ -603,6 +631,15 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
             features[i, 17] = mem.get("temporal_expr_count", 0)           # has_temporal_expr
             features[i, 18] = mem.get("entity_density", 0.0)             # entity_density
 
+            # Group H: Phase-aware sentinels (populated with real values in phase 2)
+            features[i, 25] = -1    # entity_fts_rank sentinel
+            features[i, 26] = -1    # sub_query_hit_count sentinel
+            features[i, 27] = 0.0   # seed_keyword_overlap (no seeds in phase 1)
+            features[i, 28] = 0     # phase = 0
+            features[i, 29] = 0     # expansion_method_count (no expansion in phase 1)
+            features[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score
+            features[i, 31] = 0     # is_seed (no seeds in phase 1)
+
             # Label: binary
             labels[i] = 1.0 if mid in evidence_mids else 0.0
 
@@ -707,10 +744,359 @@ def extract_features(conv_data: dict, search_data: dict) -> dict:
                 cos_sim = float(np.dot(emb, centroid) / (emb_norm + 1e-9))
                 features[i, 24] = 1.0 - cos_sim                          # centroid_distance
 
+        # Phase 1 rows: query_id = 2*qi (even) to keep CV folds correct
+        phase1_qid = 2 * qi if two_phase else qi
         all_features.append(features)
         all_labels.append(labels)
-        all_query_ids.extend([qi] * n)
+        all_query_ids.extend([phase1_qid] * n)
         all_mids.extend([(qtext, mid) for mid in candidate_list])
+
+        # --- Phase 2: expanded pool with real Group H features ---
+        if two_phase:
+            from locomo_bench.expansion import (
+                ExpansionContext, run_expansions,
+                compute_entity_fts_ranks, compute_sub_query_hits,
+                compute_seed_keyword_overlap,
+            )
+            from memory.db import get_db as _get_db2
+            from memory.embeddings import embed_text as _embed2
+            from memory.fts import sanitize_fts_query as _sanitize_fts2
+            from locomo_bench.run import setup_isolated_db as _setup2
+
+            _setup2(conv_data["run_dir"])
+            db2 = _get_db2()
+
+            # Phase 1 top seeds by RRF
+            top_seeds = sorted(candidate_list,
+                               key=lambda m: rrf_scores.get(m, 0),
+                               reverse=True)[:n_seeds]
+            top_seeds_set = set(top_seeds)
+
+            query_emb = _embed2(qtext)
+
+            # Copies so expansion doesn't corrupt phase 1 data
+            exp_fts_ranked = dict(fts_ranked)
+            exp_vec_ranked = dict(vec_ranked)
+            exp_vec_distances = dict(search_data["vec_scores"].get(qtext, {}))
+            exp_fts_scores = dict(search_data["fts_scores"].get(qtext, {}))
+
+            exp_ctx = ExpansionContext(
+                db=db2,
+                question=qtext,
+                query_embedding=query_emb,
+                seeds=list(top_seeds),
+                existing_ids=set(candidate_ids),
+                fts_ranked=exp_fts_ranked,
+                vec_ranked=exp_vec_ranked,
+                vec_distances=exp_vec_distances,
+                fts_scores=exp_fts_scores,
+                all_speakers=all_speakers_set,
+            )
+
+            exp_config = {
+                "entity_focus": True, "multi_query": True, "keyword": True,
+                "session": True, "entity_bridge": True, "rocchio": True,
+            }
+            exp_result = run_expansions(exp_ctx, exp_config)
+            exp_method_counts = exp_result.method_counts()
+            expanded_candidate_ids = set(candidate_ids) | exp_result.all_new_ids
+
+            # Load metadata for new candidates
+            for new_id in (expanded_candidate_ids - set(memories.keys())):
+                r = db2.execute("""
+                    SELECT m.id, m.content, m.themes, m.token_count, m.created_at,
+                           v.embedding
+                    FROM memories m
+                    LEFT JOIN memory_vec v ON v.rowid = m.rowid
+                    WHERE m.id = ? AND m.status = 'active'
+                """, (new_id,)).fetchone()
+                if not r:
+                    expanded_candidate_ids.discard(new_id)
+                    continue
+                content = r["content"] or ""
+                sp_match = re.match(r"^\[([^\]]+)\]", content)
+                speaker = sp_match.group(1).lower() if sp_match else ""
+                themes_list = []
+                if r["themes"]:
+                    try:
+                        themes_list = json.loads(r["themes"])
+                    except json.JSONDecodeError:
+                        pass
+                try:
+                    from datetime import datetime as _dt2, timezone as _tz2
+                    created = _dt2.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+                    age_days = (_dt2.now(_tz2.utc) - created).total_seconds() / 86400
+                except Exception:
+                    age_days = 0.0
+                session = None
+                for t in themes_list:
+                    if isinstance(t, str) and t.startswith("session_"):
+                        session = t
+                        break
+                token_count = r["token_count"] or len(content.split())
+                entities = _extract_entities(content, all_speakers_set)
+                emb = None
+                if r["embedding"]:
+                    try:
+                        emb = np.array(deserialize_f32(r["embedding"]), dtype=np.float32)
+                    except Exception:
+                        pass
+                memories[new_id] = {
+                    "content": content,
+                    "content_lower": content.lower(),
+                    "content_tokens": content.lower().split(),
+                    "speaker": speaker,
+                    "themes_list": themes_list,
+                    "theme_tokens": {tok for t in themes_list for tok in str(t).lower().replace("-", " ").split()},
+                    "theme_count": len(themes_list),
+                    "token_count": token_count,
+                    "age_days": age_days,
+                    "created_at": r["created_at"],
+                    "entities": entities,
+                    "session": session,
+                    "embedding": emb,
+                    "temporal_expr_count": _count_temporal_exprs(content),
+                    "entity_density": len(entities) / max(token_count, 1),
+                }
+
+            # Rebuild ordinal map with expanded pool
+            sorted_mids2 = sorted(memories.keys(), key=lambda m: memories[m].get("created_at", ""))
+            ordinal_map2 = {mid: i for i, mid in enumerate(sorted_mids2)}
+            for mid in memories:
+                memories[mid]["ordinal"] = ordinal_map2.get(mid, -999)
+
+            # Compute retrieval scores for expanded candidates
+            max_fts_r = max(exp_fts_ranked.values()) if exp_fts_ranked else 0
+            max_vec_r = max(exp_vec_ranked.values()) if exp_vec_ranked else 0
+            q_emb_arr = np.array(query_emb, dtype=np.float32)
+            q_norm = float(np.linalg.norm(q_emb_arr))
+
+            for new_id in (expanded_candidate_ids - set(exp_fts_ranked.keys()) - set(exp_vec_ranked.keys())):
+                mem = memories.get(new_id)
+                if not mem:
+                    continue
+                if new_id not in exp_vec_distances and mem.get("embedding") is not None:
+                    emb = mem["embedding"]
+                    emb_norm = float(np.linalg.norm(emb))
+                    if emb_norm > 0 and q_norm > 0:
+                        cos_dist = 1.0 - float(np.dot(q_emb_arr, emb) / (q_norm * emb_norm))
+                        exp_vec_distances[new_id] = cos_dist
+                        max_vec_r += 1
+                        exp_vec_ranked[new_id] = max_vec_r
+                if new_id not in exp_fts_ranked:
+                    fts_q = _sanitize_fts2(qtext)
+                    if fts_q:
+                        try:
+                            rowid_row = db2.execute(
+                                "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?",
+                                (new_id,),
+                            ).fetchone()
+                            if rowid_row:
+                                fts_check = db2.execute(
+                                    f"SELECT bm25(memory_fts, {BM25_SUMMARY_WT}, {BM25_THEMES_WT}) as score "
+                                    f"FROM memory_fts WHERE memory_fts MATCH ? AND rowid = ?",
+                                    (fts_q, rowid_row["rowid"]),
+                                ).fetchone()
+                                if fts_check:
+                                    exp_fts_scores[new_id] = fts_check["score"]
+                                    max_fts_r += 1
+                                    exp_fts_ranked[new_id] = max_fts_r
+                        except Exception:
+                            pass
+
+            # Expanded RRF scores
+            exp_rrf_scores = {}
+            for mid in expanded_candidate_ids:
+                score = 0.0
+                if mid in exp_fts_ranked:
+                    score += 1.0 / (RRF_K + exp_fts_ranked[mid])
+                if mid in exp_vec_ranked:
+                    score += 1.0 / (RRF_K + exp_vec_ranked[mid])
+                exp_rrf_scores[mid] = score
+
+            expanded_candidate_ids |= evidence_mids
+
+            # Compute Group H features
+            entity_fts_ranks = compute_entity_fts_ranks(
+                db2, qtext, all_speakers_set, expanded_candidate_ids)
+            sub_query_hits = compute_sub_query_hits(
+                db2, qtext, all_speakers_set, expanded_candidate_ids)
+            seed_keyword_overlaps = compute_seed_keyword_overlap(
+                db2, qtext, top_seeds, expanded_candidate_ids)
+
+            db2.close()
+
+            # Build phase 2 feature matrix
+            exp_candidate_list = sorted(expanded_candidate_ids)
+            n2 = len(exp_candidate_list)
+            features2 = np.zeros((n2, NUM_FEATURES), dtype=np.float32)
+            labels2 = np.zeros(n2, dtype=np.float32)
+
+            # Recompute aggregates for expanded pool
+            exp_all_rrf = sorted(exp_rrf_scores.values())
+            n_exp_rrf = len(exp_all_rrf)
+            exp_top20_rrf = sorted(expanded_candidate_ids,
+                                   key=lambda m: exp_rrf_scores.get(m, 0),
+                                   reverse=True)[:20]
+            exp_top20_set = set(exp_top20_rrf)
+            exp_session_counts = defaultdict(int)
+            for mid in exp_top20_rrf:
+                mem = memories.get(mid)
+                if mem and mem.get("session"):
+                    exp_session_counts[mem["session"]] += 1
+
+            exp_candidate_ordinals = {}
+            for mid in expanded_candidate_ids:
+                if mid in memories:
+                    exp_candidate_ordinals[mid] = memories[mid].get("ordinal", -999)
+            exp_ordinal_set = set(exp_candidate_ordinals.values())
+
+            for i, mid in enumerate(exp_candidate_list):
+                mem = memories.get(mid)
+                if mem is None:
+                    continue
+                fts_r = exp_fts_ranked.get(mid, -1)
+                vec_r = exp_vec_ranked.get(mid, -1)
+
+                # Groups A-E + F first-pass (same logic as phase 1)
+                features2[i, 0] = fts_r
+                features2[i, 1] = vec_r
+                features2[i, 2] = exp_fts_scores.get(mid, 0.0)
+                features2[i, 3] = exp_vec_distances.get(mid, 0.0)
+                features2[i, 4] = theme_overlap_map.get(mid, 0)
+                if query_terms:
+                    content_set = set(mem["content_tokens"])
+                    matched = sum(1 for t in query_terms if t in content_set)
+                    features2[i, 5] = matched / len(query_terms)
+                if len(query_terms) > 1:
+                    features2[i, 6] = _compute_proximity(query_terms, mem["content_tokens"])
+                if mem["speaker"] and mem["speaker"] in query_lower:
+                    features2[i, 7] = 1.0
+                features2[i, 8] = query_length
+                if fts_r >= 0 and vec_r >= 0:
+                    features2[i, 9] = abs(fts_r - vec_r)
+                else:
+                    features2[i, 9] = 9999
+                my_ord = exp_candidate_ordinals.get(mid, -999)
+                if my_ord >= 0:
+                    features2[i, 10] = sum(1 for o in exp_ordinal_set
+                                           if o != my_ord and abs(o - my_ord) <= 2)
+                rrf_s = exp_rrf_scores.get(mid, 0.0)
+                if n_exp_rrf > 1:
+                    features2[i, 11] = sum(1 for s in exp_all_rrf if s <= rrf_s) / n_exp_rrf
+                else:
+                    features2[i, 11] = 0.5
+                features2[i, 12] = mem["token_count"]
+                features2[i, 13] = mem.get("age_days", 0.0)
+                features2[i, 14] = mem["theme_count"]
+                features2[i, 15] = len(query_entities & mem.get("entities", set()))
+                mem_session = mem.get("session")
+                if mem_session and mid in exp_top20_set:
+                    features2[i, 16] = exp_session_counts.get(mem_session, 1) - 1
+                features2[i, 17] = mem.get("temporal_expr_count", 0)
+                features2[i, 18] = mem.get("entity_density", 0.0)
+
+                # Group H: real values
+                features2[i, 25] = entity_fts_ranks.get(mid, -1)
+                features2[i, 26] = sub_query_hits.get(mid, 0)
+                features2[i, 27] = seed_keyword_overlaps.get(mid, 0.0)
+                features2[i, 28] = 1  # phase = 1
+                features2[i, 29] = exp_method_counts.get(mid, 0)
+                features2[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score (0 if new)
+                features2[i, 31] = 1.0 if mid in top_seeds_set else 0.0
+
+                labels2[i] = 1.0 if mid in evidence_mids else 0.0
+
+            # Group F second-pass (inter-passage based on expanded top-10)
+            exp_top10_rrf = sorted(exp_candidate_list,
+                                   key=lambda m: exp_rrf_scores.get(m, 0),
+                                   reverse=True)[:10]
+            exp_top10_set = set(exp_top10_rrf)
+            exp_top10_sessions = defaultdict(int)
+            exp_top10_entities = set()
+            exp_top10_query_coverage = set()
+            for mid in exp_top10_rrf:
+                mem = memories.get(mid)
+                if not mem:
+                    continue
+                if mem.get("session"):
+                    exp_top10_sessions[mem["session"]] += 1
+                exp_top10_entities |= mem.get("entities", set())
+                content_set = set(mem["content_tokens"])
+                exp_top10_query_coverage |= (set(query_terms) & content_set)
+
+            for i, mid in enumerate(exp_candidate_list):
+                mem = memories.get(mid)
+                if mem is None:
+                    continue
+                mem_session = mem.get("session")
+                if mem_session and len(exp_top10_rrf) > 0:
+                    same = exp_top10_sessions.get(mem_session, 0)
+                    if mid in exp_top10_set:
+                        same = max(same - 1, 0)
+                    features2[i, 19] = same / len(exp_top10_rrf)
+                mem_entities = mem.get("entities", set())
+                shared_with_topk = mem_entities & (exp_top10_entities - query_entities)
+                features2[i, 20] = len(shared_with_topk)
+                if query_terms:
+                    content_set = set(mem["content_tokens"])
+                    my_coverage = set(query_terms) & content_set
+                    novel = my_coverage - exp_top10_query_coverage
+                    features2[i, 21] = len(novel) / len(query_terms)
+
+            # Group G second-pass for phase 2
+            exp_top10_embeddings = []
+            exp_top10_all_tokens = set()
+            for mid in exp_top10_rrf:
+                mem = memories.get(mid)
+                if not mem:
+                    continue
+                if mem.get("embedding") is not None:
+                    exp_top10_embeddings.append(mem["embedding"])
+                exp_top10_all_tokens |= set(mem["content_tokens"])
+
+            exp_centroid = None
+            if exp_top10_embeddings:
+                exp_centroid = np.mean(exp_top10_embeddings, axis=0)
+                exp_centroid /= np.linalg.norm(exp_centroid) + 1e-9
+
+            for i, mid in enumerate(exp_candidate_list):
+                mem = memories.get(mid)
+                if mem is None or mem.get("embedding") is None:
+                    continue
+                emb = mem["embedding"]
+                emb_norm = np.linalg.norm(emb)
+                if emb_norm < 1e-9:
+                    continue
+                max_sim = 0.0
+                for other_emb in exp_top10_embeddings:
+                    sim = float(np.dot(emb, other_emb) / (emb_norm * (np.linalg.norm(other_emb) + 1e-9)))
+                    if sim > max_sim:
+                        max_sim = sim
+                features2[i, 22] = max_sim
+                mem_tokens = set(mem["content_tokens"])
+                if mem_tokens:
+                    if mid in exp_top10_set:
+                        other_tokens = set()
+                        for other_mid in exp_top10_rrf:
+                            if other_mid != mid:
+                                other_mem = memories.get(other_mid)
+                                if other_mem:
+                                    other_tokens |= set(other_mem["content_tokens"])
+                        unique = mem_tokens - other_tokens
+                    else:
+                        unique = mem_tokens - exp_top10_all_tokens
+                    features2[i, 23] = len(unique) / len(mem_tokens)
+                if exp_centroid is not None:
+                    cos_sim = float(np.dot(emb, exp_centroid) / (emb_norm + 1e-9))
+                    features2[i, 24] = 1.0 - cos_sim
+
+            # Append phase 2 rows with odd query_id
+            phase2_qid = 2 * qi + 1
+            all_features.append(features2)
+            all_labels.append(labels2)
+            all_query_ids.extend([phase2_qid] * n2)
+            all_mids.extend([(qtext, mid) for mid in exp_candidate_list])
 
     if not all_features:
         return {"features": np.zeros((0, NUM_FEATURES)), "labels": np.zeros(0),
@@ -1304,6 +1690,81 @@ def select_mrmr(all_conv_features, top_k=15):
 
 
 # ---------------------------------------------------------------------------
+# SHAP-by-phase analysis
+# ---------------------------------------------------------------------------
+
+
+def shap_by_phase(
+    all_conv_features: list[dict],
+    feature_indices: list[int],
+    n_estimators: int = 500,
+):
+    """Train on all data, then decompose SHAP contributions by phase.
+
+    Uses LightGBM's built-in pred_contrib (tree SHAP) to compute per-feature
+    contributions for every row, then splits by phase and compares mean
+    contribution per feature between phase 0 and phase 1.
+    """
+    phase_col = FEATURE_NAMES.index("phase")
+    if phase_col not in feature_indices:
+        print("ERROR: phase feature (index 28) not in feature set. "
+              "SHAP-by-phase requires --two-phase extraction with phase in features.")
+        return
+
+    print("Training full model for SHAP analysis...")
+    model = train_full_model(all_conv_features, feature_indices, n_estimators)
+    booster = model.booster_
+
+    X_all = np.concatenate([fd["features"][:, feature_indices]
+                            for fd in all_conv_features], axis=0)
+    y_all = np.concatenate([fd["labels"] for fd in all_conv_features], axis=0)
+
+    # pred_contrib returns n_features + 1 columns (last is bias)
+    contribs = booster.predict(X_all, pred_contrib=True)
+    feature_contribs = contribs[:, :-1]
+
+    phase_idx_in_selected = list(feature_indices).index(phase_col)
+    phases = X_all[:, phase_idx_in_selected]
+    phase0_mask = phases == 0
+    phase1_mask = phases == 1
+
+    n0 = phase0_mask.sum()
+    n1 = phase1_mask.sum()
+    n0_pos = y_all[phase0_mask].sum()
+    n1_pos = y_all[phase1_mask].sum()
+
+    print(f"\n{'=' * 70}")
+    print("SHAP Contribution by Phase")
+    print(f"{'=' * 70}")
+    print(f"Phase 0: {n0:,} rows ({n0_pos:.0f} positive, {100*n0_pos/max(n0,1):.2f}%)")
+    print(f"Phase 1: {n1:,} rows ({n1_pos:.0f} positive, {100*n1_pos/max(n1,1):.2f}%)")
+
+    names = [FEATURE_NAMES[i] for i in feature_indices]
+    mean_abs_0 = np.mean(np.abs(feature_contribs[phase0_mask]), axis=0) if n0 > 0 else np.zeros(len(feature_indices))
+    mean_abs_1 = np.mean(np.abs(feature_contribs[phase1_mask]), axis=0) if n1 > 0 else np.zeros(len(feature_indices))
+
+    pos0_mask = phase0_mask & (y_all > 0)
+    pos1_mask = phase1_mask & (y_all > 0)
+    mean_signed_pos0 = np.mean(feature_contribs[pos0_mask], axis=0) if pos0_mask.sum() > 0 else np.zeros(len(feature_indices))
+    mean_signed_pos1 = np.mean(feature_contribs[pos1_mask], axis=0) if pos1_mask.sum() > 0 else np.zeros(len(feature_indices))
+
+    phase_delta = mean_abs_1 - mean_abs_0
+    order = np.argsort(np.abs(phase_delta))[::-1]
+
+    print(f"\n{'Feature':28s} {'|SHAP| P0':>10s} {'|SHAP| P1':>10s} {'Delta':>10s}  {'SHAP+ P0':>10s} {'SHAP+ P1':>10s}")
+    print("-" * 82)
+    for idx in order:
+        group = _feature_group_label(feature_indices[idx])
+        print(f"  [{group}] {names[idx]:23s} {mean_abs_0[idx]:>10.4f} {mean_abs_1[idx]:>10.4f} "
+              f"{phase_delta[idx]:>+10.4f}  {mean_signed_pos0[idx]:>10.4f} {mean_signed_pos1[idx]:>10.4f}")
+
+    h_indices_in_selected = [i for i, fi in enumerate(feature_indices) if fi in FEATURE_GROUPS.get("H", [])]
+    if h_indices_in_selected:
+        print(f"\nGroup H total |SHAP|:  Phase 0 = {sum(mean_abs_0[i] for i in h_indices_in_selected):.4f}, "
+              f"Phase 1 = {sum(mean_abs_1[i] for i in h_indices_in_selected):.4f}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1341,6 +1802,12 @@ def main():
                         help="Features to exclude from selection (by name)")
     parser.add_argument("--feature-names", type=str, nargs="+",
                         help="Explicit feature names to use (overrides --features/--config)")
+    parser.add_argument("--two-phase", action="store_true",
+                        help="Generate two-phase training data (phase 0 + phase 1 with expansion)")
+    parser.add_argument("--n-seeds", type=int, default=10,
+                        help="Number of phase 1 seeds for phase 2 expansion (default: 10)")
+    parser.add_argument("--shap-by-phase", action="store_true",
+                        help="Decompose SHAP contributions by phase (requires --two-phase extraction)")
 
     args = parser.parse_args()
 
@@ -1428,7 +1895,9 @@ def main():
             search_data = run_searches(conv_data)
             print(f"  Searches complete")
 
-            feature_data = extract_features(conv_data, search_data)
+            feature_data = extract_features(conv_data, search_data,
+                                            two_phase=args.two_phase,
+                                            n_seeds=args.n_seeds)
             n_pos = np.sum(feature_data["labels"] > 0)
             print(f"  Features: {feature_data['features'].shape[0]} pairs, "
                   f"{n_pos} positive ({100*n_pos/max(len(feature_data['labels']),1):.1f}%)")
@@ -1461,6 +1930,13 @@ def main():
     print(f"Total: {total_pairs} pairs, {total_pos} positive "
           f"({100*total_pos/max(total_pairs,1):.1f}%)")
 
+    # SHAP-by-phase analysis
+    if args.shap_by_phase:
+        shap_by_phase(all_conv_features, feature_indices, args.n_estimators)
+        elapsed = time.time() - t_start
+        print(f"\nSHAP analysis completed in {elapsed:.1f}s")
+        return
+
     # Feature selection mode
     if args.select:
         if args.exclude:
@@ -1490,8 +1966,10 @@ def main():
                                         all_search_data, n_estimators=args.n_estimators,
                                         seed=seed_indices)
             elif method == "backward":
+                backward_candidates = feature_indices if args.feature_names else None
                 select_backward_elimination(all_conv_features, all_conv_data,
-                                            all_search_data, n_estimators=args.n_estimators)
+                                            all_search_data, candidates=backward_candidates,
+                                            n_estimators=args.n_estimators)
             elif method == "permutation":
                 select_permutation_importance(all_conv_features, all_conv_data,
                                               all_search_data, n_estimators=args.n_estimators)
