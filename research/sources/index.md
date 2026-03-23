@@ -95,6 +95,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [RLabs Memory](https://github.com/RLabs-Inc/memory-ts) | rlabs-memory.md | TypeScript/Bun memory with file-based database and local MiniLM embeddings. |
 | [Sovereign AI Kit](https://github.com/tharavael/sovereign-ai-kit) | sovereign-ai-kit.md | Multi-language toolkit with SQLite memory, Chrome extension, and identity system. |
 | [Vestige + FSRS](https://github.com/samvallad33/vestige) | vestige-fsrs.md | Rust MCP memory applying FSRS-6 spaced repetition scheduling with SvelteKit 3D visualization. |
+| [virtual-context](https://github.com/virtual-context/virtual-context) | virtual-context.md | OS-style context window manager: 3-layer compression (raw/summary/tag), 3-signal RRF with gravity/hub dampening, structured fact supersession, tool-augmented paging. 95% on LongMemEval. |
 | [Zep (repo)](https://github.com/getzep/zep) | zep-repo.md | Open-source examples and integrations; the actual engine lives in the Graphiti repo. |
 
 ## Discussions

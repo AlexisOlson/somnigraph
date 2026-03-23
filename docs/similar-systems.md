@@ -1,6 +1,6 @@
 # Similar Systems
 
-An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (80 sources), see `research/sources/index.md`.
+An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (81 sources), see `research/sources/index.md`.
 
 ## Contents
 
@@ -27,6 +27,8 @@ AI memory systems cluster into three approaches:
 **Temporal-first**: Extract facts from conversations with bi-temporal validity (event time + transaction time), supersede rather than overwrite on contradiction. memv is the clearest implementation. Clean temporal reasoning, but no offline consolidation and retrieval is basic.
 
 **Platform-first**: Build a unified memory + toolkit layer that multiple AI agents can share, with integrations across dozens of apps as the differentiator. RedPlanet CORE is the exemplar. Broad but shallow on memory quality — retrieval doesn't learn from use.
+
+**Context-window-manager**: Sit as a proxy between client and LLM, compressing and indexing conversation history to fit within the context window. Not a memory server — manages what the model sees per-turn via paging, eviction, and tool-augmented drill-down. virtual-context is the exemplar. High per-turn accuracy, but no persistence beyond the conversation and no feedback-driven learning.
 
 Somnigraph doesn't fit neatly into any of these. It stores discrete memories (like extract-and-store), builds a graph of relationships between them (like graph-based), and shapes retrieval through a feedback loop (shared with Ori-Mnemos, though via different mechanisms). The sleep pipeline adds offline consolidation that none of the others attempt at this level.
 
@@ -329,6 +331,27 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 - Benchmark claims unvalidated. LongMemEval harness built but not run.
 
 **What's interesting for us**: The `superseded_by` field for explicit contradiction chains — a schema migration that would make Somnigraph's contradiction handling traversable. An `at_time` parameter on `recall()` for point-in-time queries — Somnigraph has the temporal fields but doesn't expose them through the API. The extraction-source discipline principle — worth auditing whether any sleep consolidation steps extract from LLM-generated content rather than originals. Write-time temporal normalization for `remember()` or during sleep.
+
+### virtual-context
+
+**What it is**: An OS-style context window manager that sits as a proxy between client and LLM, compressing conversation history into three layers (raw turns → segment summaries + facts → tag summaries) and paging topics in/out at adjustable depth levels. Not a memory server — manages the active context window, not a persistent store.
+
+**What it does well**:
+- 3-signal RRF retrieval (IDF tag overlap, BM25, embedding) with thoughtful post-fusion dampening: gravity dampening halves embedding scores with no BM25 support, hub dampening penalizes overly-broad tags above p90, resolution boost favors fact-bearing tags.
+- Structured fact extraction with SVO schema, temporal status lifecycle (`active → completed`, `planned → completed` auto-promotion past date), and LLM-based supersession detection with explicit `superseded_by` chains.
+- Tool-augmented retrieval: the LLM gets tools to drill down (`vc_expand_topic`, `vc_find_quote`, `vc_query_facts`, `vc_remember_when`) rather than receiving one-shot results.
+- 95% accuracy on LongMemEval (vs. 33% full-context baseline), validating compression-and-retrieve over brute-force context.
+- Anti-repetition tracking across tool loop iterations prevents duplicate results.
+
+**Where it falls short**:
+- No retrieval feedback loop. The system can't learn which results were useful — fixed weights and hand-tuned dampening parameters.
+- No offline consolidation or sleep. Compaction is triggered by token pressure, not scheduled for quality improvement.
+- No decay or forgetting model. Staleness managed by LRU paging eviction, not biological decay.
+- No graph structure. Topics are flat tags, not connected nodes — no PPR, no edge traversal, no Hebbian co-retrieval.
+- No ground truth or evaluation infrastructure beyond benchmark harnesses.
+- Local embeddings (MiniLM-L6-v2, 384d) — lower quality than cloud embeddings but zero API cost.
+
+**What's interesting for us**: Gravity dampening as a cross-signal agreement mechanism — expressible as a reranker feature (`has_bm25_support` or `bm25_embed_agreement`). The tool-augmented retrieval paradigm as a documented design alternative to one-shot recall. Structured fact supersession with `superseded_by` chains (same pattern as memv). LongMemEval as a potential second benchmark.
 
 ---
 
