@@ -71,6 +71,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Daem0n-MCP](https://github.com/DasBluEyedDevil/Daem0n-MCP) | daem0n.md | Async MCP memory/decision system with Qdrant vectors, Leiden community detection, and E2B sandboxing. |
 | [DiffMem](https://github.com/Growth-Kinetics/DiffMem) | diffmem.md | Git-native memory backend using Markdown files and a multi-turn LLM agent that explores git history via shell commands for retrieval -- no vectors, no BM25, no database. Powers Annabelle WhatsApp bot. |
 | [Ember MCP](https://github.com/Arkya-AI/ember-mcp) | ember-mcp.md | Async MCP server using FAISS vectors with Voronoi cell spatial partitioning. |
+| [EXIA GHOST Benchmarks](https://github.com/francisdu53/exia-ghost-benchmarks) | exia-ghost.md | Proprietary bio-inspired memory with 5 typed stores, ChromaDB + MiniLM retrieval, NLI contradiction ensemble, 89.94% LoCoMo (cats 1-4) via extraction quality + prompt engineering over retrieval sophistication. |
 | [Empirica](https://github.com/Nubaeon/empirica) | empirica.md | Epistemic middleware with git-notes storage, optional Qdrant vectors, and calibration tracking. |
 | [Engram](https://github.com/Harshitk-cp/engram) | engram.md | Go HTTP API with PostgreSQL/pgvector implementing multi-system cognitive memory with consolidation and decay. |
 | [Graphiti](https://github.com/getzep/graphiti) | graphiti.md | Zep's production temporal knowledge graph with multi-backend support (Neo4j, FalkorDB, Kuzu, Neptune). |

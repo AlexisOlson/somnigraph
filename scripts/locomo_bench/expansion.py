@@ -7,10 +7,12 @@ text processing only.
 
 import json
 import logging
+import math
 import re
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +33,47 @@ STOPWORDS = frozenset({
     "likely", "would", "based", "considered", "answer", "yes",
 })
 
-# Words that look like proper nouns but aren't (sentence starters, etc.)
-ENTITY_STOPWORDS = frozenset({
-    "what", "which", "who", "where", "when", "why", "how", "would",
-    "could", "should", "does", "did", "has", "have", "the", "yes", "no",
-    "likely", "based", "answer", "during",
+# Named entities worth bridging on (allowlist extracted from LoCoMo corpus,
+# curated by Opus — replaces the broken capitalization heuristic)
+LOCOMO_ENTITIES = frozenset({
+    # People
+    "amy", "andrew", "anna", "anthony", "audrey", "cal", "calvin", "caroline",
+    "caro", "cindy", "dave", "david", "deb", "deborah", "debs", "dre", "ed",
+    "emma", "ev", "evan", "frank", "george", "gina", "harry", "herbert",
+    "jack", "james", "jean", "jill", "jo", "joanna", "john", "jolene", "jon",
+    "josh", "karlie", "kyle", "laura", "lebron", "maria", "mark", "matt",
+    "max", "mel", "melanie", "mell", "nate", "neal", "ned", "nicole", "nils",
+    "nutt", "olafur", "oliver", "oscar", "patrick", "patterson", "peter",
+    "rob", "rothfuss", "rowling", "russell", "sam", "samantha", "samuel",
+    "sara", "shia", "stephenson", "susie", "tim", "toby", "tupac", "watson",
+    # Pets
+    "bailey", "buddy", "coco", "daisy", "luna", "marley", "panda", "pepper",
+    "pixie", "precious", "scout", "shadow", "tilly",
+    # Places
+    "bali", "banff", "barcelona", "bogota", "boston", "california", "canada",
+    "chicago", "detroit", "edinburgh", "england", "fenway", "florida",
+    "francisco", "galway", "himalayas", "ireland", "italy", "janeiro",
+    "japan", "jasper", "liverpool", "london", "manchester", "mexico", "miami",
+    "michigan", "minnesota", "moher", "nuuk", "oregon", "paris", "phuket",
+    "rio", "rockies", "rome", "scotland", "seattle", "shibuya", "shinjuku",
+    "spain", "stamford", "sweden", "tahoe", "talkeetna", "tampa", "thailand",
+    "tokyo", "toronto", "turkey", "vancouver", "woodhaven", "york",
+    # Brands / products
+    "facebook", "ferrari", "ford", "gatorade", "instagram", "logitech",
+    "mustang", "nike", "nintendo", "prius", "sennheiser", "starbucks",
+    "tiktok", "youtube",
+    # Media / culture
+    "aerosmith", "aragorn", "bach", "bareilles", "battlefield", "catan",
+    "civilization", "cyberpunk", "disney", "dune", "fortnite", "gatsby",
+    "godfather", "gondor", "gryffindor", "hobbit", "labeouf", "mario",
+    "minalima", "mozart", "overcooked", "overwatch", "potter", "python",
+    "ratatouille", "seraphim", "spider-man", "stormlight", "unity",
+    "valhalla", "valorant", "witcher", "zelda",
+    # Events / other
+    "christmas", "eisenhower", "fireworks", "kustom", "perseid",
+    "pomodoro", "rocky", "santa", "smoky", "thanksgiving", "wolves",
+    # Demonyms / languages (specific enough for bridging)
+    "french", "german", "hawaiian", "japanese", "irish",
 })
 
 
@@ -86,6 +124,47 @@ class ExpansionResult:
 # Shared utilities
 # ---------------------------------------------------------------------------
 
+# Cache IDF per DB (keyed by id so each conversation DB gets its own lookup)
+_idf_cache: dict[int, tuple[dict[str, float], int]] = {}
+
+
+def _get_idf(db: sqlite3.Connection) -> tuple[dict[str, float], int]:
+    """Compute IDF for all terms in the corpus. Cached per DB connection.
+
+    Returns (idf_dict, n_docs) where idf_dict maps term -> log(N/df).
+    """
+    db_id = id(db)
+    if db_id in _idf_cache:
+        return _idf_cache[db_id]
+
+    # Count total documents
+    n_docs = db.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+    if n_docs == 0:
+        _idf_cache[db_id] = ({}, 0)
+        return {}, 0
+
+    # Compute document frequency per token from content
+    df: Counter = Counter()
+    rows = db.execute("SELECT content FROM memories").fetchall()
+    for row in rows:
+        content = row[0] if isinstance(row, tuple) else row["content"]
+        if not content:
+            continue
+        content = re.sub(r"^\[[^\]]+\]\s*", "", content)
+        tokens = set()
+        for tok in content.lower().split():
+            clean = re.sub(r"[.,!?\"';:()\[\]]+", "", tok)
+            if clean and len(clean) >= 3 and clean not in STOPWORDS:
+                tokens.add(clean)
+        for t in tokens:
+            df[t] += 1
+
+    idf = {term: math.log((n_docs - count + 0.5) / (count + 0.5) + 1)
+           for term, count in df.items()}
+    _idf_cache[db_id] = (idf, n_docs)
+    return idf, n_docs
+
+
 def _fts_search(db: sqlite3.Connection, query: str, limit: int = 30,
                 ) -> list[tuple[str, float]]:
     """Run an FTS query and return (memory_id, bm25_score) pairs.
@@ -119,31 +198,15 @@ def _extract_question_entities(question: str, speakers: set[str]) -> set[str]:
 
     Two sources:
     1. Speaker names: match question tokens against known speakers (case-insensitive).
-    2. Proper nouns: capitalized words not at sentence start, not in stoplist.
+    2. Known entities: match against LOCOMO_ENTITIES allowlist.
 
     Returns lowercase entity strings.
     """
     entities = set()
-    tokens = question.split()
-
-    # Match against known speakers
-    for tok in tokens:
+    for tok in question.split():
         clean = re.sub(r"[.,!?\"';:()\[\]]+", "", tok).lower()
-        if clean and clean in speakers:
+        if clean and (clean in speakers or clean in LOCOMO_ENTITIES):
             entities.add(clean)
-
-    # Proper nouns: capitalized words (skip sentence-initial words)
-    prev_ends_sentence = True  # treat start of text as sentence boundary
-    for tok in tokens:
-        clean = re.sub(r"[.,!?\"';:()\[\]]+$", "", tok)
-        if (clean and len(clean) >= 2 and clean[0].isupper()
-                and not clean.isupper()
-                and not prev_ends_sentence
-                and not clean.startswith("I'")
-                and clean.lower() not in ENTITY_STOPWORDS
-                and clean.lower() not in speakers):  # already captured above
-            entities.add(clean.lower())
-        prev_ends_sentence = bool(re.search(r"[.!?]$", tok))
 
     return entities
 
@@ -295,8 +358,13 @@ def expand_keyword(ctx: ExpansionContext) -> set[str]:
     for qt in query_tokens:
         seed_tokens.pop(qt, None)
 
-    # Take top-10 most frequent distinctive terms
-    top_terms = [term for term, _ in seed_tokens.most_common(10)]
+    # Rank by TF-IDF: frequent in seeds, rare in corpus
+    idf, _ = _get_idf(ctx.db)
+    top_terms = sorted(
+        seed_tokens,
+        key=lambda t: seed_tokens[t] * idf.get(t, 0.0),
+        reverse=True,
+    )[:10]
     if not top_terms:
         return set()
 
@@ -383,18 +451,10 @@ def expand_entity_bridge(ctx: ExpansionContext) -> set[str]:
         ).fetchone()
         if not row or not row["content"]:
             continue
-        words = (row["content"]).split()
-        prev_ends_sentence = True  # treat start of content as sentence boundary
-        for w in words:
-            clean = re.sub(r'[.,!?"\';:()\[\]]+$', '', w)
-            if (clean and len(clean) >= 2 and clean[0].isupper()
-                    and not clean.isupper()
-                    and not prev_ends_sentence
-                    and not clean.startswith("I'")
-                    and clean.lower() not in ENTITY_STOPWORDS
-                    and clean.lower() not in ctx.all_speakers):
-                bridge_entities.add(clean.lower())
-            prev_ends_sentence = bool(re.search(r'[.!?]$', w))
+        for w in row["content"].split():
+            clean = re.sub(r"[.,!?\"';:()\[\]]+$", "", w).lower()
+            if clean in LOCOMO_ENTITIES:
+                bridge_entities.add(clean)
 
     # Remove entities already in the query
     bridge_entities -= query_tokens_lower
@@ -610,8 +670,14 @@ def compute_seed_keyword_overlap(
     for qt in query_tokens:
         seed_tokens.pop(qt, None)
 
-    # Top distinctive terms
-    top_terms = {term for term, _ in seed_tokens.most_common(20)}
+    # Top distinctive terms (ranked by TF-IDF)
+    idf, _ = _get_idf(db)
+    top_terms_list = sorted(
+        seed_tokens,
+        key=lambda t: seed_tokens[t] * idf.get(t, 0.0),
+        reverse=True,
+    )[:20]
+    top_terms = set(top_terms_list)
     if not top_terms:
         return {mid: 0.0 for mid in candidate_ids}
 

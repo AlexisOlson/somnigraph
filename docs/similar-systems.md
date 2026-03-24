@@ -1,6 +1,6 @@
 # Similar Systems
 
-An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (81 sources), see `research/sources/index.md`.
+An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (82 sources), see `research/sources/index.md`.
 
 ## Contents
 
@@ -401,6 +401,8 @@ These problems are unsolved across all systems we surveyed:
 
 Most systems either ignore contradictions or handle them poorly. Mem0 hard-deletes the old fact. Zep invalidates edges but requires extraction to detect the conflict. HippoRAG, GraphRAG, and Letta don't detect contradictions at all. Generative Agents stores conflicting facts without awareness. memv handles contradictions well at extraction time (predict-calibrate surfaces them, `superseded_by` chains preserve history) but cannot detect transitive contradictions (a child fact surviving when its parent is superseded). Engram has the most sophisticated approach: five-level graded tension classification (hard/temporal/contextual/soft/none) with distinct behaviors per level.
 
+EXIA GHOST claims 92.31% F1 using a DeBERTa-v3 NLI cross-encoder ensemble (base + small, OR logic) — significantly higher than other reported numbers, though on an internal benchmark. If validated, this suggests NLI models may outperform LLM-based classification for pairwise contradiction detection specifically.
+
 Benchmark performance across all systems: 0.025–0.037 F1 on contradiction detection tasks. This isn't a tuning problem — it's a representation problem. Detecting that "we use REST" and "we migrated to GraphQL" are about the same claim requires understanding what a "claim" is, which current systems don't model. Kumiho's AGM belief revision formalism provides the strongest theoretical treatment: `Supersedes` edges with tag re-pointing ensure only the current revision is authoritative, while preserving the full revision history. But the detection of *which* beliefs contradict remains LLM-dependent — the formal machinery handles what happens after detection, not the detection itself.
 
 ### Write-path quality
@@ -423,4 +425,4 @@ memv makes the strongest attempt: write-time temporal normalization resolves rel
 
 ---
 
-*For the full research corpus of 73 source analyses, see `research/sources/`. Each analysis extracts architecture, key claims with evidence, relevance to this project, and ideas worth borrowing.*
+*For the full research corpus of 82 source analyses, see `research/sources/`. Each analysis extracts architecture, key claims with evidence, relevance to this project, and ideas worth borrowing.*

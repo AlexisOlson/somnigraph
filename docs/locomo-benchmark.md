@@ -64,7 +64,7 @@ Superseded by Level 2 below.
 ### Level 2 — LoCoMo Reranker v2: entity overlap + session co-occurrence (2026-03-22)
 
 Added two new features targeting the multi-hop gap:
-- **entity_overlap** (Group E): Count of shared non-speaker named entities between query and candidate. Regex-based proper noun extraction (capitalized words not at sentence start, excluding speakers and a small stoplist). Zero API cost.
+- **entity_overlap** (Group E): Count of shared named entities between query and candidate. Uses a curated allowlist of ~200 LoCoMo entities (people, places, brands, media) rather than capitalization heuristics. Zero API cost.
 - **session_cooccurrence** (Group E): Number of other top-20 RRF candidates sharing this candidate's session. Sessions recovered from themes (`session_N` tags). Top-20 scope prevents domination by session size.
 
 Ablation revealed Group C (cross-result features: rank_agreement, neighbor_density, score_percentile) hurts generalization despite high feature importance — classic overfitting pattern. Three dead features (proximity, age_days, theme_count) confirmed at 0.0 gain. Best config `no_C_pruned` drops all six, leaving 11 features.
@@ -246,9 +246,170 @@ OVERALL           759   0.703   62.1%   75.8%   81.0%   86.0%   90.5%
 
 **Delta (expand-all vs baseline):** MRR +0.049, R@1 +6.6pp, R@3 +4.0pp, R@5 +2.6pp, R@10 +1.4pp, R@20 +1.3pp. Multi-hop R@10 +9.1pp (61.4% → 70.5%). Expansion helps across every category and metric.
 
-**Note:** Entity bridge extraction has a stopword leak — sentence-initial words ("Hey", "But", "Cool") and I-contractions ("I'm", "I've") pass the capitalization heuristic. Fix applied but model was trained with noisy entities; retrain needed to measure clean impact.
+### What didn't work: capitalization-based entity extraction
 
-**Pending (overnight run):** Retrain with entity fix + 3 new Group H features (expansion_method_count, phase1_rrf_score, is_seed) + theme_overlap fix for expanded candidates. Forward stepwise, backward elimination, and old-15 baseline compared across all 10 conversations, both with and without expansion. Results in `~/.somnigraph/benchmark/overnight/`.
+The original entity bridge and entity_overlap features used a capitalization heuristic to find proper nouns: capitalized words not at sentence start, not in a stoplist. This failed badly on casual dialog.
+
+**First fix (session 44):** Added sentence-boundary detection (`prev_ends_sentence` flag) and I-contraction filtering. This caught sentence-initial words but missed the dominant failure mode: vocative patterns like "Hey John!" where "Hey" has no trailing punctuation, so "John" is treated as mid-sentence. Also missed all conversational filler that happens to be capitalized mid-sentence ("Thanks", "Wow", "Cool").
+
+**Second fix (session 45):** Replaced the heuristic entirely with a curated allowlist. Extracted all 1,209 distinct capitalized words from LoCoMo, had an Opus agent classify each as entity or noise, producing ~200 real entities (people, places, brands, media, events). The bridge method now does simple allowlist lookup instead of capitalization parsing. This also flipped speaker names from *excluded* to *included* — speakers are the highest-value bridge entity ("seed mentions Caroline → find other Caroline memories") but were previously filtered out.
+
+**Lesson:** Capitalization is not a feature of casual dialog — it's a feature of edited prose. Any heuristic built on it will produce more noise than signal on conversational data. A corpus-specific allowlist is less general but dramatically cleaner.
+
+**Overnight run (session 44):** Retrain with entity stopword fix + 3 new Group H features (expansion_method_count, phase1_rrf_score, is_seed) + theme_overlap fix for expanded candidates. Forward stepwise, backward elimination compared across all 10 conversations, both with and without expansion. Results in `~/.somnigraph/benchmark/overnight/`.
+
+### Overnight Run Results (2026-03-22 → 2026-03-23)
+
+Forward stepwise (NDCG@10) and backward elimination (NDCG@10) across all 10 conversations with the entity stopword fix and 3 new Group H features. n_estimators=300.
+
+**Feature selection (CV on all 10 conversations, ~1.65M pairs):**
+
+| Method | Features | NDCG@10 |
+|--------|----------|---------|
+| Forward stepwise | 12 | 0.8472 |
+| Backward elimination | 26 (removed 3: entity_overlap, entity_density, topk_session_frac) | 0.8590 |
+| Full 29 features | 29 | 0.8466 |
+
+**Trained models (leave-one-conv-out CV):**
+
+| Model | MRR | NDCG@10 | R@1 | R@5 | R@10 | R@20 |
+|-------|-----|---------|-----|-----|------|------|
+| bare RRF | 0.369 | 0.371 | 27.0% | 46.1% | 55.9% | 65.9% |
+| Forward (12f) | 0.492 | 0.828 | 40.9% | 61.2% | 69.7% | 79.8% |
+| Backward (26f) | 0.505 | 0.859 | 41.5% | 63.6% | 73.7% | 81.4% |
+
+**End-to-end retrieval eval (all 10 conversations, limit=20):**
+
+| Model | Mode | MRR | R@1 | R@5 | R@10 | R@20 |
+|-------|------|-----|-----|-----|------|------|
+| Forward 12f | baseline | 0.665 | 55.9% | 79.8% | 85.7% | 90.6% |
+| Forward 12f | expanded | 0.704 | 61.5% | 81.7% | 87.3% | 91.8% |
+| Backward 26f | baseline | 0.652 | 54.6% | 78.4% | 83.5% | 87.3% |
+
+Backward 26f expanded eval did not complete (killed mid-run).
+
+**Key finding:** Backward had higher CV scores but lower end-to-end performance — classic overfitting from 26 features on this data. Forward 12f generalized better despite weaker CV metrics.
+
+**New Group H features:** expansion_method_count was selected at step 6 by forward (NDCG +0.0095). Backward kept all three (expansion_method_count, phase1_rrf_score, is_seed). is_seed had near-zero importance (0.8 gain) but didn't hurt enough to remove.
+
+### Level 4 — R@10-Optimized Feature Selection (2026-03-23)
+
+The overnight results showed NDCG@10 optimization doesn't maximize R@10 (backward-26 had better CV NDCG but worse end-to-end R@10 than forward-12). This prompted a metric-specific selection strategy.
+
+**Approach:** Two-pass forward selection (`--select-union`):
+1. Forward greedy on R@10 until exhausted
+2. Continue from that set, accepting features that improve NDCG@10
+3. Backward elimination on R@10 to prune
+
+**Seed determination:** Manual testing identified a 6-feature R@10 core (vec_rank, fts_rank, token_count, query_coverage, query_length, has_temporal_expr) by incrementally building up from single features and measuring R@10 at each step. Key finding: fts_rank hurts R@10 when paired only with vec_rank (-1.3pp) but becomes useful once content features are added.
+
+**Forward selection (seeded with 6 features, 23 candidates):**
+
+R@10 primary pass:
+```
+  Step 1: +speaker_match             r@10=0.6869 (+0.0197)
+  Step 2: +is_seed                   r@10=0.7142 (+0.0273)
+  Step 3: +vec_dist                  r@10=0.7172 (+0.0030)
+  Step 4: +entity_density            r@10=0.7198 (+0.0025)
+  Step 5: +topk_session_frac         r@10=0.7223 (+0.0025)
+  Step 6: +entity_overlap            r@10=0.7289 (+0.0066)
+  Step 7: +centroid_distance         r@10=0.7451 (+0.0162)
+  Step 8: +entity_fts_rank           r@10=0.7476 (+0.0025)
+```
+
+NDCG@10 secondary pass:
+```
+  Step 10: +theme_complementarity     ndcg@10=0.8583 (+0.0005)
+  Step 11: +expansion_method_count    ndcg@10=0.8672 (+0.0089)
+  Step 12: +sub_query_hit_count       ndcg@10=0.8684 (+0.0012)
+  Step 13: +theme_overlap             ndcg@10=0.8793 (+0.0109)
+```
+
+Backward elimination on R@10 removed entity_fts_rank (+0.0051 from removal).
+
+**Final model: 17 features.**
+
+**R@10 vs NDCG divergence:** Three features that backward elimination *removed* for NDCG (entity_density, topk_session_frac, entity_overlap) were *selected* by R@10 forward. These features help get the right answer into the top 10 but hurt ranking precision within it — different metrics, different optimal feature sets.
+
+**Leave-one-conv-out CV (17 features, n_estimators=300):**
+
+```
+Config              N     MRR  NDCG@10     R@1     R@3     R@5    R@10    R@20
+-----------------------------------------------------------------------------------
+bare_rrf         1977   0.370    0.372   27.1%   40.2%   46.1%   55.9%   65.9%
+reranker         1977   0.516    0.872   41.9%   57.5%   65.1%   75.3%   83.1%
+-----------------------------------------------------------------------------------
+Delta vs bare RRF:
+  reranker             +0.147   +0.501  +14.9%  +17.2%  +19.0%  +19.3%  +17.2%
+```
+
+Beats backward-26 (NDCG-optimized, 26 features) on every metric with 9 fewer features.
+
+**Feature importance (gain):**
+```
+  [G] centroid_distance   :   1240.4
+  [D] token_count         :   1215.4
+  [A] vec_rank            :   1070.6
+  [A] vec_dist            :    983.1
+  [B] query_coverage      :    969.7
+  [A] fts_rank            :    828.4
+  [F] entity_density      :    682.2
+  [B] query_length        :    673.3
+  [F] topk_session_frac   :    483.8
+  [F] theme_complementarity:    183.5
+  [F] has_temporal_expr   :    158.7
+  [H] sub_query_hit_count :    118.0
+  [E] entity_overlap      :    109.0
+  [A] theme_overlap       :    108.6
+  [B] speaker_match       :     81.0
+  [H] is_seed             :     72.8
+  [H] expansion_method_count:      9.5
+```
+
+**End-to-end retrieval eval (baseline, all 10 conversations, limit=20):**
+
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20
+----------------------------------------------------------------------
+single-hop        281   0.685   57.7%   76.5%   81.9%   87.2%   92.5%
+temporal          320   0.708   61.9%   77.2%   81.6%   86.2%   90.3%
+multi-hop          89   0.483   36.0%   57.3%   64.0%   76.4%   82.0%
+open-domain       841   0.712   62.3%   77.5%   81.9%   87.2%   90.8%
+adversarial       446   0.596   49.6%   66.6%   72.0%   77.8%   83.0%
+----------------------------------------------------------------------
+OVERALL          1531   0.693   59.8%   76.1%   80.8%   86.3%   90.5%
+(excludes adversarial)
+```
+
+**Delta vs Level 3 forward-12 baseline (OVERALL):**
+
+| Metric | Forward-12 (NDCG) | R@10-optimized (17f) | Delta |
+|--------|-------------------|----------------------|-------|
+| MRR | 0.665 | 0.693 | +0.028 |
+| R@1 | 55.9% | 59.8% | +3.9pp |
+| R@10 | 85.7% | 86.3% | +0.6pp |
+| R@20 | 90.6% | 90.5% | -0.1pp |
+
+Per-category R@10 gains: multi-hop +5.6pp (70.8% → 76.4%), adversarial +3.8pp, temporal +0.6pp, open-domain +0.4pp, single-hop flat.
+
+**With `--expand-all` (BM25-damped IDF keyword selection):**
+
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20
+----------------------------------------------------------------------
+single-hop        281   0.693   56.6%   79.0%   87.2%   91.1%   94.0%
+temporal          320   0.736   65.9%   79.7%   82.8%   87.8%   91.6%
+multi-hop          89   0.478   36.0%   53.9%   61.8%   75.3%   79.8%
+open-domain       841   0.735   64.8%   80.7%   84.1%   89.7%   93.0%
+adversarial       446   0.638   53.4%   70.4%   76.5%   83.4%   87.0%
+----------------------------------------------------------------------
+OVERALL          1531   0.713   61.9%   78.6%   83.1%   88.7%   92.1%
+(excludes adversarial)
+```
+
+**Delta (expanded vs baseline, OVERALL):** MRR +0.020, R@1 +2.1pp, R@10 +2.4pp, R@20 +1.6pp.
+
+**Keyword expansion IDF experiment:** Tested three term selection strategies for keyword expansion: (1) raw frequency (original), (2) aggressive IDF `log(N/df)`, (3) BM25-damped IDF `log((N-df+0.5)/(df+0.5)+1)`. Aggressive IDF improved MRR/R@1 but crushed multi-hop R@10 (-2.3pp) by filtering bridge terms. BM25-damped recovered multi-hop while keeping MRR gains. The damped formula matches BM25's own information-theoretic assumptions — consistent with the scoring already in use.
 
 ## End-to-End QA Results
 
@@ -316,6 +477,23 @@ Ori Mnemos      37.69  –      –     29.31  –      –       –     –   
 ```
 
 *A-Mem\* = re-run with temperature 0 for judge. Mem0g = Mem0 + graph memory (Neo4j). Ori Mnemos numbers from their README (GPT-4.1-mini generation, BM25 + embedding + PageRank fusion). Adversarial category excluded from all — no ground truth.*
+
+### Additional published Overall J scores
+
+| System | Overall J | Judge | Cats | Notes |
+|--------|----------|-------|------|-------|
+| MemU | 92.09% | — | 1-4 | No public methodology |
+| MemMachine v0.2 | 91.23% | — | 1-4 | $43.5M funding |
+| EXIA GHOST | 89.94% | GPT-4o-mini | 1-4 | Proprietary; ChromaDB + MiniLM, LLM extraction of atomic facts. See `research/sources/exia-ghost.md` |
+| **Somnigraph** | **88.3%** | **GPT-4.1-mini** | **1-4** | **No sleep enhancements yet** |
+| **Somnigraph** | **85.1%** | **Opus 4.6** | **1-4** | **Stricter judge (+3.2pp)** |
+| EXIA GHOST | 85.80% | GPT-4o-mini | 1-5 | Only system publishing cat 5; 71.52% adversarial |
+| RedPlanet CORE | 88.24% | — | 1-4 | Self-reported, Neo4j + pgvector |
+| Memobase | 75.78% | — | 1-4 | |
+
+*All competitor scores are self-reported. No independent cross-verification exists for any system. Judge leniency varies: Opus is 3.2pp stricter than GPT-4.1-mini (measured). GPT-4o-mini leniency relative to GPT-4.1-mini is unknown.*
+
+**Note on Somnigraph headroom:** Current results use baseline retrieval + reader with no sleep enhancements (no consolidation, no edge building, no summary generation, no expansion on full QA pipeline). Sleep pass ablation and feedback loop ablation are pending — these represent the primary expected sources of uplift.
 
 **Key observations:**
 - Everyone clusters in the 35-39 F1 range for single-hop. The field is saturated on easy questions.

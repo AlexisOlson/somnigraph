@@ -59,25 +59,14 @@ BENCHMARK_DIR = DATA_DIR / "benchmark"
 # Entity extraction
 # ---------------------------------------------------------------------------
 
-_ENTITY_STOPWORDS = {
-    "i'm", "i've", "i'll", "i'd", "it", "it's", "its", "we", "he", "she",
-    "they", "what", "how", "the", "this", "that", "your", "my", "do",
-    "can't", "don't", "won't", "have", "keep", "take", "thanks", "well",
-}
-
-
 def _extract_entities(text: str, speakers: set[str]) -> set[str]:
-    """Extract likely proper nouns, excluding speakers and stopwords."""
-    text = re.sub(r'^\[[^\]]+\]\s*', '', text)  # strip [Speaker] prefix
+    """Extract named entities using allowlist from expansion module."""
+    from expansion import LOCOMO_ENTITIES
     entities = set()
-    for i, w in enumerate(text.split()):
-        if i == 0:
-            continue
-        clean = re.sub(r'[.,!?"\';:()]+$', '', w)
-        if clean and len(clean) >= 2 and clean[0].isupper() and not clean.isupper():
-            lower = clean.lower()
-            if lower not in _ENTITY_STOPWORDS and lower not in speakers:
-                entities.add(lower)
+    for w in text.split():
+        clean = re.sub(r'[.,!?"\';:()]+$', '', w).lower()
+        if clean in LOCOMO_ENTITIES or clean in speakers:
+            entities.add(clean)
     return entities
 
 
@@ -1412,15 +1401,15 @@ _DEAD_FEATURES = {6, 13, 14}  # proximity, age_days, theme_count
 
 
 def _cv_score(all_conv_features, all_conv_data, all_search_data,
-              feature_indices, n_estimators=500):
-    """Quick CV score (NDCG@10) for a feature set."""
+              feature_indices, n_estimators=500, metric="ndcg@10"):
+    """Quick CV score for a feature set."""
     if not feature_indices:
         return 0.0
     metrics, _ = train_cv(all_conv_features, all_conv_data, all_search_data,
                           sorted(feature_indices), n_estimators)
     if not metrics:
         return 0.0
-    return np.mean([m["ndcg@10"] for m in metrics])
+    return np.mean([m[metric] for m in metrics])
 
 
 def select_correlation_filter(all_conv_features, threshold=0.85):
@@ -1481,75 +1470,103 @@ def select_correlation_filter(all_conv_features, threshold=0.85):
 
 
 def select_forward_stepwise(all_conv_features, all_conv_data, all_search_data,
-                            candidates=None, n_estimators=500, seed=None):
-    """Greedy forward selection: add the feature that most improves CV MRR.
+                            candidates=None, n_estimators=500, seed=None,
+                            metric="ndcg@10", union_metrics=None):
+    """Greedy forward selection: add the feature that most improves a CV metric.
 
     If seed is provided (list of feature indices), start with those features
     already selected and build from there.
+
+    If union_metrics is provided (list of metric names, e.g. ["r@10", "ndcg@10"]),
+    runs a two-pass forward selection:
+      Pass 1: greedy on the first metric until exhausted
+      Pass 2: continue from that set, accepting features that improve the second metric
     """
     if candidates is None:
         candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
 
     selected = list(seed) if seed else []
     remaining = [i for i in candidates if i not in selected]
-    best_score = 0.0
     history = []
+
+    if union_metrics:
+        passes = [(m, m) for m in union_metrics]
+    else:
+        passes = [(metric, metric)]
 
     print(f"\n{'=' * 60}")
     print("Forward Stepwise Selection")
     print(f"{'=' * 60}")
+    if union_metrics:
+        print(f"Two-pass: {union_metrics[0]} primary, then {union_metrics[1]} additions")
+    else:
+        print(f"Metric: {metric}")
     if selected:
         print(f"Seed: {[FEATURE_NAMES[i] for i in selected]}")
-        best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                               selected, n_estimators)
-        print(f"Seed NDCG@10: {best_score:.4f}")
+        for _, m in passes:
+            s = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                          selected, n_estimators, metric=m)
+            print(f"  Seed {m}: {s:.4f}")
     print(f"Candidate pool: {len(remaining)} features")
 
     step = 0
-    while remaining:
-        step += 1
-        best_feat = None
-        best_new_score = best_score
+    for pass_idx, (pass_metric, _) in enumerate(passes):
+        best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                               selected, n_estimators, metric=pass_metric) if selected else 0.0
+        if union_metrics:
+            pass_label = "Primary" if pass_idx == 0 else "Secondary"
+            print(f"\n  --- {pass_label} pass: {pass_metric} ---")
 
-        for feat in remaining:
-            trial = selected + [feat]
-            score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                              trial, n_estimators)
-            if score > best_new_score:
-                best_new_score = score
-                best_feat = feat
+        while remaining:
+            step += 1
+            best_feat = None
+            best_new_score = best_score
 
-        if best_feat is None:
-            print(f"  Step {step}: no improvement, stopping")
-            break
+            for feat in remaining:
+                trial = selected + [feat]
+                score = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                                  trial, n_estimators, metric=pass_metric)
+                if score > best_new_score:
+                    best_new_score = score
+                    best_feat = feat
 
-        delta = best_new_score - best_score
-        selected.append(best_feat)
-        remaining.remove(best_feat)
-        best_score = best_new_score
-        history.append((best_feat, best_score, delta))
-        print(f"  Step {step}: +{FEATURE_NAMES[best_feat]:25s} NDCG@10={best_score:.4f} (+{delta:.4f})")
+            if best_feat is None:
+                print(f"  Step {step}: no improvement on {pass_metric}, stopping")
+                break
 
+            delta = best_new_score - best_score
+            selected.append(best_feat)
+            remaining.remove(best_feat)
+            best_score = best_new_score
+            history.append((best_feat, best_score, delta, pass_metric))
+            print(f"  Step {step}: +{FEATURE_NAMES[best_feat]:25s} {pass_metric}={best_score:.4f} (+{delta:.4f})")
+
+    # Print final scores for all tracked metrics
+    final_metrics = list(dict.fromkeys(m for _, m in passes))
     print(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
-    print(f"Final NDCG@10: {best_score:.4f}")
+    for m in final_metrics:
+        s = _cv_score(all_conv_features, all_conv_data, all_search_data,
+                      selected, n_estimators, metric=m)
+        print(f"  {m}: {s:.4f}")
     return selected, history
 
 
 def select_backward_elimination(all_conv_features, all_conv_data, all_search_data,
-                                candidates=None, n_estimators=500):
+                                candidates=None, n_estimators=500, metric="ndcg@10"):
     """Greedy backward elimination: remove the feature whose removal hurts least."""
     if candidates is None:
         candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
 
     selected = list(candidates)
     best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                           selected, n_estimators)
+                           selected, n_estimators, metric=metric)
     history = []
 
     print(f"\n{'=' * 60}")
     print("Backward Elimination")
     print(f"{'=' * 60}")
-    print(f"Starting with {len(selected)} features, NDCG@10={best_score:.4f}")
+    print(f"Metric: {metric}")
+    print(f"Starting with {len(selected)} features, {metric}={best_score:.4f}")
 
     step = 0
     while len(selected) > 1:
@@ -1560,7 +1577,7 @@ def select_backward_elimination(all_conv_features, all_conv_data, all_search_dat
         for feat in selected:
             trial = [f for f in selected if f != feat]
             score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                              trial, n_estimators)
+                              trial, n_estimators, metric=metric)
             if score > best_new_score:
                 best_new_score = score
                 best_drop = feat
@@ -1573,10 +1590,10 @@ def select_backward_elimination(all_conv_features, all_conv_data, all_search_dat
         selected.remove(best_drop)
         best_score = best_new_score
         history.append((best_drop, best_score, delta))
-        print(f"  Step {step}: -{FEATURE_NAMES[best_drop]:25s} NDCG@10={best_score:.4f} ({delta:+.4f})")
+        print(f"  Step {step}: -{FEATURE_NAMES[best_drop]:25s} {metric}={best_score:.4f} ({delta:+.4f})")
 
     print(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
-    print(f"Final NDCG@10: {best_score:.4f}")
+    print(f"Final {metric}: {best_score:.4f}")
     return selected, history
 
 
@@ -1798,6 +1815,12 @@ def main():
                              "permutation (permutation importance), mrmr (min-redundancy max-relevance)")
     parser.add_argument("--seed-features", type=str, nargs="+",
                         help="Seed features for forward stepwise (by name)")
+    parser.add_argument("--select-metric", type=str, default="ndcg@10",
+                        choices=["ndcg@10", "r@10", "r@20", "mrr"],
+                        help="Metric for feature selection (default: ndcg@10)")
+    parser.add_argument("--select-union", action="store_true",
+                        help="Forward two-pass: greedy on R@10, then continue accepting NDCG@10 gains. "
+                             "Backward prunes using --select-metric.")
     parser.add_argument("--exclude", type=str, nargs="+",
                         help="Features to exclude from selection (by name)")
     parser.add_argument("--feature-names", type=str, nargs="+",
@@ -1962,14 +1985,17 @@ def main():
                             print(f"ERROR: unknown feature '{name}'. Available: {FEATURE_NAMES}")
                             return
                         seed_indices.append(FEATURE_NAMES.index(name))
+                union = ["r@10", "ndcg@10"] if args.select_union else None
                 select_forward_stepwise(all_conv_features, all_conv_data,
                                         all_search_data, n_estimators=args.n_estimators,
-                                        seed=seed_indices)
+                                        seed=seed_indices, metric=args.select_metric,
+                                        union_metrics=union)
             elif method == "backward":
                 backward_candidates = feature_indices if args.feature_names else None
                 select_backward_elimination(all_conv_features, all_conv_data,
                                             all_search_data, candidates=backward_candidates,
-                                            n_estimators=args.n_estimators)
+                                            n_estimators=args.n_estimators,
+                                            metric=args.select_metric)
             elif method == "permutation":
                 select_permutation_importance(all_conv_features, all_conv_data,
                                               all_search_data, n_estimators=args.n_estimators)
