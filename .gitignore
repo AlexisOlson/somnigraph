@@ -27,6 +27,7 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/
+.playwright-mcp/
 
 # Backups
 *.bak
