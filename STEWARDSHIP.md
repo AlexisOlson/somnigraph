@@ -26,7 +26,7 @@ LightGBM pointwise reranker is live in production, running from repo code via di
 
 Current state: 26-feature production model trained on 1032 real-data queries (NDCG=0.7958, +6.17pp over formula). 5 new features defined in code but not yet trained on real data (query_length, candidate_pool_size, fts_bm25_norm, vec_dist_norm, decay_rate — bringing the total to 31). fts_bm25_norm and vec_dist_norm were exercised in LoCoMo forward passes (P4) but not the production model. All three improvement experiments are complete: LambdaRank (parity, not improvement), query features (8 features integrated), raw-score features (defined, LoCoMo-tested, production retrain pending). Utility calibration study confirmed no self-reinforcement (per-query r=0.70).
 
-Remaining: retrain production model with 31 features, document improvement experiment findings in `docs/experiments.md`, counterfactual coverage check, sleep impact measurement.
+Remaining: FSI stability audit before retrain (10–20 seed runs to check for first-mover bias in correlated feature groups — see `research/sources/first-mover-bias.md`), retrain production model with 31 features, document improvement experiment findings in `docs/experiments.md`, counterfactual coverage check, sleep impact measurement.
 
 *Move this down when*: 31-feature retrain is complete and findings documented.
 
@@ -53,6 +53,16 @@ Known benchmark limitations: LoCoMo's LLM judge accepts 62.81% of intentionally 
 Remaining: expansion method ablation, rerun with corrected GT, sleep pass ablation, feedback loop ablation, document findings in experiments.md. Retrieval is approaching diminishing returns — sleep enhancements and vocabulary-gap solutions (HyDE, better expansion) are the expected next levers.
 
 *Move this down when*: ablations are complete and findings documented. Move up if external interest in comparative numbers increases.
+
+### 5. PERMA personalization benchmark
+
+PERMA (arXiv:2603.23231, March 2026) is a fresh benchmark evaluating preference-state maintenance across event-driven, multi-session, multi-domain interactions. 10 synthetic users, 20 domains, 2,166 preferences, 1.8M tokens. Decoupled evaluation separates memory fidelity from task performance. See `research/sources/perma.md` for full analysis, `docs/roadmap.md` § PERMA for SOTA targets.
+
+Current SOTA among memory systems: MemOS (MCQ 0.811, Turn=1 0.548 single-domain, 0.306 multi-domain). **Primary goal: multi-domain Turn=1 (currently 0.306)** — all benchmarked systems collapse on cross-domain synthesis, which is exactly the gap Somnigraph's graph-based retrieval is designed to fill. No system in the paper has a learned reranker, feedback loop, or graph-conditioned retrieval. We'd like to beat all metrics, but the multi-domain result is the headline claim.
+
+Remaining: build ingestion pipeline for PERMA's event-driven dialogue format, run MCQ + interactive evaluation, analyze per-dimension results (temporal depth, noise robustness, cross-domain synthesis). Ablate graph contribution specifically on multi-domain tasks.
+
+*Move this up when*: external interest in comparative numbers increases, or LoCoMo ablations complete and PERMA becomes the next benchmark. *Move this down when*: initial results show the benchmark's synthetic data doesn't exercise Somnigraph's strengths (preference tracking via graph is untested — the result could be negative).
 
 ## Decision framework
 

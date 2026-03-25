@@ -10,7 +10,9 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Agent Workflow Memory](https://arxiv.org/abs/2409.07429) | agent-workflow-memory.md | Induces reusable parameterized workflows from agent trajectories for web navigation, yielding +24.6% step success on Mind2Web and +51.1% task success on WebArena. |
 | [CogMem: Cognitive Memory Architecture](https://arxiv.org/abs/2512.14118) | cogmem.md | Three-layer memory-augmented reasoning (LTM/Direct Access/Focus of Attention) inspired by Oberauer's working memory model, achieving 0.93 accuracy on TurnBench-MS with bounded token growth. |
 | [Continuum Memory Architectures](https://arxiv.org/abs/2601.09913) | continuum.md | Definitional paper formalizing six behavioral requirements that any memory system must satisfy to support long-horizon agents beyond stateless RAG. |
+| [Contradiction Reconciliation with LLMs](https://arxiv.org/abs/2603.22735) | contradiction-reconciliation.md | Reconciliatory explanation generation (making contradictions compatible) tested on 18 LLMs. Best model 40.25% success. Actionable idea: reconciliation-as-enrichment during NREM sleep for contradiction edges. |
 | [Dynamic Cheatsheet](https://arxiv.org/abs/2504.07952) | dynamic-cheatsheet.md | Persistent evolving external memory that accumulates strategies at inference time without parameter updates, doubling Claude 3.5 Sonnet's AIME accuracy (23% to 50%). |
+| [First-Mover Bias in Gradient Boosting](https://arxiv.org/abs/2603.22346) | first-mover-bias.md | Path-dependent feature importance concentration in gradient boosting under multicollinearity. Diagnostic: FSI stability audit for the LightGBM reranker before 31-feature retrain. |
 | [EverMemOS](https://arxiv.org/abs/2601.02163) | evermemos.md | Self-organizing memory operating system with MongoDB/Milvus/Elasticsearch stack and Spring-like Python architecture for structured long-horizon reasoning. |
 | [Generative Agents](https://arxiv.org/abs/2304.03442) | generative-agents.md | Foundational work introducing memory stream + reflection + recursive planning for simulated agents (UIST 2023). The architecture all subsequent consolidation work builds on. |
 | [HyDE: Hypothetical Document Embeddings](https://arxiv.org/abs/2212.10496) | hyde.md | Zero-shot dense retrieval via LLM-generated hypothetical documents; replaces query-document similarity with document-document similarity (ACL 2023). |
@@ -30,6 +32,13 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [SimpleMem](https://arxiv.org/abs/2601.02553) | simplemem.md | Three-stage memory pipeline achieving 43.24% F1 on LoCoMo with ~531 tokens per query — a 30x reduction vs. full-context (~3.1k GitHub stars). |
 | [SPLADE v2](https://arxiv.org/abs/2109.10086) | splade.md | Learned sparse representations via BERT MLM head with max pooling; SOTA zero-shot BEIR (0.500 NDCG@10) while maintaining inverted index efficiency. |
 | [Zep: A Temporal Knowledge Graph Architecture](https://arxiv.org/abs/2501.13956) | zep-paper.md | Three-tier temporal knowledge graph with bi-temporal modeling, outperforming MemGPT on DMR with 90% latency reduction. |
+| [flexvec: SQL Vector Retrieval](https://arxiv.org/abs/2603.22587) | flexvec.md | SQL-based vector retrieval with programmatic embedding modulation (suppress, decay, centroid shift, MMR). Useful idea: `suppress:X` for dominant-cluster mitigation at recall time. |
+| [Graph-Aware Late Chunking for RAG](https://arxiv.org/abs/2603.22633) | graph-aware-late-chunking.md | UMLS KG-infused late chunking for biomedical RAG with structural coverage metrics. Limited relevance: entity-based retrieval hurts MRR, confirming expansion-wip findings. |
+| [Graphs RAG at Scale](https://arxiv.org/abs/2603.22340) | graphs-rag-at-scale.md | LPG + text-to-Cypher for structured financial data (92.8% on structured queries). Domain mismatch limits relevance; one idea for edge-type-aware PPR weighting. |
+| [Knowledge Access Beats Model Size](https://arxiv.org/abs/2603.23013) | knowledge-access.md | 2x2 factorial (memory x routing) for persistent agents. Routing irrelevant to single-instance; useful data: timestamp-as-text hurts temporal queries -3.8 F1, LLM summaries can poison RAG. |
+| [MemCollab: Cross-Agent Memory](https://arxiv.org/abs/2603.23234) | memcollab.md | Contrastive trajectory distillation for cross-agent memory sharing. Limited relevance (single-agent system); one idea: contrastive correction distillation during sleep. |
+| [MemReward: Graph-Based Experience Memory](https://arxiv.org/abs/2603.19310) | memreward.md | GNN-based reward propagation from labeled to unlabeled rollouts via heterogeneous graph. Actionable idea: PPR-neighbor feedback for cold-start memories as reranker feature. |
+| [ProGRank: Probe-Gradient Reranking](https://arxiv.org/abs/2603.22934) | progrank.md | Gradient-probing reranker for adversarial corpus poisoning defense. Low relevance (single-user, API embeddings); minor ideas for score-gated corrections and perturbation stability. |
 
 ## Benchmarks
 
@@ -47,6 +56,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [MemoryArena](https://arxiv.org/abs/2602.16313) | memory-arena.md | 736 multi-session task instances formalized as a POMDP with memory failures as belief drift. |
 | [MemoryBench](https://arxiv.org/abs/2510.17281) | memorybench.md | 11 datasets testing procedural and declarative memory, revealing current systems cannot consistently outperform naive RAG. |
 | [MEMTRACK](https://arxiv.org/abs/2510.01353) | memtrack.md | 47 multi-platform software engineering workflows (Linear + Slack + Gitea) where even GPT-5 achieves only 60% correctness. |
+| [PERMA](https://arxiv.org/abs/2603.23231) | perma.md | 10 synthetic users, 20 domains, 2,166 preferences with event-driven emergence across sessions. Key finding: all systems collapse on cross-domain synthesis (0.548→0.306). Decoupled memory fidelity evaluation. |
 | [TReMu](https://arxiv.org/abs/2502.01630) | tremu.md | 600 temporal multiple-choice questions on LoCoMo, plus a neuro-symbolic framework raising GPT-4o from 30% to 78% on temporal questions (ACL Findings 2025). |
 
 ## Surveys

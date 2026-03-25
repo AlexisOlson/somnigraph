@@ -6,7 +6,7 @@ What we've learned, what's still open, and what's worth pursuing next. Read alon
 
 ## What we learned
 
-Seven findings from 81 source analyses and 20+ tuning studies that would change your first decisions if you were building a memory system from scratch.
+Seven findings from 93 source analyses and 20+ tuning studies that would change your first decisions if you were building a memory system from scratch.
 
 ### 1. Feedback is the system
 
@@ -230,7 +230,9 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 8. **~~Reranker improvement: query features.~~** *(Complete.)* 8 query-dependent features added (query_coverage, proximity, query_idf_var, burstiness, betweenness, diversity_score, fb_time_weighted, session_recency). Integrated during production unification (2026-03-20). query_idf_var is the top new feature by importance. 5 more features added in 31-feature batch (query_length, candidate_pool_size, fts_bm25_norm, vec_dist_norm, decay_rate), pending retrain.
 
-9. **UCB retuning reassessment.** The ESS-corrected UCB exploration bonus (from the limit-parameter branch) needs joint retuning of UCB_COEFF and EWMA_ALPHA. However, if the reranker is the production scoring path, UCB only matters for the formula fallback. Decide whether retuning is worth the effort. Accept if: decision documented with reasoning.
+9. **FSI stability audit before 31-feature retrain.** Train 10–20 LightGBM models with different random seeds on the current 26-feature dataset, compute gain-based importance per feature across runs, flag features with high rank variance. First-mover bias (arXiv:2603.22346) shows that correlated features in gradient boosting create path-dependent importance concentration — whichever feature wins early splits gets a self-reinforcing advantage. Somnigraph's reranker has at least 4 correlated groups: fts_rank/fts_bm25, feedback_mean/ucb_bonus/fb_time_weighted, age_hours/hours_since_access/session_recency, and the pending fts_bm25_norm/vec_dist_norm pair. The R@10 vs. NDCG feature set disagreement documented in STEWARDSHIP (3 features backward-eliminated for NDCG were selected by R@10) may partly be a first-mover artifact rather than genuine metric disagreement — the FSI audit can disambiguate. Accept if: per-feature stability scores computed, correlated groups identified, findings inform whether the 31-feature retrain needs seed averaging or independent ensemble. See `research/sources/first-mover-bias.md`. Effort: low (1–2 hours, no new dependencies).
+
+10. **UCB retuning reassessment.** The ESS-corrected UCB exploration bonus (from the limit-parameter branch) needs joint retuning of UCB_COEFF and EWMA_ALPHA. However, if the reranker is the production scoring path, UCB only matters for the formula fallback. Decide whether retuning is worth the effort. Accept if: decision documented with reasoning.
 
 10. **Prospective indexing.** At write time (or during sleep REM), generate 2–3 hypothetical future recall queries for each memory and append them to the enriched text before embedding. This bridges the cue-trigger semantic disconnect — the reason queries fail when the question uses different language than the stored memory. Kumiho (arXiv:2603.17244) reports this eliminated the >6-month accuracy cliff on LoCoMo-Plus (37.5% → 84.4%), with independent partial reproduction by the benchmark authors. The cost is one LLM call per memory — already the pattern for Somnigraph's REM classification. Accept if: NDCG@5k improves on GT queries, or negative result documented with analysis of why the enriched embedding already captures this. See `research/sources/kumiho.md`.
 
@@ -258,7 +260,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 19. **PPR graph traversal.** Replace one-hop adjacency expansion with Personalized PageRank. Accept if: multi-hop queries measurably improve, or honest documentation of why PPR didn't help at current scale.
 
-20. **Contradiction detection research.** The hardest problem. No clear experiment design yet — this is genuinely research-grade. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline across surveyed systems.
+20. **Contradiction detection research.** The hardest problem. New approach from arXiv:2603.22735: instead of detecting contradictions to discard one side, generate reconciliatory explanations that make both sides compatible ("Cassie hates coffee" + "She buys coffee everyday" → she buys it for coworkers). **Reconciliation-as-enrichment during NREM sleep**: when a contradiction edge is detected in `sleep_nrem.py`, attempt to generate a reconciling explanation via the session LLM and store it as `linking_context` on the edge. This creates a graduated response — reconciled contradictions get explanatory context, genuinely irreconcilable ones keep the bare contradiction flag. The paper's best model achieves only 40.25% success on short NLI pairs, so this is hard, but it's the right framing for personal memory where "both sides are true in different contexts" is the common case. The NLI cross-encoder roadmap item (for detecting contradictions in the first place) remains a prerequisite. Accept if: any measurable improvement over the 0.025–0.037 F1 baseline, or reconciliation quality evaluated on manually identified contradiction pairs. See `research/sources/contradiction-reconciliation.md`.
 
 21. **Resolution-fidelity evaluation.** Measure not just "was a relevant memory returned" but "was the required level of detail returned." Assesses whether summaries lose the specific details that made a memory useful — the detail-vs-compression tradeoff. Accept if: fidelity metric defined and measured.
 
@@ -279,6 +281,43 @@ Pipeline: ingest LoCoMo conversations → recall with LoCoMo-specific reranker (
 **Known limitations:** LoCoMo's GT has a 6.4% error rate (corrected GT vendored from locomo-audit). The LLM judge is generous — Opus is 3.2pp stricter than GPT-4.1-mini. GPT-5.4-mini (reasoning model) is -6.6pp worse as reader because it computes dates instead of quoting context.
 
 **Remaining:** Rerun with corrected GT, sleep/feedback ablations to isolate contributions.
+
+### PERMA personalization benchmark *(Proposed)*
+
+PERMA (arXiv:2603.23231, March 2026) evaluates personalized memory agents on preference-state maintenance across event-driven, multi-session, multi-domain interactions. 10 synthetic users, 20 domains, 2,166 preference details, 1.8M tokens. Decoupled evaluation: memory fidelity (BERT-F1, Memory Score 1-4) measured separately from task performance (MCQ accuracy, interactive Turn=1/Turn<=2). See `research/sources/perma.md` for full analysis.
+
+**Why it matters:** PERMA's hardest dimension — cross-domain synthesis — is where all benchmarked systems collapse (MemOS Turn=1 drops from 0.548 to 0.306). Somnigraph's graph-based retrieval (PPR, NREM edges, Hebbian co-retrieval) is architecturally positioned for exactly this, but untested. Fresh benchmark (March 2026) with no established SOTA beyond the paper's baselines.
+
+**SOTA targets to beat (memory systems only, Clean single-domain):**
+
+| Metric | Current SOTA | System | Notes |
+|--------|-------------|--------|-------|
+| MCQ Accuracy | 0.811 | MemOS | LLMs reach 0.882 (Kimi-K2.5) with full context |
+| BERT-F1 | 0.859 | RAG (BGE-M3) | Raw retrieval completeness |
+| Memory Score | 2.27 / 4.0 | MemOS | LLM-judged coverage + accuracy + noise |
+| Turn=1 (single-domain) | 0.548 | MemOS | One-shot interactive success |
+| Turn<=2 (single-domain) | 0.830 | Memobase | Success with one correction round |
+| Turn=1 (multi-domain) | 0.306 | MemOS | The hard problem — cross-domain synthesis |
+| Completion | 0.846 | EverMemOS | Task completion rate |
+
+**SOTA targets (Noisy):**
+
+| Metric | Current SOTA | System |
+|--------|-------------|--------|
+| MCQ Accuracy | 0.794 | MemOS |
+| Turn=1 | 0.524 | MemOS |
+
+**Primary goal: multi-domain Turn=1 (0.306).** This is where every system collapses and where graph-conditioned retrieval should differentiate. A strong result here (0.45+) would be the headline claim. All other metrics are secondary targets — we'd like to beat them all, but cross-domain synthesis is the story.
+
+**Somnigraph advantages for this benchmark:**
+- Learned reranker (vs. fixed top-k retrieval used by all benchmarked systems) — directly addresses the finding that expanding from top-10 to top-20 hurts most systems
+- PPR graph traversal for cross-domain bridging — no benchmarked system has graph-conditioned retrieval
+- Feedback loop — no benchmarked system adapts retrieval based on utility signals
+- Sleep-based consolidation — category-aware memory organization that MemOS achieves via write-time extraction
+
+**Pipeline requirements:** Ingest PERMA's event-driven dialogue sessions → build memory store → answer MCQ and interactive evaluation at Type 1/2/3 checkpoints. All memory systems in the paper use GPT-4o-mini as backbone. Code: https://github.com/PolarisBoy1/PERMA.
+
+**Effort:** 2-3 sessions. Session 1: ingest pipeline + MCQ evaluation. Session 2: interactive evaluation + analysis. Session 3: ablations (graph contribution, feedback contribution, sleep contribution).
 
 ### What's measurable but unmeasured
 
