@@ -1,6 +1,7 @@
 # cognee (topoteretes/cognee) -- Analysis
 
 *Generated 2026-02-20 by Opus agent analyzing GitHub repo via API*
+*Updated 2026-03-27: v0.5.3–v0.5.5 review (skills system, triplet embeddings as default, entity consolidation)*
 
 ---
 
@@ -88,6 +89,14 @@ The `cognify()` function orchestrates a 5-stage pipeline:
 **Comparison to our /sleep pipeline**: Our planned consolidation involves synthesizing summaries, detecting evolution of understanding, and building layers of abstraction. Cognee's memify is more of a "graph enrichment toolkit" than a consolidation system. It doesn't synthesize, abstract, or detect patterns across memories. The usage frequency tracking is the closest thing to what we'd call "consolidation" but it's just counting, not synthesizing.
 
 **Comparison to Neuroca's dreaming**: Neuroca proposed simulated annealing, memory abstraction, and cross-tier consolidation (though largely unimplemented). Cognee's memify is less ambitious but more functional -- it actually works and processes real data.
+
+### Post-v0.5.2 Developments (reviewed 2026-03-27)
+
+**Triplet embeddings promoted to default** (v0.5.5): `create_triplet_embeddings` is now a first-class documented pipeline and replaced coding rules as the default memify behavior. Implementation: `get_triplet_datapoints` yields text representations of `source → relationship → target`, `index_data_points` writes them to a `Triplet_text` vector collection. Queried via `SearchType.TRIPLET_COMPLETION`. Notable limitation: standalone collection, not fused into `GRAPH_COMPLETION` — our proposed RRF integration would already be more sophisticated.
+
+**Entity consolidation pipeline** (v0.5.3): Post-cognify enrichment that rewrites `Entity` node descriptions using graph neighborhood context. Three steps: load entities with edges + neighbors, LLM-generate consolidated descriptions, write back in-place. Addresses real fragmentation problem where per-chunk extraction produces partial entity descriptions. LLM-heavy (one call per entity).
+
+**Skills system** (v0.5.4rc1): Self-improving agent workflow framework — ingest SKILL.md files, execute, observe with LLM-based scoring (not binary), then `amendify` to propose improvements. Closed-loop learning for agent behaviors. Interesting conceptually but orthogonal to memory retrieval — closer to agent orchestration.
 
 ### Retrieval
 
@@ -238,25 +247,31 @@ This is NOT RRF (Reciprocal Rank Fusion). It's a custom scoring where vector dis
 **How it maps**: We could create a separate `triplets` table with composite text embeddings. During retrieval, search both `memories` and `triplets` tables, fuse results. This fits naturally into our planned RRF fusion as an additional retrieval path.
 **Effort**: Moderate -- requires a new table, a background process to generate triplet embeddings from related memories, and integration into retrieval.
 
-### 2. Graph-Aware Retrieval Scoring (Medium value, Medium effort)
+### 2. Neighborhood-Aware Entity Consolidation (Medium-High value, Medium effort)
+**What**: After extraction, rewrite entity/node descriptions using their full graph neighborhood (edges + neighbors) rather than just the originating chunk.
+**Why**: Our sleep pipeline's entity work produces per-memory descriptions. An entity mentioned across 20 memories over 3 months should have a richer description than any single `remember()` call produced. Cognee's `consolidate_entity_descriptions_pipeline` does this in batch; for us it would be incremental during sleep — identify entities whose neighborhood has grown since last consolidation, rewrite only those.
+**How it maps**: During sleep consolidation, query entities with new edges since last pass, fetch neighborhood, LLM-consolidate descriptions. The temporal dimension matters — descriptions should reflect how understanding evolved, not just flatten everything. Lower LLM cost than Cognee's batch approach since we'd only touch changed entities.
+**Effort**: Moderate — requires tracking "last consolidated" per entity and a sleep step to rewrite descriptions. The LLM call pattern is straightforward.
+
+### 3. Graph-Aware Retrieval Scoring (Medium value, Medium effort)
 **What**: Instead of just vector similarity, score results by considering the graph neighborhood. Cognee maps vector distances onto graph structure and scores triplets holistically.
 **Why**: Our memories have implicit relationships (shared themes, temporal proximity, corrections of each other). Scoring could consider these connections.
 **How it maps**: Even without a full graph DB, we could build a lightweight relationship index. When a memory is retrieved, check if related memories (by theme, by `source`, by correction chains) also score well, and boost accordingly.
 **Effort**: Requires defining relationship types and building a scoring function. Could start simple.
 
-### 3. Usage Frequency as Retrieval Signal (Low value for us, Low effort)
+### 4. Usage Frequency as Retrieval Signal (Low value for us, Low effort)
 **What**: Track which memories are actually used in responses, boost frequently-used ones.
 **Why**: We already track `access_count` but don't use it in retrieval scoring. Cognee's `frequency_weight` approach could be adapted.
 **How it maps**: We could add `access_count` as a signal in our retrieval scoring, either as a direct boost or through RRF.
 **Effort**: Minimal -- we already have the data.
 
-### 4. Session Cognification Pattern (Medium value, High effort)
+### 5. Session Cognification Pattern (Medium value, High effort)
 **What**: Re-process successful Q&A interactions through the extraction pipeline to extract new knowledge.
 **Why**: When our system successfully answers a question using context from multiple memories, the synthesized understanding could itself become a memory.
 **How it maps**: After a successful recall, the synthesized context could be stored as a new "derived" memory with links to its source memories. This is related to our planned consolidation pipeline.
 **Effort**: High -- requires deciding what counts as "worth remembering" from a session, avoiding circular amplification.
 
-### 5. Iterative Retrieval (CoT/Context Extension) (Medium value, Medium effort)
+### 6. Iterative Retrieval (CoT/Context Extension) (Medium value, Medium effort)
 **What**: After initial retrieval and generation, validate the answer, generate follow-up queries, retrieve more context, iterate.
 **Why**: Single-pass retrieval misses context that becomes relevant only after initial analysis.
 **How it maps**: Could be implemented at the `recall()` level -- if initial results seem insufficient, automatically expand the search.

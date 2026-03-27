@@ -1,12 +1,13 @@
 # PERMA: Benchmarking Personalized Memory Agents via Event-Driven Preference and Realistic Task Environments -- Analysis
 
 *Generated 2026-03-24 by Opus 4.6 agent reading arXiv:2603.23231*
+*Updated 2026-03-27: Full paper review — formal definitions, prompts, domain-specific results, positional probing, case study*
 
 ---
 
 ## Paper Overview
 
-**Paper**: Shuochen Liu, Junyi Zhu, Long Shu, Junda Lin, Yuhao Chen, Haotian Zhang, Chao Zhang, Derong Xu, Jia Li, Bo Tang, Zhiyu Li, Feiyu Xiong, Enhong Chen, Tong Xu (University of Science and Technology of China, KU Leuven, MemTensor, City University of Hong Kong, Northeastern University). "PERMA: Benchmarking Personalized Memory Agents via Event-Driven Preference and Realistic Task Environments." arXiv:2603.23231, March 2026. 39 pages. Code: https://github.com/PolarisBoy1/PERMA.
+**Paper**: Shuochen Liu, Junyi Zhu, Long Shu, Junda Lin, Yuhao Chen, Haotian Zhang, Chao Zhang, Derong Xu, Jia Li, Bo Tang, Zhiyu Li, Feiyu Xiong, Enhong Chen, Tong Xu (University of Science and Technology of China, KU Leuven, MemTensor, City University of Hong Kong, Northeastern University). "PERMA: Benchmarking Personalized Memory Agents via Event-Driven Preference and Realistic Task Environments." arXiv:2603.23231, March 2026. 39 pages. Code: https://github.com/PolarisLiu1/PERMA.
 
 **Problem addressed**: Existing personalization memory benchmarks have three blind spots: (1) they frame preferences as static statements given upfront, rather than signals that emerge through event-driven dialogue; (2) they treat user models as snapshots rather than evolving states that accumulate across sessions; (3) they evaluate end-to-end output quality without decoupling memory quality from generation quality. PERMA fills this gap by constructing temporally ordered interaction histories where preferences emerge gradually across multiple sessions and domains, and evaluating both memory fidelity and task performance separately.
 
@@ -59,6 +60,31 @@ Real user queries sampled from WildChat replace the synthetic user turns, while 
 
 **Memory Fidelity**: BERT-F1 between retrieved context and ground-truth dialogues, plus a 1-4 Memory Score from an LLM judge evaluating coverage, accuracy, and noise.
 
+### Formal Definitions (from full paper)
+
+The paper formalizes five key concepts worth internalizing:
+
+**Persona State (Def 3.3)**: `S_t = f({C1, C2, ..., Ct})` — the persona state at time t is a text representation synthesizing preferences and episodic memory from all dialogue history up to t. For memory systems, f is an aggregation operator (extraction, structuring, consolidation). For vanilla LLMs, f is identity over raw history. This is the precise formulation of what our sleep pipeline should produce — sleep is the f that transforms raw memories into consolidated, cross-linked representations.
+
+**Interaction Event (Def 3.2)**: `e_t = (τ, dom, C, Φ)` where τ ∈ {EMERGENCE, SUPPLEMENT, TASK}. EMERGENCE is first contact with a domain (initial preferences). SUPPLEMENT is refinement/deepening. TASK is an evaluation checkpoint with empty Φ. This emergence/supplement distinction is more precise than our current `source` field and could inform how we track preference evolution.
+
+**Memory System (Def 3.5)**: Explicitly decoupled into ADD (ingestion) and SEARCH (retrieval). Effectiveness is defined by the utility of retrieved segments s_t for answering query q_t. Simple but clarifying — it makes explicit that memory quality and generation quality are independent variables.
+
+**Persona Consistency Objective (Def 3.4)**: `a = argmax P(a' | q_t, S_t)` subject to `S_t = f(G_{u,≤t})` — the generated response should maximize alignment with the evolved persona state. The key constraint: the persona state must satisfy both demographic attributes D_u and accumulated preference updates Φ_{1:t}. This formalizes "personalization is not retrieval — it's synthesis."
+
+### Evaluation Prompts (Appendix A)
+
+The full paper includes all prompts. Two are directly actionable:
+
+**EVAL_MEMORY_SCORE (Figure 19)**: Four-level rubric evaluating retrieved memory on three axes:
+- Coverage (recall): Are all critical preference points present? Missing a core preference = major failure.
+- Accuracy (precision): Consistent with specific preference details? Checks for hallucinations, outdated info, contradictions.
+- Noise: Is the memory concise and focused, or overwhelmed by irrelevant fragments?
+
+Scoring: 1 (memory failure/hallucination), 2 (incomplete/fragmented), 3 (accurate but unrefined), 4 (perfect recall). This prompt is a ready-made template for Worth Stealing #3 (decoupled memory fidelity metric).
+
+**USER_FEEDBACK_PROMPT (Figure 16)**: The user simulator is granted ground-truth dialogue history and preference annotations. It outputs "TERMINATE" only when (a) the task is completed and (b) all preferences are satisfied. Otherwise it provides focused corrective feedback (1-3 sentences). Capped at 10 turns. The key design choice: the simulator *never adds new requests* once the task is satisfied — it only drives toward completion of the original query.
+
 ---
 
 ## Key Claims & Evidence
@@ -107,6 +133,48 @@ Expanding retrieval from top-10 to top-20 *hurts* most memory systems on multi-d
 
 At ~116k tokens with real linguistic style, standalone LLMs degrade (GPT-4o-mini fails entirely, Qwen2.5-14B-1M drops from 0.766 to 0.716). Memory systems maintain stable performance, demonstrating their value proposition for very long interaction histories.
 
+### Domain-Specific Performance (Table 10)
+
+Performance varies dramatically by domain. Hardest domains (lowest MCQ Acc. across all systems):
+- **Restaurant**: 0.390–0.719 (MemOS best among memory systems at 0.719)
+- **Media**: 0.500–0.778
+- **Movie**: 0.400–0.814
+
+Easiest domains:
+- **Messaging**: 0.810–0.980 (Kimi-K2.5 at 0.980)
+- **Finance**: 0.743–0.957
+
+The hard domains involve dynamic, frequently-updated preferences (restaurant tastes, media consumption evolves). The easy domains have more stable, structured preferences (messaging format, financial constraints). This pattern maps directly to our decay_rate design — high-decay domains need faster consolidation, while stable preferences benefit from longer retention. MemOS narrows the gap with standalone LLMs most dramatically in Shopping (0.889 vs 0.833 for Qwen3-32B) and Travel (0.856 vs 0.870) — domains where structured preference representation compensates for weaker backbone reasoning.
+
+### Positional Probing (Table 9)
+
+Fine-grained measurement of accuracy as context depth increases from 10% to 100% of the full timeline:
+- **MemOS is stable across all positions and settings.** Clean: 0.676→0.794 (improves then plateaus). Noise: 0.811→0.851 (actually improves at deeper positions). Long-context: 0.854→0.773 (slight degradation but stays above all competitors).
+- **Other systems degrade.** Lightmem: 0.676→0.631 (Clean). Supermemory: 0.649→0.653 (flat but low). Memobase: 0.730→0.688 (steady decline).
+- **GPT-4o-mini collapses in long-context.** 0.829 at 10% → 0.000 at 100% — the model literally fails at full context length. Memory systems bypass this entirely by reducing long-range reasoning to persona-state matching.
+
+The noise-position interaction is the most interesting finding: MemOS *improves* from 0.811 to 0.851 as noisy context deepens. The paper attributes this to noise acting as a "semantic catalyst" — in-session contradictions and preference corrections inadvertently emphasize the preference signal, and MemOS's structured extraction captures this emphasis. Other systems lack the extraction quality to benefit.
+
+### Noise-as-Catalyst Effect (Section 5.2.2)
+
+MemOS's retrieval volume nearly doubles under noise (709.1 → 1486.7 context tokens). This expanded context provides more detailed preference descriptions, leading to improved Memory Score (2.27 → 2.38) and MCQ Acc. (0.811 → 0.853). The mechanism: noisy input (inconsistent preferences, context switches) forces the user to clarify and re-state preferences, which the extraction pipeline captures as additional signal. Systems without structured extraction (Mem0, Supermemory) don't benefit because they can't distinguish the signal amplification from the noise.
+
+This has a direct implication for Somnigraph: our contradiction detection in NREM could be reframed not just as error correction but as signal enrichment — contradictions reveal what the user actually cares about.
+
+### Case Study: Retrieved Memory Comparison (Tables 11-12)
+
+The paper provides a side-by-side comparison of what each system retrieves for the same hotel query. This is the most revealing section:
+
+- **MemOS**: Three parallel channels — episodic facts (timestamped dialogue excerpts), explicit preferences (bullet points: "prefers Radisson, Hyatt, or Intercontinental, 4-5 star, city center"), implicit preferences ("preference for hotels with reputable brands, unique cultural experiences"). Structured, actionable, ~890 tokens.
+- **RAG (BGE-M3)**: Raw dialogue chunks, semantically relevant but unstructured. ~957 tokens. High BERT-F1 (most key info present) but the reader LLM must synthesize.
+- **EverMemOS**: Verbose episodic narration — "The conversation began on September 24, 2023 (Sunday) at 12:00 AM UTC..." — 2632+ tokens for a single query. High recall but terrible information density.
+- **Mem0**: Timestamped event summaries without preference abstraction. Good for "what did the user ask about?" but weak for "what does the user prefer?"
+- **Lightmem**: Compressed temporal summaries. ~10 lines. Loses specific details (no hotel chain names in some entries).
+- **Supermemory**: Over-compressed — "User needs help finding a hotel. User is planning a trip to Italy." Lost all specific preference details. ~92 context tokens but nearly useless.
+- **Memobase**: Profile-oriented but drifts — includes Rav-Kav card application and bus travel preferences for a hotel query. Retrieval precision problem.
+
+The lesson: the representation spectrum runs from over-compressed (Supermemory, ~92 tokens, lost detail) to over-verbose (EverMemOS, ~2632 tokens, buried signal). MemOS wins by maintaining three resolution levels. This validates our detail/summary/gestalt layer design and our sleep pipeline's role in producing the right resolution for each query.
+
 ### Methodological Strengths
 
 1. **Decoupled evaluation.** Separating memory fidelity (BERT-F1, Memory Score) from task performance (MCQ, interactive) is genuinely useful. Most benchmarks conflate retrieval quality with generation quality.
@@ -121,6 +189,15 @@ At ~116k tokens with real linguistic style, standalone LLMs degrade (GPT-4o-mini
 3. **MCQ as primary metric.** 8-way multiple choice is easier than open-ended generation. The paper acknowledges this: "selecting the correct option from predefined candidates is considerably easier than generating a reasoned answer." The interactive evaluation is more informative but only applies to memory systems.
 4. **No ablation of the memory systems themselves.** The paper benchmarks systems as black boxes. There's no investigation of *why* MemOS outperforms -- is it the structured representation, the parallel retrieval channels (episodic/explicit/implicit), or something else?
 5. **Scale is modest.** 10 users, 20 domains, ~800 events. The long-context variant extends to 116k tokens, but real long-term memory systems operate over much longer horizons.
+6. **Implementation fairness issues (from repo review).** The released code at `github.com/PolarisLiu1/PERMA` reveals several uncontrolled variables that the paper doesn't disclose:
+   - **Uneven integration depth.** MemOS and EverMemOS are API-only (hosted REST endpoints); Mem0 uses the paid cloud API (not open-source); only LightMem, RAG, and Memobase are fully reproducible. EverMemOS and "Memu" client classes are referenced in the code but not defined — their results may come from code not included in the repo.
+   - **Supermemory gets extra retrieval features.** Its client uses `rerank=True, rewrite_query=True` — query rewriting and reranking that other systems don't receive.
+   - **Uncontrolled embedding models.** LightMem uses `all-MiniLM-L6-v2` (384-dim) while other systems use their own embedding models. Embedding quality is a confound.
+   - **Inconsistent cleanup.** Memobase's `get_client()` calls `delete_user()` on every initialization; other systems don't, risking data contamination between runs.
+   - **Universal content truncation at 8000 chars** before ingestion, not mentioned in the paper.
+   - **No license file** despite Apache 2.0 badge. `evaluation_prompts.py` carries an Amazon CC-BY-NC-4.0 header — license conflict.
+
+   These issues don't invalidate the paper's structural conclusions (cross-domain collapse is universal, MemOS wins across all conditions, noise-as-catalyst is consistent) but they mean specific per-system numbers should be taken with some salt. The relative ordering is likely robust; the absolute gaps may not be.
 
 ---
 
@@ -146,7 +223,7 @@ At ~116k tokens with real linguistic style, standalone LLMs degrade (GPT-4o-mini
 
 3. **Graph-conditioned retrieval.** Somnigraph's PPR expansion in `scoring.py`, Hebbian co-retrieval weights, and NREM-detected edges provide multi-hop retrieval paths. PERMA's finding that cross-domain synthesis is the hard problem (Turn=1 drops from 0.548 to 0.306 for MemOS) suggests that graph traversal -- connecting Travel preferences to Calendar events -- is exactly the kind of capability needed. The `betweenness` and `edge_count` features in the reranker provide graph signals that none of the benchmarked systems have.
 
-4. **Sleep-based consolidation.** PERMA observes that MemOS wins partly because it categorizes memory into episodic facts, explicit preferences, and implicit preferences with parallel retrieval. Somnigraph's sleep pipeline (NREM edge detection in `sleep_nrem.py`, REM clustering and summarization in `sleep_rem.py`) performs this kind of organization automatically rather than relying on write-time extraction. The `layer` field (detail/summary/gestalt) in the schema already supports the multi-resolution representation that PERMA's analysis suggests is important.
+4. **Sleep-based consolidation — the aggregation operator f.** PERMA's formal definition (Def 3.3) defines persona state as `S_t = f({C1, ..., Ct})` where f is the aggregation operator. For MemOS, f is write-time extraction into three channels. For Somnigraph, f is the sleep pipeline: NREM detects edges and contradictions, REM clusters and summarizes. The key difference: MemOS's f runs at write time (every ADD operation); Somnigraph's f runs periodically during sleep. This means Somnigraph's persona state may lag behind recent interactions but produces deeper consolidation (cross-linking, layer generation) than any write-time-only system. The case study confirms this matters: MemOS's three-channel representation (episodic/explicit/implicit) beats every other system. Our detail/summary/gestalt layers and multi-category schema provide the same multi-resolution representation, but generated through consolidation rather than extraction.
 
 5. **Biological decay.** PERMA's Type 3 checkpoint measures forgetting, and all systems degrade. Somnigraph's per-memory `decay_rate` and temporal suppression in `scoring.py` are designed for exactly this -- managing the relevance of old information without losing it. The `age_hours` and `hours_since_access` features in the reranker explicitly model temporal dynamics.
 
@@ -180,15 +257,15 @@ At ~116k tokens with real linguistic style, standalone LLMs degrade (GPT-4o-mini
 
 **Why it matters**: PERMA's BERT-F1 + Memory Score decoupling reveals that RAG has the highest BERT-F1 (0.859) but lowest MCQ accuracy among memory systems -- retrieval completeness doesn't guarantee synthesis quality. Conversely, some systems with lower BERT-F1 have higher task completion because their structured representations are easier for the reader LLM to use. Somnigraph's LoCoMo pipeline in `scripts/locomo_bench/` only evaluates final answer correctness. Adding a memory fidelity metric would distinguish retrieval failures from reader failures, directly informing whether to invest in reranker improvements or reader improvements.
 
-**Implementation**: After the retrieval step in the LoCoMo pipeline, compute BERT-F1 between retrieved memories and the ground-truth evidence turns. Add an LLM judge step modeled on PERMA's EVAL_MEMORY_SCORE that evaluates coverage, accuracy, and noise of the retrieved context before the reader generates an answer. This parallels the existing R@10 metric but measures quality rather than just presence.
+**Implementation**: After the retrieval step in the LoCoMo pipeline, compute BERT-F1 between retrieved memories and the ground-truth evidence turns. Add an LLM judge step using PERMA's EVAL_MEMORY_SCORE prompt (Figure 19, now available in full — four-level rubric scoring Coverage, Accuracy, and Noise independently). This parallels the existing R@10 metric but measures quality rather than just presence. The prompt is directly usable with minor adaptation (replace "Preferences to be Mastered" with ground-truth evidence turns).
 
-**Effort**: Low (1 session). The retrieval step already exists; this adds a scoring step.
+**Effort**: Low (1 session). The retrieval step already exists; this adds a scoring step. The prompt template is ready.
 
 ### 4. Noise robustness testing for the retrieval pipeline
 
 **What**: Systematically test how Somnigraph's retrieval handles noisy input at both write time and query time.
 
-**Why it matters**: PERMA's surprising finding that noise sometimes *helps* memory systems (by emphasizing preferences through internal conflict) suggests that Somnigraph's write-time processing might benefit from adversarial testing. The FTS5 BM25 channel in `fts.py` is purely lexical and would likely fail on colloquial/slang queries. The vector channel may be more robust but this is untested. Understanding noise sensitivity would inform whether BM25-damped IDF keyword expansion (currently used for LoCoMo) needs adaptation for real-world noisy input.
+**Why it matters**: PERMA's noise-as-catalyst finding is nuanced: noise *helps* systems with strong extraction (MemOS's retrieval volume doubles from 709→1487 tokens, improving MCQ Acc. from 0.811→0.853) but *hurts* systems without it. The mechanism: in-session contradictions and corrections force users to re-state preferences more explicitly, amplifying the signal for systems that can capture it. For Somnigraph, this suggests: (a) the FTS5 BM25 channel in `fts.py` would likely fail on colloquial/slang queries (purely lexical), (b) the vector channel may be more robust but this is untested, and (c) our NREM contradiction detection could be reframed as signal enrichment rather than just error correction.
 
 **Implementation**: Create paraphrased and noise-injected variants of existing GT queries (slang, incomplete references, context-switched). Measure per-channel (FTS5 vs vector) retrieval quality degradation. This connects directly to roadmap Tier 2 #15 (paraphrase robustness test) but extends it with PERMA's noise taxonomy.
 
@@ -213,6 +290,10 @@ The WildChat-interleaved 116k-token context is designed to stress-test long-cont
 ### Interactive user simulator protocol
 
 PERMA's LLM-based user simulator with corrective feedback is useful for evaluating agent-like systems. Somnigraph's MCP-based architecture means the Claude Code instance *is* the user -- the feedback loop already closes naturally through real interaction, not simulated interaction. Building a simulator would be less informative than the existing production feedback data.
+
+### Repo note: what's usable if we benchmark
+
+The released data is complete and well-structured: 10 users with full profiles, clean/noise/style dialogue variants, and pre-computed MCQ gold labels in `data/evaluation/`. The cleanest path to PERMA benchmarking would be: write a Somnigraph adapter (like the existing system clients in `code/src/function/`), ingest dialogues, run MCQ evaluation against the pre-computed metadata. All prompts are in the repo (`prompt.py`, `evaluation_prompts.py`). Raw system outputs from the paper's experiments are NOT released — only questions, options, and gold labels.
 
 ---
 
@@ -267,8 +348,14 @@ A-Mem's autonomous linking and note evolution resemble what PERMA suggests is ne
 
 ## Summary Assessment
 
-PERMA is a well-constructed benchmark that identifies a genuine gap: existing evaluations measure factual recall, not preference-state maintenance. The distinction between "what happened" and "what does the user want" is real and underserved. The temporal probing (Type 1/2/3 checkpoints), noise injection, and decoupled memory/task evaluation are methodologically sound contributions that go beyond what LoCoMo, LongMemEval, or PersonaMem offer.
+PERMA is a well-constructed benchmark that identifies a genuine gap: existing evaluations measure factual recall, not preference-state maintenance. The distinction between "what happened" and "what does the user want" is real and underserved. The temporal probing (Type 1/2/3 checkpoints), noise injection, and decoupled memory/task evaluation are methodologically sound contributions that go beyond what LoCoMo, LongMemEval, or PersonaMem offer. The full paper delivers on the abstract's promise — the formal definitions are precise, the prompts are reproducible, and the case study provides the qualitative grounding that the tables alone don't convey.
 
-The paper's most important finding for Somnigraph is the cross-domain synthesis collapse. All memory systems -- including the best performer MemOS -- struggle dramatically when tasks require integrating preferences from multiple domains. This validates Somnigraph's investment in graph-based retrieval (PPR, Hebbian co-retrieval, NREM-detected edges) as architecturally positioned for the hardest retrieval problem, but also highlights that this capability is completely untested. The gap between "we have the architecture for this" and "we've measured that it works" is the actionable takeaway.
+Three findings from the full paper are particularly important for Somnigraph:
 
-The paper's limitations are typical of benchmark papers: fully synthetic data, black-box system evaluation, modest scale. The 10-user, 20-domain design is sufficient for comparative analysis but doesn't stress-test the long-tail scenarios that real systems encounter. The reliance on GPT-4o-mini as a unified backbone means the results reflect that specific model's strengths and weaknesses. Still, as a benchmark contribution it's solid -- the evaluation dimensions (temporal depth, noise robustness, cross-domain synthesis, interactive recovery) are the right ones to measure, and the results provide useful signal about where current memory systems fail.
+1. **Cross-domain synthesis collapse remains the headline.** All memory systems struggle when tasks require integrating preferences across domains (Turn=1: 0.548 → 0.306 for MemOS). This validates our investment in graph-based retrieval but highlights the measurement gap — we have the architecture but haven't tested whether it actually bridges domains.
+
+2. **The representation spectrum determines outcomes.** The case study makes this concrete: Supermemory's 92 tokens lose all preference detail. EverMemOS's 2632 tokens bury signal in narration. MemOS's three-channel approach (episodic/explicit/implicit, ~890 tokens) wins by maintaining the right resolution. Our detail/summary/gestalt layers are the closest analog among evaluated systems, but generated through sleep consolidation rather than write-time extraction — a different f in PERMA's formalism, with different tradeoffs.
+
+3. **Noise-as-catalyst is real and reframable.** MemOS improves under noise (0.811 → 0.853 MCQ Acc.) because in-session contradictions amplify preference signals for systems with strong extraction. This reframes our NREM contradiction detection: contradictions aren't just errors to resolve — they're evidence of what the user cares about.
+
+The paper's limitations are typical of benchmark papers: fully synthetic data, black-box system evaluation, modest scale, single backbone model. But the evaluation dimensions (temporal depth, noise robustness, cross-domain synthesis, interactive recovery) are the right ones to measure, the prompts are directly reusable, and the domain-specific and positional probing data provide granularity that most benchmark papers lack.
