@@ -1,100 +1,105 @@
-# MemOS: An Operating System for LLM Memory -- Analysis
+# MemOS: A Memory OS for AI System -- Analysis
 
-*Generated 2026-02-18 by Opus agent reading 2505.22101v1*
+*Updated 2026-03-25 by Opus agent reading arXiv:2507.03724v4 (Dec 2025), GitHub repo, and PERMA benchmark results. Replaces prior analysis (2026-02-18) based on short vision paper 2505.22101v1.*
 
 ---
 
 ## Paper Overview
 
-- **Authors**: Zhiyu Li, Shichao Song, Hanyu Wang, Simin Niu, Ding Chen, et al. (19 authors)
-- **Affiliations**: MemTensor (Shanghai) Technology Co., Shanghai Jiao Tong University, Renmin University of China, China Telecom Research Institute
-- **Venue**: arXiv preprint, May 28, 2025 (short version)
-- **Paper**: arXiv:2505.22101v1 [cs.CL]
-- **Benchmark**: None. This is a system-design/vision paper with no empirical evaluation.
+- **Authors**: Zhiyu Li, Chenyang Xi, Chunyu Li, Ding Chen, et al. (35+ authors)
+- **Affiliations**: MemTensor (Shanghai) Technology Co., Institute for Advanced Algorithms Research, China Telecom Research Institute, Tongji/Zhejiang/Peking/Renmin/Beihang universities, Shanghai Jiao Tong University
+- **Venue**: arXiv preprint, v4 dated December 3, 2025
+- **Paper**: arXiv:2507.03724v4 [cs.CL], 37 pages
+- **Code**: https://github.com/MemTensor/MemOS (Apache 2.0)
+- **Website**: https://memos.openmem.net/
 
-**Core problem**: LLMs treat memory as an afterthought. Parametric memory (model weights) is opaque and hard to update. Activation memory (KV-cache, hidden states) is ephemeral. RAG-based plaintext memory is an "ad hoc textual patch" without lifecycle management. The result is four critical gaps: (1) no long-term multi-turn state modeling, (2) poor knowledge evolution, (3) no persistent user/agent preference modeling, and (4) "memory silos" across platforms preventing reuse and migration.
+**Core problem**: LLMs lack a unified framework for managing memory as a first-class system resource. Parametric memory (weights) is opaque and expensive to update. Activation memory (KV-cache) is ephemeral. RAG-based plaintext memory is stateless. The result is four gaps: no long-range dependency modeling, poor knowledge evolution, no persistent personalization, and cross-platform memory silos.
 
-**Key contribution**: A proposed *memory operating system* (MemOS) that elevates memory to a "first-class operational resource" for LLMs. The central abstraction is the **MemCube** -- a standardized container that wraps heterogeneous memory types (parametric patches, activation tensors, plaintext content) with unified metadata, enabling scheduling, lifecycle management, access control, and cross-type transformation. MemOS organizes around a three-layer architecture (Interface, Operation, Infrastructure) inspired by traditional OS design.
+**Key contribution**: A full memory operating system with three-layer architecture (Interface, Operation, Infrastructure), three memory types (plaintext, activation, parametric), and the MemCube abstraction as a universal container. Unlike the earlier short version (2505.22101), this paper includes extensive benchmarks across four evaluation suites and a working open-source implementation.
 
-**Result**: No empirical results. The paper is a design document / architectural proposal. It presents the conceptual framework, data structures, and system modules, but does not report benchmarks, ablations, or deployment metrics. It is explicitly labeled "Short Version," suggesting a longer paper with evaluation is forthcoming.
-
-**Why this paper matters for us**: MemOS is the most comprehensive attempt to formalize the OS metaphor for LLM memory that we have encountered. We already use a Letta/MemGPT-inspired register/RAM/disk analogy. MemOS extends this into a full system design with explicit scheduling policies, lifecycle state machines, access control, memory transformation pathways, and a marketplace concept. The gap between their vision and their evidence is large, but several architectural ideas are worth examining against our implementation priorities.
+**Result**: SOTA on LoCoMo (75.80 overall LLM judge), LongMemEval (77.8 overall), PreFEval (77.2 personalized response, 0 turns), and PersonaMem (61.2 precision). Benchmarked against MIRIX, Mem0, Zep, Memobase, Supermemory, and MemU using GPT-4o-mini as the common backbone. Also demonstrates KV-cache memory acceleration (up to 94.2% TTFT reduction on Qwen models) and API robustness (100% success rate at 100 QPS).
 
 ---
 
-## Architecture / Method
+## Architecture
 
-### Three Memory Types
+### Storage & Schema
 
-MemOS classifies all LLM memory into three types, each with distinct representation, lifecycle, and invocation semantics:
+**Backend**: Neo4j graph database as the primary store. The `TreeTextMemory` class (the main memory implementation) wraps a `Neo4jGraphDB` graph store. Alternative backends exist in code for PostgreSQL (PolarDB) and Nebula, but Neo4j is the tested path. Vector search is done through Neo4j's native vector index, not a separate vector DB. Qdrant and Milvus adapters exist for the vec_db abstraction but are not used by the tree memory path.
 
-| Type | What It Is | Representation | Lifecycle | MemOS Role |
-|------|-----------|----------------|-----------|------------|
-| **Parametric** | Knowledge in model weights | Feedforward/attention layers, LoRA patches | Long-term, updated via fine-tuning | "Backbone" -- zero-shot capabilities, domain skill modules |
-| **Activation** | Inference-time cognitive state | Hidden activations, attention weights, KV-cache | Ephemeral per-inference | "Working memory" -- context awareness, style control |
-| **Plaintext** | Explicit external knowledge | Documents, knowledge graphs, prompt templates | Editable, shareable, governable | "Knowledge base" -- rapid updates, personalization, multi-agent collaboration |
+**Memory item schema** (from `TextualMemoryItem` / `TreeNodeTextualMemoryMetadata`):
+- `id`: UUID
+- `memory`: string content
+- `status`: "activated" | "resolving" | "archived" | "deleted"
+- `memory_type`: "WorkingMemory" | "LongTermMemory" | "UserMemory" | "OuterMemory" | "ToolSchemaMemory" | "ToolTrajectoryMemory" | "RawFileMemory" | "SkillMemory" | "PreferenceMemory"
+- `sources`: list of `SourceMessage` (provenance tracking with role, content, chat_time, doc_path, file_info)
+- `embedding`: vector
+- `tags`: list of strings
+- `confidence`: float 0-100
+- `version`: int (incremented on update)
+- `history`: list of `ArchivedTextualMemory` (preserves prior versions with update_type: conflict/duplicate/extract/unrelated)
+- `key`: memory title/key
+- `background`: contextual background string
+- `usage`: list of usage history entries
+- `visibility`: "private" | "public" | "session"
+- `created_at`, `updated_at`: ISO timestamps
 
-**Transformation pathways** (Figure 3) are a key concept:
-- *Plaintext -> Activation*: Frequently accessed text is pre-encoded into activation templates (reducing re-decoding cost)
-- *Plaintext/Activation -> Parametric*: Stable, reusable knowledge is distilled into LoRA patches via fine-tuning
-- *Parametric -> Plaintext*: Rarely used parameters are externalized back to editable text
-- *Activation -> Plaintext*: Inference states are decoded/summarized into structured text
+### Memory Types (as implemented)
 
-These transformations are triggered by behavioral indicators (access frequency, context relevance, version lineage), making the system a kind of memory promotion/demotion hierarchy analogous to CPU cache hierarchies.
+The paper describes three conceptual types (plaintext, activation, parametric). In the codebase, the textual/plaintext path is the mature implementation. Activation memory (KV-cache) has basic support (`kv.py`, `vllmkv.py`) for local open-weight models. Parametric memory (LoRA) has a stub implementation (`lora.py`) that is essentially a placeholder.
 
-### MemCube: The Core Abstraction
+The real differentiation is within plaintext memory, which is subdivided into:
 
-The MemCube is the fundamental unit of memory in MemOS. Every memory resource -- whether a LoRA patch, a KV-cache tensor, or a text document -- is wrapped in a MemCube with:
+1. **WorkingMemory**: Short-term, recent context. Capped (default 20 items). Automatically cleaned up when long-term memories are added.
+2. **LongTermMemory**: Persistent extracted facts. Default cap 1500.
+3. **UserMemory**: User-specific attributes and preferences. Default cap 480.
+4. **PreferenceMemory**: Separate extraction pipeline for explicit/implicit preferences with dedicated metadata (`preference_type`, `dialog_id`, `original_text`).
+5. **ToolSchemaMemory / ToolTrajectoryMemory / SkillMemory / RawFileMemory**: Specialized types for tool usage patterns, raw document chunks, etc.
 
-**Metadata Header** (three categories):
-1. **Descriptive Metadata**: timestamps, origin signature (user input vs. inference output), semantic type (user preference, task prompt, domain knowledge), model association
-2. **Governance Attributes**: access permissions (user/role lists), lifespan policies (TTL, frequency-based decay), priority level, sensitivity tags, watermarking, access logging
-3. **Behavioral Indicators**: access frequency, context relevance scores, version lineage -- collected automatically at runtime, used to drive scheduling and cross-type transformation
+### Write Path
 
-**Memory Payload** (one of three types):
-- Plaintext content: `{"type": "explicit", "format": "text", "content": "..."}`
-- Activation state: `{"type": "activation", "format": "tensor", "injection_layer": 12, "value": "[tensor]"}`
-- Parametric patch: `{"type": "parametric", "format": "lora_patch", "module": "mlp.6.down_proj", "value": "[low-rank-delta]"}`
+1. **MemReader** parses incoming messages (conversation turns, documents, images) into structured `TextualMemoryItem` objects. Uses LLM to extract memories from conversation context, with separate extractors for general memories and preferences.
+2. **MemFeedback** (the write-path module, despite the name) handles conflict detection: when new memories are added, it searches for existing memories above a similarity threshold (0.80 default), then uses LLM to judge whether the new memory conflicts with, duplicates, or is unrelated to existing ones. Conflicting/duplicate memories trigger updates with version history.
+3. **MemoryManager** adds items to Neo4j. Dual-write: items go to both WorkingMemory (for immediate context) and their target memory type (LongTermMemory, etc.). Batch or parallel insertion. After sync-mode adds, working memory is cleaned up (overflow eviction).
+4. **Reorganizer** (`GraphStructureReorganizer`) runs as an optional post-write step, detecting pairwise relations (CAUSE, CONDITION, CONFLICT, RELATE) between new and existing nodes via LLM, and inferring new fact nodes from causal/conditional relations. Currently mostly commented out in `process_node()` -- the relation detection, inference, sequence links, and aggregate concept detection are all wrapped in commented-out blocks.
 
-The paper shows a concrete JSON-like schema (Figure 4) including fields for `created`, `last_used`, `source`, `model`, `usage` count, `priority`, `expires`, `access` list, `tags`, `embedding_fp`, and `storage_mode`.
+### Retrieval
 
-### Three-Layer Architecture
+The retrieval pipeline (`Searcher` -> `AdvancedSearcher`) follows this flow:
 
-**Interface Layer** -- Entry point for all memory operations:
-- **MemReader**: Parses natural language into structured memory API calls
-- **Memory API**: `Provenance API` (source annotation), `Update API` (content mutation), `LogQuery API` (usage trace queries)
-- **Pipeline mechanism**: DAG-based operation chains (e.g., Query-Update-Archive) with transaction control. Each pipeline node passes context via MemCube.
+1. **TaskGoalParser**: LLM decomposes query into structured task goal with keywords, topic, concept, time scope, entity focus.
+2. **GraphMemoryRetriever**: Parallel hybrid retrieval:
+   - **Graph recall**: Traverses Neo4j using parsed task goals (topic/concept/fact nodes)
+   - **Vector recall**: Embedding similarity search via Neo4j's vector index
+   - **BM25 recall**: Optional in-memory BM25 (custom `EnhancedBM25` class, not a database index)
+   - **Fulltext recall**: Optional Neo4j fulltext index search
+   - Results are merged by ID (union, no fusion scoring)
+3. **Reranker**: Pluggable reranker architecture. Default is `cosine_local` (cosine similarity with level-based weights for topic/concept/fact). Also supports BGE reranker via HTTP and concatenation-based strategies. Strategies split dialogue sources into turn pairs and score them individually.
+4. **Deduplication**: Cosine similarity deduplication to remove near-identical results.
+5. **Reasoner** (optional, "fine" mode only): LLM-based chain-of-thought reasoning over retrieved memories to filter and synthesize.
 
-**Operation Layer** -- Central controller:
-- **MemScheduler**: Selects which memory to activate based on context. Supports pluggable strategies: LRU, semantic similarity, label-based matching. Operates at user-, task-, or organization-level.
-- **MemLifecycle**: Models memory as a state machine with version rollback and freeze capabilities. Governs creation, activation, archival, deletion.
-- **MemOperator**: Organizes memory via tagging, graph structures, and multi-layer partitions. Supports hybrid structural + semantic search. Frequently accessed entries are cached at an intermediate layer.
+**Important gap between paper and code**: The paper describes "task-aligned memory routing" with a `MemoryPathResolver` decomposing queries into topic-concept-fact hierarchies. The code has `TaskGoalParser` which does query decomposition, but the hierarchical routing is implemented as parallel search across memory scopes, not as the structured path resolution the paper suggests.
 
-**Infrastructure Layer** -- Storage and governance:
-- **MemGovernance**: Access permissions, lifecycle policies, audit trails, privacy protection, watermarking
-- **MemVault**: Unified access across heterogeneous storage backends (Vector DB, Graph DB, etc.)
-- **MemLoader/MemDumper**: Structured import/export for cross-platform migration
-- **MemStore**: A marketplace for publishing and subscribing to memory units across models/agents
+### Consolidation / Processing
 
-### Execution Flow (Figure 6)
+The **MemFeedback** module is the closest thing to consolidation. When new memories arrive:
+- It identifies keywords, searches for related existing memories
+- Uses LLM to judge if new content should update, replace, or coexist with existing memories
+- On conflict/duplicate: updates existing memory content, increments version, archives old content in the `history` field plus a separate archived node
+- Supports keyword replacement tracking
 
-1. User prompt arrives
-2. MemReader parses it into structured Memory API call
-3. Pipeline initiated, context passed via MemCube units
-4. MemScheduler selects relevant memory (parametric, activation, or plaintext) based on access patterns and scheduling policies
-5. Retrieved MemCubes injected into reasoning context
-6. MemOperator organizes semantically/structurally
-7. MemLifecycle governs state transitions
-8. Archived memory persisted in MemVault
-9. MemGovernance enforces compliance
-10. MemStore enables inter-agent sharing via MemLoader/MemDumper
+The **Reorganizer** is designed to detect structural relations and create graph edges, but the core functionality is largely disabled in the current code (commented out). When enabled, it would detect CAUSE/CONDITION/CONFLICT/RELATE edges and infer new fact nodes.
 
-### Future Directions
+There is no sleep-like offline consolidation, no scheduled background processing, and no decay mechanism in the codebase. Memory lifecycle states exist in the schema (Generated -> Activated -> Merged -> Archived) but transitions are triggered by write-time conflict detection, not by temporal or usage patterns.
 
-The paper outlines three planned extensions:
-1. **Cross-LLM Memory Sharing**: A Memory Interchange Protocol (MIP) for cross-model/app memory transmission
-2. **Self-Evolving MemBlocks**: Memory units that self-optimize based on usage feedback
-3. **Scalable Memory Marketplace**: Decentralized exchange for memory assets
+### Lifecycle Management
+
+The lifecycle state machine described in the paper (Generated, Activated, Merged, Archived, with Time Machine rollback and Frozen state) is partially implemented:
+- `status` field supports "activated", "resolving", "archived", "deleted"
+- Version history is maintained in the `history` field
+- No evidence of freeze/frozen state in the code
+- No Time Machine / rollback implementation found
+- No TTL enforcement or time-based archival
 
 ---
 
@@ -102,156 +107,158 @@ The paper outlines three planned extensions:
 
 | Claim | Evidence | Assessment |
 |-------|----------|------------|
-| Memory should be a "first-class operational resource" | Conceptual argument; no benchmark | Philosophically sound but aspirational. The same argument has been made by Letta, Mem0, and others. |
-| Three memory types (parametric, activation, plaintext) form a complete taxonomy | References to prior work on KV-cache, LoRA, RAG | Reasonable taxonomy for model-level memory. Does not address relational/graph memory as a distinct type. |
-| MemCube unifies heterogeneous memory | Schema description, Figure 4 | The schema is concrete and well-specified. Whether a single abstraction can truly unify a LoRA delta and a text document is an open question. |
-| Cross-type transformation pathways enable memory evolution | Conceptual description | Interesting but unvalidated. The Plaintext->Parametric path (distillation to LoRA) is technically feasible but expensive. The Activation->Plaintext path (decoding hidden states to text) is an active research problem. |
-| Three-layer architecture provides closed-loop governance | Architecture diagrams | Standard layered architecture. The governance layer (access control, watermarking, audit) is more developed than most memory systems but not implemented/evaluated. |
-| "Mem-training" is the next scaling paradigm after post-training | Figure 2 trend extrapolation | Speculative. No evidence provided beyond a conceptual trend line. |
-
-**Overall evidence quality**: This is an architectural vision paper, not an empirical contribution. There are zero experiments, zero benchmarks, zero ablations. The paper's value lies entirely in its conceptual framework and system design. The "Short Version" label suggests evaluation is deferred to a longer paper.
-
----
-
-## Relevance to claude-memory
-
-### Direct Parallels
-
-| MemOS Concept | claude-memory Equivalent | Status |
-|---------------|-------------------------|--------|
-| Three memory types | We operate exclusively in "plaintext memory" space (explicit text stored in Supabase). We have no parametric or activation memory levers. | N/A -- we can't modify Claude's weights or KV-cache |
-| MemCube metadata (timestamps, usage count, priority, access) | Our memory schema has `created_at`, `last_accessed`, `access_count`, `priority`, `temperature` | Already implemented |
-| Governance attributes (TTL, decay, access control) | Temperature-based decay, priority floors, category-based management | Partially implemented |
-| Behavioral indicators driving scheduling | `access_count` and `temperature` influence `startup_load` and `recall` ranking | Partially implemented |
-| MemScheduler (LRU, semantic similarity, label matching) | Hybrid search (pgvector + planned BM25), category filters, temperature-weighted ranking | In progress (RRF fusion is priority #1) |
-| MemLifecycle state machine | We have soft-delete and temperature decay but no formal state machine with freeze/rollback | Gap |
-| MemOperator (tagging, graph structure) | Tags/themes exist; relationship edges are priority #2 | Planned |
-| MemStore (marketplace) | N/A -- single-user system | Not relevant |
-| Cross-type transformation | N/A -- we cannot fine-tune Claude or inject KV-cache states | Not applicable |
-
-### Key Differences
-
-1. **Scope**: MemOS is designed for open-weight models where you control the full stack (weights, inference engine, KV-cache). claude-memory operates as a wrapper around a hosted API model. We will never have parametric or activation memory levers. Our entire design space is plaintext memory + prompt engineering.
-
-2. **Multi-user/multi-agent**: MemOS heavily emphasizes access control, multi-user governance, watermarking, and cross-agent memory sharing. claude-memory is a single-user, single-agent system. The governance machinery is irrelevant to our use case.
-
-3. **Evaluation**: MemOS provides no empirical validation. claude-memory has been in daily production use with iterative tuning based on real sessions. Our practical experience is more informative than their design document.
-
-4. **Memory processing**: MemOS describes transformation pathways but not consolidation, reflection, or sleep-like processing. Our `/sleep` skill design (detail -> summary -> gestalt layers) addresses a gap that MemOS does not even identify as a problem.
+| SOTA on LoCoMo (75.80 overall) | Table 3: beats MIRIX (64.33), Mem0 (64.57), Zep (59.22), Memobase (72.01), MemU (56.55), Supermemory (55.34) | Strong. All systems use GPT-4o-mini backbone. Comprehensive comparison across 5 task types. |
+| SOTA on LongMemEval (77.8 overall) | Table 4: beats all baselines. Notably strong on single-session preference (96.7) and single-session user (95.7) | Strong. Wide margin on preference and user categories. |
+| SOTA on PreFEval (77.2 / 71.9) | Table 5: best personalized response in both 0-turn and 10-turn settings, lowest preference unaware error | Strong. Demonstrates robustness to irrelevant conversation noise. |
+| SOTA on PersonaMem (61.2 precision) | Table 6: beats Memobase (58.9), Mem0 (57.8), Zep (57.8) | Moderate. Margins are smaller; 1424 context tokens is moderate. |
+| Three memory types form a complete hierarchy | Paper describes plaintext/activation/parametric | Overreached. Only plaintext is mature. Activation (KV-cache) is basic. Parametric (LoRA) is a stub. The "unified scheduling across memory types" does not exist in code. |
+| MemLifecycle provides formal state management | Paper describes 5 states + Time Machine + Frozen | Partially implemented. Status field exists with 4 states. No freeze, no rollback, no TTL enforcement. |
+| Hierarchical graph organization (topic-concept-fact) | Paper and code: TaskGoalParser decomposes queries | Real in retrieval. The parser extracts structured goals. But graph nodes are not themselves organized into topic-concept-fact layers -- retrieval uses the decomposition to search, not to navigate a pre-built hierarchy. |
+| KV-cache injection provides up to 94.2% TTFT reduction | Table 8: systematic evaluation across 3 Qwen models, 3 context lengths, 3 query lengths | Strong for open-weight models. Not applicable to API-hosted models. |
+| 100% success rate at 100 QPS | Table 7: while all other systems degrade, MemOS maintains 100% success | Strong. Demonstrates engineering quality of the server infrastructure (Redis queues, async handlers). |
+| Relation and reasoning detection enriches graph | Code: `RelationAndReasoningDetector` | Designed but disabled. All four detection methods (pairwise relations, inferred nodes, sequence links, aggregate concepts) are commented out in `process_node()`. |
 
 ---
 
-## Worth Stealing (ranked)
+## PERMA Benchmark Results
 
-### 1. Formal Lifecycle State Machine (Medium priority)
+From arXiv:2603.23231 (PERMA paper). All memory systems use GPT-4o-mini as backbone.
 
-MemOS models memory lifecycle as an explicit state machine with states like active, frozen, archived, deleted -- plus version rollback. We currently have a simpler model (active/soft-deleted with temperature decay). A formal state machine would:
-- Enable **freeze**: mark a memory as immutable (e.g., foundational identity memories that should not be consolidated or overwritten)
-- Enable **rollback**: revert a memory to a previous version after a bad consolidation
-- Make lifecycle transitions explicit and auditable
+| Setting | MCQ Acc. | BERT-F1 | Memory Score | Context Tokens | Completion | Turn=1 | Turn<=2 |
+|---------|----------|---------|-------------|----------------|------------|--------|---------|
+| Clean Single | 0.811 | 0.830 | **2.27** | 709.1 | 0.842 | **0.548** | 0.801 |
+| Clean Multi | 0.732 | 0.819 | **2.14** | 664.7 | 0.643 | 0.306 | 0.592 |
+| Noise Single | **0.853** | **0.844** | **2.38** | 1486.7 | **0.837** | **0.567** | **0.837** |
+| Noise Multi | **0.752** | 0.816 | **2.17** | 680.6 | 0.650 | 0.268 | 0.580 |
+| Style-aligned Single | **0.813** | -- | -- | 647.7 | -- | 0.563 | 0.839 |
+| Style-aligned Multi | **0.764** | -- | -- | 644.1 | -- | **0.331** | **0.637** |
 
-This connects to our planned **mutation log** (priority #6). A state machine + mutation log together give us full lifecycle auditability.
+### Analysis
 
-**Implementation sketch**: Add a `lifecycle_state` enum column (`active`, `frozen`, `archived`, `deleted`) to the memories table. Freeze prevents consolidation/edit. Archive removes from active retrieval but preserves for audit. Mutation log records all transitions.
+**Noise robustness is the headline finding**: MemOS improves with noise (MCQ 0.811 -> 0.853, Memory Score 2.27 -> 2.38). This happens because noise doubles the context token volume (709 -> 1487), providing richer retrieval context. This is counterintuitive -- most systems degrade with noise -- and suggests MemOS's retrieval is robust enough that more context helps even when the additional context contains noise. The implication is that MemOS may be under-retrieving in the clean setting.
 
-### 2. MemCube-style Metadata Schema as Validation Checklist (Low priority, but useful)
+**Multi-domain collapse is universal**: Turn=1 accuracy drops from 0.548 (single-domain) to 0.306 (multi-domain) in clean settings. This is the cross-domain synthesis failure that every benchmarked system shares. MemOS's absolute numbers here are the best, but the relative collapse is just as severe (~44% drop).
 
-The MemCube metadata categories (descriptive, governance, behavioral) provide a useful checklist for evaluating our own schema completeness:
-- **Descriptive**: We have timestamps, source, category, themes. We lack `model` association (which model version created the memory) -- could be useful for detecting memories created by less capable models.
-- **Governance**: We have priority and soft-delete. We lack explicit TTL/expiry dates. Temperature decay serves a similar function but is less explicit.
-- **Behavioral**: We have `access_count` and `last_accessed`. We lack `context_relevance` scoring (how relevant was this memory when it was last retrieved?). This could inform better decay -- memories that are retrieved but rarely contextually useful should decay faster than memories that are retrieved and consistently useful.
+**Style-aligned multi-domain is MemOS's strongest relative showing**: 0.764 MCQ and 0.331 Turn=1 in the hardest setting, both best among all systems. The preference extraction pipeline (explicit + implicit) gives it a structural advantage for style-adapted responses.
 
-**Concrete addition**: A `relevance_when_used` field that tracks not just "was this memory accessed" but "did it contribute to the response." This is hard to measure automatically but could be approximated by whether the memory was included in the final context window vs. filtered out during ranking.
+**Context efficiency**: MemOS uses moderate context (644-1487 tokens), roughly comparable to Mem0g's 592-1399. Not the most parsimonious (Supermemory and MemU use less) but delivers more value per token.
 
-### 3. Pipeline/DAG-based Operation Chains (Low priority)
+---
 
-The pipeline concept (Query-Update-Archive as a composable chain) is interesting for our `/sleep` skill. Sleep consolidation is inherently a multi-step pipeline: retrieve candidates -> cluster by theme -> generate summaries -> detect contradictions -> update edges -> archive details. Modeling this as a DAG with MemCube-like units flowing between stages would make the sleep process more modular and debuggable.
+## Relevance to Somnigraph
 
-Not worth building pipeline infrastructure for, but worth keeping in mind as a design pattern when implementing `/sleep`.
+### What MemOS does that Somnigraph doesn't
 
-### 4. Transformation Pathway Concept (Conceptual value only)
+1. **Preference extraction pipeline**: Dedicated `NaiveExtractor` splits explicit and implicit preferences using separate prompts. Preferences get their own metadata type (`PreferenceTextualMemoryMetadata`) with preference_type, dialog_id, original_text. This is a write-path specialization Somnigraph lacks entirely -- Somnigraph stores preferences as regular memories with no structural distinction.
 
-The idea that memory should flow between representation types based on usage patterns is elegant. We cannot do Plaintext->Parametric or Plaintext->Activation, but within our plaintext-only space we do have an analogous hierarchy:
-- **Hot memories** (high temperature, frequently accessed) -> loaded into context via `startup_load` (analogous to "activation")
-- **Warm memories** (moderate temperature) -> retrievable via `recall` (analogous to "plaintext")
-- **Cold memories** (low temperature) -> archived, only surfaced by targeted search (analogous to "parametric" in the sense of being background knowledge)
+2. **Real-time conflict detection on write**: MemFeedback searches for similar existing memories before inserting, then uses LLM to classify the relationship (conflict/duplicate/update/unrelated). Somnigraph defers all conflict detection to sleep (NREM pairwise classification). This means Somnigraph can accumulate contradicting memories until the next sleep cycle.
 
-Our temperature-based decay already implements a version of this promotion/demotion. The MemOS framing validates our approach but does not add new mechanism.
+3. **Version history per memory**: Each memory carries an inline `history` list of `ArchivedTextualMemory` objects preserving prior content with version numbers and update types. Somnigraph's `revision` edges track evolution across memories but don't preserve inline history within a single memory.
+
+4. **Multi-memory-type retrieval**: The search pipeline can simultaneously query WorkingMemory, LongTermMemory, UserMemory, PreferenceMemory, ToolMemory, and SkillMemory with per-type top_k controls. Somnigraph has category-based filtering but no structural distinction between short-term and long-term memory stores.
+
+5. **Graph-based structured retrieval**: Neo4j graph traversal alongside vector and BM25 search. While Somnigraph has PPR-based graph expansion, MemOS's graph retrieval uses the parsed task structure (topic/concept/fact) to navigate, which is a different (and more query-adaptive) approach.
+
+6. **Internet retrieval integration**: Built-in internet search retriever can augment memory results with web content (Bocha search, Xinyu search). Somnigraph has no external knowledge integration.
+
+### What Somnigraph does better
+
+1. **Learned reranker**: Somnigraph's 26-feature LightGBM reranker trained on 1032 real-data queries (NDCG=0.7958) is a fundamentally different approach from MemOS's cosine similarity or BGE reranker. A learned model that adapts to actual usage patterns vs. a static similarity model.
+
+2. **Explicit feedback loop**: Per-query utility ratings with EWMA aggregation, UCB exploration bonus, and measured GT correlation (r=0.70). MemOS has no user feedback mechanism -- the `MemFeedback` module is about write-path conflict detection, not retrieval quality feedback.
+
+3. **Offline consolidation (sleep)**: Three-phase LLM-mediated consolidation -- NREM (pairwise classification, edge creation, merge/archive), REM (gap analysis, question generation), orchestrator. MemOS has no offline processing at all. Its reorganizer is designed for online use but largely disabled.
+
+4. **Typed edges with semantic meaning**: Somnigraph's edge types (supports, contradicts, evolves, revision, derivation) are detected by LLM during sleep and carry semantic weight. MemOS's graph edges are structural (SUMMARY, MATERIAL, FOLLOWING, PRECEDING) without semantic typing.
+
+5. **Biological decay**: Per-category exponential decay with configurable half-lives, floors, and reheat on access. MemOS has no decay mechanism -- memories persist indefinitely until explicit deletion or write-path conflict resolution.
+
+6. **Retrieval fusion**: Somnigraph's Bayesian-optimized RRF (k=14) for combining BM25 and vector results. MemOS combines retrieval channels by ID union with no score fusion -- just deduplication. This means MemOS cannot leverage the complementary signal from different retrieval channels.
+
+7. **Measured retrieval quality**: Ground truth evaluation, utility calibration study, multi-hop failure analysis, feature importance analysis. MemOS reports end-to-end benchmark scores but no introspective retrieval analysis.
+
+---
+
+## Worth Stealing
+
+### 1. Write-Path Conflict Detection (High impact, Medium effort)
+
+**What**: Before inserting a new memory, search for similar existing memories (threshold ~0.80) and classify the relationship. On conflict: update the existing memory, preserve history. On duplicate: merge or skip.
+
+**Why**: Somnigraph defers all conflict detection to sleep, which means contradicting memories accumulate between sleep cycles. Write-path detection catches the most obvious conflicts immediately.
+
+**Implementation sketch**: In `impl_remember()`, after embedding the new memory, do a quick vector search (top-3, threshold 0.80). If hits, run a lightweight LLM classification (conflict/duplicate/update/unrelated). On conflict: create a `revision` edge and update the existing memory. On duplicate: skip insertion. This adds one vector search + possibly one LLM call to the write path.
+
+**Caution**: MemOS's MemFeedback module is ~1200 lines and handles many edge cases (keyword replacement, multi-language, chunk splitting). Start simple -- just the similarity check + binary conflict/not-conflict classification.
+
+### 2. Preference Memory Type (Medium impact, Low effort)
+
+**What**: Structurally distinguish preference memories from factual memories with dedicated metadata (preference_type: explicit/implicit, original_text linking back to source).
+
+**Why**: PERMA results show that preference-state maintenance is a distinct capability from factual recall. Having a structural distinction would allow preference-specific retrieval weighting and targeted evaluation.
+
+**Implementation sketch**: Add "preference" to the category enum. On write, optionally tag with preference_type (explicit/implicit). In retrieval, allow boosting preference memories for personalization-heavy queries. This is a schema addition, not a pipeline change.
+
+### 3. Working/Long-term Memory Distinction (Medium impact, Medium effort)
+
+**What**: Maintain a separate short-lived working memory buffer (capped, recent items) alongside long-term storage. Working memory always included in context; long-term memory retrieved by query.
+
+**Why**: MemOS's WorkingMemory (capped at 20) ensures recent context is never missed. Somnigraph's `startup_load` serves a similar purpose but mixes high-priority long-term memories with recent ones.
+
+**Implementation sketch**: This is conceptually what `startup_load` already does. The actionable delta is: ensure the most recent N memories from the current session are always surfaced regardless of their priority/temperature, then let the reranker handle the rest.
+
+### 4. Inline Version History (Low impact, Low effort)
+
+**What**: When a memory is updated (by sleep consolidation or write-path conflict), preserve the prior content inline rather than only as an edge to another node.
+
+**Why**: Makes rollback trivial and provides audit trail without graph traversal. MemOS stores `ArchivedTextualMemory` objects in a `history` list field.
+
+**Implementation sketch**: Add a `history` JSON column to the memories table. On update during NREM merge, append `{version, content, updated_at, update_type}` to history before overwriting. Low-cost addition to the existing merge flow.
 
 ---
 
 ## Not Useful For Us
 
-### 1. Parametric and Activation Memory Management
-The entire parametric memory system (LoRA patch scheduling, module injection) and activation memory system (KV-cache manipulation, steering vectors, attention bias injection) are irrelevant. We use Claude via API. We cannot modify weights, inject activation tensors, or manipulate KV-cache. This is roughly 40% of the paper's conceptual contribution.
+### 1. Parametric and Activation Memory
+The paper's grand vision of unifying LoRA patches, KV-cache tensors, and plaintext under one abstraction. The code shows this is aspirational -- LoRA is a stub, KV-cache is basic and only for local open-weight models. Irrelevant for API-hosted Claude.
 
 ### 2. Multi-User Governance / Access Control
-Watermarking, sensitivity tags, multi-user access permissions, compliance mechanisms -- all designed for enterprise/multi-tenant deployment. claude-memory is single-user. Not applicable.
+MemGovernance, ACLs, watermarking, multi-tenant isolation, compliance auditing. Somnigraph is single-user. The enterprise governance layer is ~15% of the paper but 0% of our use case.
 
 ### 3. Memory Marketplace (MemStore)
-The vision of publishing and purchasing memory units in a decentralized marketplace. This is a business model, not a technical contribution. Not relevant to our use case.
+Publishing, subscribing, licensing memory units across agents. Business model, not technical contribution. Even in the code, this is minimal infrastructure (API endpoints exist but no marketplace logic).
 
-### 4. Memory Interchange Protocol (MIP)
-Cross-model memory sharing standard. We operate with a single model (Claude). Not relevant unless we wanted to migrate memories to a different LLM, which is not a current priority.
+### 4. MemReader (NL Intent Parsing)
+Parsing natural language to determine memory operations. We use explicit tool calls (`remember()`, `recall()`), which is more reliable. MemReader is useful for systems where memory operations are implicit in conversation, but Somnigraph's MCP-based approach is intentionally explicit.
 
-### 5. "Mem-training" Scaling Law Prediction
-The claim that memory-centric training will be the next scaling paradigm (Figure 2) is speculative futurism with no supporting evidence. Not actionable.
+### 5. Task-Aligned Memory Routing
+The topic-concept-fact decomposition for query routing. Interesting idea, but Somnigraph's learned reranker already handles query-memory alignment in a data-driven way. Adding a fixed hierarchical decomposition would be a step backward from learned features like `query_coverage`, `query_idf_var`, and `proximity`.
 
-### 6. MemReader (Natural Language -> Memory API)
-The idea of parsing natural language to determine memory intent. We already handle this via explicit tool calls (`remember()`, `recall()`, `forget()`). Our approach is more reliable because the model explicitly decides when to invoke memory operations rather than having an intermediary try to parse intent from natural language.
-
----
-
-## Impact on Implementation Priority
-
-The MemOS paper does not change our implementation priorities. Here is the updated assessment:
-
-| Priority | Item | MemOS Impact |
-|----------|------|-------------|
-| 1 | **RRF fusion** | No change. MemOS mentions "semantic similarity" and "label-based matching" as MemScheduler strategies but does not discuss RRF or hybrid retrieval. Our priority is validated by prior papers (Zep, Hindsight), not by MemOS. |
-| 2 | **Relationship edges** | Slightly reinforced. MemOperator uses "graph-based structures" for organization, which aligns with our planned `memory_edges` table. But we already had strong motivation from every other system we analyzed. |
-| 3 | **Graded contradiction detection** | No change. MemOS does not discuss contradiction detection at all -- a significant gap in their design. |
-| 4 | **Decay floor + power-law** | No change. MemOS mentions "frequency-based decay" and "time-to-live" but provides no formulas or evaluation. Our existing designs from CortexGraph/Omega are more specific. |
-| 5 | **Sleep skill** | Slightly reinforced conceptually. MemOS's transformation pathways (especially the consolidation direction) are thematically related to sleep, but they describe type-conversion (plaintext -> parametric) rather than content-consolidation (detail -> summary -> gestalt). Our sleep design remains more specific and practical. |
-| 6 | **Mutation log** | Reinforced. MemOS's lifecycle state machine + version rollback concept strengthens the case for an append-only event log. Consider pairing mutation log with a formal lifecycle state machine (see "Worth Stealing" #1). |
-| 7 | **Confidence scores** | No change. Not addressed by MemOS. |
-| 8 | **Reference index** | No change. |
-| 9 | **Multi-angle indexing** | No change. |
-
-**Net impact**: Minor reinforcement of items #2, #5, #6. No new items added. No priority reordering warranted.
-
-**One possible addition** (not to the main priority list, but to the "nice to have" backlog): **Lifecycle state machine** -- adding `frozen` and `archived` states alongside our existing active/deleted. This is a small schema change that pairs well with the mutation log work at priority #6. Worth bundling together when we get there.
+### 6. KV-Cache Acceleration
+The TTFT reduction results (up to 94.2%) are genuinely impressive for local deployment. Not applicable to API-hosted models where we have no control over KV-cache.
 
 ---
 
 ## Connections
 
-### To Prior Analyses
+| System | Connection to MemOS |
+|--------|-------------------|
+| **Mem0** | MemOS directly benchmarks against Mem0 and beats it on all four evaluation suites. Both do write-path conflict detection (Mem0's extract-then-update vs. MemOS's MemFeedback), but MemOS's version history is richer. MemOS uses graph storage (Neo4j) while Mem0 uses flat vector store (or optionally a knowledge graph via Mem0g). |
+| **Zep/Graphiti** | Both use temporal knowledge graphs. Zep's bi-temporal modeling and structured query resolution are more mature for temporal reasoning; MemOS beats Zep on overall LoCoMo (75.80 vs 59.22) and LongMemEval (77.8 vs 63.8) but Zep outperforms on specific subtasks (single-session assistant: 75.0 vs 67.9 on LongMemEval). |
+| **EverMemOS** | Similar OS-inspired framing. EverMemOS uses MongoDB/Milvus/Elasticsearch; MemOS uses Neo4j. EverMemOS has more mature cognitive processing (curiosity-driven exploration, sleep cycle). MemOS has better benchmarks and a public repo. |
+| **Kumiho** | Both use Neo4j for graph storage. Kumiho's AGM belief revision and prospective indexing are more theoretically grounded. MemOS's reorganizer (when enabled) does similar relation detection but without the formal belief revision framework. Kumiho reports 0.447 F1 on LoCoMo; MemOS reports 75.80 LLM judge score -- different metrics, hard to compare directly. |
+| **HippoRAG** | HippoRAG's PPR-based graph traversal for multi-hop retrieval vs. MemOS's parsed-goal graph recall. Different approaches to graph-conditioned retrieval. MemOS does not use PPR. Somnigraph borrows more from HippoRAG's approach. |
+| **MIRIX** | MemOS benchmarks against MIRIX. MIRIX uses six memory components (Core, Episodic, Semantic, Procedural, Resource, Knowledge Vault). MemOS's simpler memory type taxonomy (Working/LongTerm/User + specializations) outperforms MIRIX across all benchmarks. |
+| **A-Mem** | A-Mem's Zettelkasten linking and autonomous note organization vs. MemOS's LLM-mediated reorganization. A-Mem achieves 93% fewer tokens on LoCoMo. MemOS is heavier but more comprehensive. |
+| **Generative Agents** | MemOS does not implement reflection or consolidation in the Generative Agents sense. The absence of offline processing is a gap that Somnigraph fills with its sleep pipeline. |
+| **Memory-R1** | RL-trained memory management. Memory-R1 achieves SOTA on LoCoMo with only 152 training QA pairs. MemOS uses engineering rather than learning for memory management. Neither has a learned reranker in Somnigraph's sense. |
 
-| Prior Paper | Connection to MemOS |
-|-------------|-------------------|
-| **Letta/MemGPT** | MemOS explicitly cites Letta [22] as a Stage 3 system that "implements paged context management and modular invocation" but "falls short of providing unified scheduling, lifecycle governance, and memory fusion." MemOS positions itself as the next evolution. The critique is fair but unsubstantiated -- MemOS has no empirical comparison. |
-| **Mem0** | Cited [4] alongside EasyEdit as "toolkits supporting explicit memory manipulation." MemOS frames these as point solutions lacking OS-level integration. |
-| **CogMem** | Not cited. CogMem's Oberauer-based three-tier model (FoA/DA/LTM) is a more rigorous cognitive grounding than MemOS's three memory types. MemOS's taxonomy is hardware-inspired (parametric/activation/plaintext); CogMem's is cognition-inspired (attention/access/long-term). For our purposes, CogMem's model maps more cleanly to our architecture. |
-| **Zep** | Not cited. Zep's bi-temporal modeling and temporal trajectory tracking are more practically useful for knowledge evolution than MemOS's abstract lifecycle state machine. |
-| **Generative Agents** | Not cited. The reflection/consolidation mechanism from Park et al. addresses the memory *processing* problem that MemOS ignores entirely. |
-| **Continuum** | Not cited. CMA's 6 behavioral requirements provide a more concrete evaluation framework than MemOS's design principles. |
-| **A-Mem** | Not cited. A-Mem's Zettelkasten linking and multi-faceted embedding address specific retrieval problems that MemOS gestures at ("multi-layer partitions") without specifying. |
-| **Dynamic Cheatsheet** | Not cited. The finding that "summaries fail when replacing detail" directly challenges MemOS's implicit assumption that consolidation (plaintext -> parametric) is always beneficial. |
+---
 
-### Theoretical Positioning
+## Summary Assessment
 
-MemOS positions itself within a three-stage evolution of LLM memory:
-1. **Memory Definition and Exploration**: Taxonomies, knowledge editing, KV-cache optimization
-2. **Human-like Memory**: Brain-inspired architectures (HippoRAG, Memory^3)
-3. **Systematic Memory Management**: Tool-based operations + OS governance (EasyEdit, Mem0, Letta... and MemOS as the culmination)
+MemOS v4 is a substantial improvement over the vision paper we analyzed in February 2026. The earlier paper was pure architecture with zero empirical results; this version delivers working code and SOTA benchmarks across four evaluation suites. The LoCoMo result (75.80) beats every system in their comparison set, and the PERMA results confirm genuine preference-tracking capability, particularly the noise robustness finding (improving with noisy input by retrieving more context). The engineering is solid -- 100% success rate at 100 QPS with lowest latency among all compared systems.
 
-This framing is useful for understanding where our project sits. claude-memory bridges Stages 2 and 3: we use human-inspired concepts (temperature = memory strength, consolidation = sleep, categories = memory types) but implement them as systematic tools (MCP server, Supabase backend, explicit API).
+However, there is meaningful gap between the paper's claims and the code's reality. The "unified scheduling across memory types" is mostly plaintext memory with stubs for activation and parametric. The reorganizer (graph structure enrichment) is largely disabled. The lifecycle state machine is partial -- no freeze, no rollback, no TTL enforcement. The "Memory OS" framing oversells what is fundamentally a well-engineered graph-based memory system with good conflict detection and multi-type retrieval. Strip away the OS metaphor and MemOS is: Neo4j graph store + LLM-based memory extraction + write-path conflict detection + hybrid retrieval (vector + graph traversal + BM25) + BGE reranker + preference extraction pipeline.
 
-### Honest Assessment
-
-MemOS is more vision than substance. The OS metaphor is pushed further here than anywhere else we have read, and some of the abstractions (MemCube metadata schema, lifecycle state machine, transformation pathways) are thoughtfully designed. But the complete absence of empirical validation makes it impossible to evaluate whether these abstractions actually work in practice. The paper reads like a product whitepaper for MemTensor's planned commercial offering rather than a research contribution.
-
-The most useful papers in our research so far (Zep, CogMem, Generative Agents, Dynamic Cheatsheet) all provided empirical results that changed how we think about specific design decisions. MemOS provides a framework but no evidence. We can use it as a conceptual reference -- "have we thought about lifecycle states? access governance? transformation pathways?" -- but it does not give us new mechanisms to implement.
-
-**Bottom line**: Read once, extract the lifecycle state machine idea, note the schema checklist value, and move on. This paper does not warrant revisiting.
+For Somnigraph, the most actionable takeaway is write-path conflict detection. MemOS's MemFeedback module catches contradictions at insertion time rather than deferring everything to sleep. This does not replace sleep (offline consolidation discovers relationships that write-path checks miss) but provides a first line of defense. The preference extraction pipeline is also worth studying for PERMA -- MemOS's structural distinction between preference and factual memory maps directly to the cross-domain synthesis capability that PERMA evaluates. Somnigraph's learned reranker, explicit feedback loop, biological decay, and offline consolidation remain significant differentiators that no system in MemOS's comparison set possesses. The strongest path is to adopt MemOS's write-path ideas while retaining Somnigraph's retrieval and consolidation strengths.

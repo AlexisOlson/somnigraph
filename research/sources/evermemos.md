@@ -1,6 +1,6 @@
 # EverMemOS: Source Analysis
 
-**Phase 14 | 2026-03-06**
+**Phase 14 | 2026-03-06 | Updated 2026-03-25 (PERMA results, repo updates)**
 **Repo**: [EverMind-AI/EverMemOS](https://github.com/EverMind-AI/EverMemOS) | **Paper**: [arXiv 2601.02163](https://arxiv.org/abs/2601.02163)
 
 ---
@@ -11,7 +11,7 @@
 
 **Authors**: Chuanrui Hu, Xingze Gao, Zuyi Zhou, Dannong Xu, Yi Bai, Xintong Li, Hui Zhang, Tong Li, Chong Zhang, Lidong Bing, Yafeng Deng (EverMind AI)
 
-**Stars**: ~2,400 | **License**: Apache 2.0 | **Language**: Python
+**Stars**: ~3,200 | **License**: Apache 2.0 | **Language**: Python | **Version**: v1.2.0
 
 **Stack**:
 - **Backend**: FastAPI (REST API on port 1995)
@@ -26,6 +26,13 @@
 This is an enterprise-grade system with dependency injection framework, multi-tenant support, distributed locking (Redis), Kafka queue support, Prometheus metrics, and HMAC signature middleware. The codebase has a Spring-like Java architecture ported to Python: DI container with bean scanning, lifecycle management, OXM (Object-X Mapping) layers for Mongo/ES/Milvus/Postgres. Substantially heavier infrastructure than most MCP memory servers.
 
 **Deployment model**: Self-hosted Docker stack (minimum 4-core, recommended 8-core). GitHub Codespaces supported. Commercial SaaS also available via evermind.ai.
+
+**Since last analysis (March 2026)**:
+- v1.2.0 released (2025-01-20): added `role` field to POST /memories, optional `group_id` in conversation-meta endpoints, major DB efficiency improvements. Breaking schema changes.
+- **OpenClaw plugin**: Context-engine integration for the OpenClaw agent framework. Automatic recall before each reply and save after each turn -- no manual memory tool calls needed. Session state management with 2-hour TTL, subagent tracking, and configurable flush behavior. This is EverMemOS's first agentic integration (vs. pure REST API).
+- **Memory Sparse Attention (MSA)**: Companion paper/repo for 100M-token contexts using scalable sparse attention + document-wise RoPE, KV cache compression, and Memory Interleave for multi-hop reasoning. Separate from EverMemOS core but signals the team's research direction toward attention-level memory integration.
+- **Evaluation framework**: Unified multi-system benchmark suite supporting LoCoMo, LongMemEval, PersonaMem, and EverMemBench. Includes adapters for Mem0, MemOS, MemU, Zep. Their own LoCoMo results: 92.32% overall (GPT-4.1-mini reader), beating full-context (91.21%), Zep (85.22%), MemOS (80.76%), Mem0 (64.20%).
+- **vLLM support** (v1.1.0): Self-hosted embedding and reranker models via vLLM, tailored for Qwen3 series.
 
 ---
 
@@ -56,28 +63,18 @@ Episodes, foresights, event logs, and embeddings are **not** stored on the MemCe
 
 3. **Event Log**: Structured atomic event sequences extracted from interactions.
 
-4. **Profile Memory**: Two flavors:
-   - `ProfileMemory`: Standard profile with evidence-backed facts
-   - `ProfileMemoryLife`: Explicit/implicit separation -- explicit info (directly stated, with evidence + sources) vs. implicit traits (inferred from behavioral patterns). Max 25 items per profile. Includes skills, personality, decision-making patterns, goals, motivations, fears, values, humor use, colloquialisms.
+4. **Profile Memory**: Two flavors -- `ProfileMemory` (standard, evidence-backed) and `ProfileMemoryLife` (explicit/implicit separation with evidence + sources). Max 25 items per profile. Includes skills, personality, decision-making patterns, goals, motivations, fears, values.
 
-5. **Group Profile**: Work-centric profiles for group chat contexts, tracking roles, topics, engagement metrics (speaking count, mention count, conversation count).
+5. **Group Profile**: Work-centric profiles for group chat contexts, tracking roles, topics, engagement metrics.
 
 ### Memory Lifecycle (Tools/Pipeline)
 
 The system exposes a REST API rather than MCP tools:
 
-- `POST /api/v1/memories` -- triggers the full memorization pipeline
+- `POST /api/v1/memories` -- triggers the full memorization pipeline (v1.2.0 added `role` field)
 - `GET /api/v1/memories/search` -- retrieval with query, user_id, memory_types array, retrieve_method (hybrid/BM25/embeddings)
 
-The memorization pipeline is a multi-stage orchestration:
-
-1. **Preprocess**: Fetch historical messages since `last_memcell_time`, combine with new messages
-2. **Boundary detection**: LLM-based semantic segmentation (sliding window) with hard limits (8192 tokens or 50 messages forces split). Returns `BoundaryDetectionResult` with `should_end`, confidence, topic_summary
-3. **MemCell materialization**: If boundary detected, create MemCell with accumulated messages
-4. **Clustering** (MemScene creation): Incremental centroid-based clustering assigns MemCell to existing or new cluster
-5. **Profile extraction**: Triggered when cluster reaches `profile_min_memcells` threshold
-6. **Memory extraction**: Parallel extraction of episodes (group + personal), foresight, event logs
-7. **Polyglot persistence**: Episode memories -> MongoDB + Elasticsearch + Milvus; Foresight/Event logs -> MongoDB + sync service; Profiles -> dedicated profile repository
+The memorization pipeline: preprocess (fetch since `last_memcell_time`) -> LLM boundary detection (sliding window, hard limits at 8192 tokens / 50 messages) -> MemCell materialization -> centroid-based clustering into MemScenes -> profile extraction at cluster threshold -> parallel extraction of episodes, foresight, event logs -> polyglot persistence (MongoDB + ES + Milvus).
 
 ---
 
@@ -107,7 +104,7 @@ Five retrieval strategies, dispatched by configuration:
 
 Post-retrieval scoring uses:
 - RRF fusion (k=60) for combining channels
-- Neural reranker (DeepInfra or vLLM-served model) with exponential backoff retry
+- Neural reranker (DeepInfra or self-hosted vLLM model) with exponential backoff retry
 - Group-level importance scoring: `(speaking_count + mention_count) / conversation_count`
 - Temporal filtering for expired Foresight signals
 
@@ -140,60 +137,32 @@ This parallels the Complementary Learning Systems (CLS) theory (McClelland et al
 
 ### Phase 1: Episodic Trace Formation
 
-**Semantic boundary detection** is the entry point. Rather than chunking by token count or session boundaries, EverMemOS uses an LLM-based sliding window to detect topic transitions. The `ConvMemCellExtractor` accumulates messages and asks an LLM to assess whether a topical boundary has been reached, returning a `BoundaryDetectionResult` with confidence and topic summary. Hard limits (8192 tokens or 50 messages) force splits to prevent unbounded accumulation.
-
-This is significant because it means memory segmentation tracks semantic coherence rather than arbitrary boundaries. The paper claims semantic segmentation outperforms both heuristic chunking and session boundary oracles in ablation studies.
+**Semantic boundary detection** is the entry point. The `ConvMemCellExtractor` uses an LLM-based sliding window to detect topic transitions, returning a `BoundaryDetectionResult` with confidence and topic summary. Hard limits (8192 tokens or 50 messages) force splits. The paper claims semantic segmentation outperforms both heuristic chunking and session boundary oracles in ablation studies.
 
 Once a boundary is detected, the MemCell is materialized and downstream extractors run in parallel:
 - **Episode extractor**: Converts conversation to third-person narrative preserving all entities, dates, specifics
 - **Foresight extractor**: Generates 4-10 associative predictions with temporal validity intervals
 - **Event log extractor**: Captures discrete atomic events
 
-The **Foresight** concept is novel and draws on cognitive science research on prospection -- the human capacity to mentally simulate future states (Gilbert & Wilson, 2007). Each foresight has validity intervals `[t_start, t_end]` enabling automatic expiration. The LLM is instructed to generate "specific and verifiable" predictions grounded in evidence from the conversation. This addresses a gap most memory systems have: they only look backward, never forward.
+The **Foresight** concept draws on prospection research (Gilbert & Wilson, 2007). Each foresight has validity intervals `[t_start, t_end]` enabling automatic expiration. The LLM generates "specific and verifiable" predictions grounded in evidence. This addresses a gap most memory systems have: they only look backward, never forward.
 
 ### Phase 2: Semantic Consolidation
 
-MemCells are organized into **MemScenes** through incremental centroid-based clustering:
+MemCells are organized into **MemScenes** through incremental centroid-based clustering. Cosine similarity against existing cluster centroids, gated by `max_time_gap_seconds`, determines assignment vs. new cluster creation. The `ClusterState` tracks centroids, counts, and last-seen timestamps.
 
-1. New MemCell embedding is computed via the vectorize service
-2. Cosine similarity calculated against existing cluster centroids
-3. If similarity exceeds threshold AND timestamp gap within `max_time_gap_seconds`: assign to existing cluster, update centroid incrementally
-4. Otherwise: create new cluster (MemScene)
-
-Clusters receive sequential IDs (`cluster_000`, `cluster_001`, etc.). The `ClusterState` tracks centroids, counts, and last-seen timestamps. The ClusterManager is a pure computation component -- persistence is handled by the calling orchestration layer.
-
-When a cluster accumulates enough MemCells (`profile_min_memcells` threshold), profile extraction triggers. The `ProfileManager` implements incremental profile updates with recency bias:
-- Most recent MemCells processed first (batch limiting)
-- Old profiles passed as context for LLM-based incremental merging
-- Explicit/implicit trait separation
-- Evidence tracking for traceability
-- Conflict resolution for skills/systems: keep highest level; for regular fields: evidence merging
-
-The `ProfileMemoryMerger` handles cross-group profile consolidation, prioritizing "important" profiles and using field-type-specific merging strategies.
+When a cluster accumulates enough MemCells (`profile_min_memcells` threshold), profile extraction triggers. The `ProfileManager` implements incremental updates with recency bias, explicit/implicit trait separation, evidence tracking, and field-type-specific conflict resolution (keep highest skill level; merge evidence for regular fields). The `ProfileMemoryMerger` handles cross-group profile consolidation.
 
 ### Phase 3: Reconstructive Recollection
 
-This is the most technically interesting phase. Rather than returning stored text verbatim, the system reconstructs context dynamically through agentic retrieval:
+Rather than returning stored text verbatim, the system reconstructs context dynamically through the multi-round agentic retrieval described in Section 3. The key innovation is the **sufficiency assessment loop**: after initial retrieval, an LLM evaluates whether retrieved memories are sufficient, identifies gaps, and generates targeted follow-up queries. This mirrors the iterative, cue-dependent nature of human memory recall.
 
-**The necessity-and-sufficiency principle**: The system aims to compose exactly the context needed for downstream reasoning -- no more, no less. This is implemented through the multi-round agentic retrieval described in Section 3.
-
-The key innovation is the **sufficiency assessment loop**: after initial retrieval, an LLM evaluates whether the retrieved memories are sufficient to answer the query, identifies gaps, and generates targeted follow-up queries. This is fundamentally different from one-shot retrieval -- it mirrors the iterative, cue-dependent nature of human memory recall, where each retrieved memory can serve as a cue for further retrieval.
-
-**Hierarchical context construction** groups retrieved memories by conversation context (group_id), sorts within groups temporally, and ranks groups by engagement importance. This preserves the narrative coherence of episodes rather than presenting decontextualized fragments.
+**Hierarchical context construction** groups retrieved memories by conversation context (group_id), sorts within groups temporally, and ranks groups by engagement importance -- preserving narrative coherence rather than presenting decontextualized fragments.
 
 ### Comparison to Biological Memory
 
-The system captures several properties of biological memory that most AI memory systems miss:
+The system captures: (1) transformation, not storage -- memories change form through phases; (2) prospection via foresight signals (Schacter et al., 2007); (3) reconstructive recall -- context assembled at retrieval time, not returned as-is; (4) clustering as consolidation -- extracting statistical regularities from episodic traces.
 
-1. **Transformation, not storage**: Memories change form as they move through phases (raw dialogue -> episodic narrative -> clustered scenes -> reconstructed context). This mirrors the episodic-to-semantic transformation in biological consolidation.
-
-2. **Prospection**: Foresight signals model the forward-looking aspect of memory, which cognitive science recognizes as fundamentally linked to episodic memory (Schacter et al., 2007 -- the constructive episodic simulation hypothesis).
-
-3. **Reconstructive recall**: Context is assembled at retrieval time, not returned as-is. Each recall can produce different output depending on the query, the available MemScenes, and the sufficiency assessment -- mirroring the constructive nature of human remembering.
-
-4. **Clustering as consolidation**: The online incremental clustering of MemCells into MemScenes parallels how the brain extracts statistical regularities during consolidation, forming semantic structures from episodic traces.
-
-What it does NOT model (compared to biological memory): emotional tagging, interference effects, spacing effects, reconsolidation (retrieved memories being destabilized and re-stored), or the role of sleep oscillations in consolidation. Our NREM/REM pipeline is closer to biological consolidation mechanics in some respects.
+What it does NOT model: emotional tagging, interference effects, spacing effects, reconsolidation, or sleep oscillations. Our NREM/REM pipeline is closer to biological consolidation mechanics in some respects.
 
 ---
 
@@ -217,15 +186,61 @@ This means the same pipeline produces different memory structures depending on c
 
 ### 5.4 Neural Reranking in Retrieval
 
-Post-retrieval neural reranking (DeepInfra or self-hosted vLLM) with exponential backoff retry. Extracts key fields (episode text, summary, subject, event_log) for reranking context. Falls back gracefully to original ranking on service failure. This adds a learned relevance signal beyond BM25/vector scoring.
+Post-retrieval neural reranking (DeepInfra or self-hosted vLLM) with exponential backoff retry. Extracts key fields (episode text, summary, subject, event_log) for reranking context. Falls back gracefully to original ranking on service failure. v1.1.0 added vLLM self-hosting support tailored for Qwen3 series, reducing dependency on external API providers.
 
 ### 5.5 Profile Discrimination and Evidence Tracking
 
 The `ValueDiscriminator` pre-screens MemCells for profile-worthiness before expensive LLM extraction. Context windows (configurable, default 2 previous MemCells) provide local context. Profiles maintain evidence chains linking traits to source conversations, enabling auditability.
 
+### 5.6 OpenClaw Agent Integration (new)
+
+Context-engine plugin for the OpenClaw agent framework. Unlike the REST API approach, the plugin operates transparently: `assemble()` injects relevant memories before each reply, `afterTurn()` saves new content. Session state with 2-hour TTL, subagent tracking for tool-use conversations, and configurable flush intervals. This represents EverMemOS's first zero-friction agentic integration -- memory without explicit tool calls, similar in spirit to how our MCP tools are designed to be used by Claude Code's autonomous agent loop.
+
+### 5.7 Unified Evaluation Framework (new)
+
+Multi-system benchmark suite with adapters for Mem0, MemOS, MemU, Zep. Supports LoCoMo, LongMemEval, PersonaMem, and EverMemBench. Four-stage pipeline with cross-stage checkpointing. They fixed implementation issues in competitor adapters (Mem0 timezone handling, Zep v2->v3 API migration, MemU retrieval gaps) to ensure fair evaluation.
+
 ---
 
-## 6. Gap Ratings
+## 6. PERMA Benchmark Results
+
+PERMA (arXiv:2603.23231) evaluates preference-state maintenance across event-driven, multi-session, multi-domain interactions. 10 synthetic users, 20 domains, 2,166 preferences, 1.8M tokens.
+
+### Results
+
+| Setting | MCQ Acc. | BERT-F1 | Memory Score | Context Tokens | Completion | Turn=1 | Turn≤2 |
+|---------|----------|---------|-------------|----------------|------------|--------|--------|
+| Clean Single | 0.728 | 0.827 | 2.08 | 3230.5 | **0.846** | 0.508 | 0.790 |
+| Clean Multi | 0.713 | 0.820 | 1.98 | 3134.4 | 0.688 | 0.268 | 0.573 |
+| Noise Single | 0.695 | 0.824 | 1.98 | 3092.9 | 0.713 | 0.274 | 0.561 |
+| Noise Multi | 0.732 | 0.820 | 1.98 | 3092.9 | 0.713 | 0.268 | 0.522 |
+| Style-aligned Single | 0.740 | -- | -- | 3307.2 | -- | 0.501 | 0.785 |
+| Style-aligned Multi | 0.720 | -- | -- | 3185.7 | -- | 0.274 | 0.561 |
+
+### Analysis
+
+**Strengths**: Highest Completion rate in Clean Single (0.846) among all benchmarked systems -- the system retrieves *something* relevant most of the time. High context token counts (~3100-3300) suggest the agentic retrieval loop aggressively gathers material. MCQ accuracy is solid in single-domain (0.728-0.740).
+
+**Weaknesses exposed**:
+
+1. **Multi-domain collapse**: Turn=1 drops from 0.508 (single) to 0.268 (multi) -- a 47% relative decline. This pattern holds across all noise conditions. The centroid-based clustering that organizes memories by semantic similarity likely fragments cross-domain preferences into separate MemScenes, making it hard to synthesize across domains when the query requires it. This is the same structural weakness graph-based systems are designed to address.
+
+2. **Noise vulnerability**: Unlike MemOS (which paradoxically improved with noise), EverMemOS degrades. MCQ drops from 0.728 to 0.695 in single-domain, Turn=1 from 0.508 to 0.274. The semantic boundary detector and episode extractor likely propagate noisy inputs into stored memories without filtering, and the lack of contradiction detection means noisy preference updates overwrite clean ones.
+
+3. **Latency**: 16s search in Clean, 26s in Noise. The multi-round agentic retrieval with sufficiency assessment is expensive. This is a fundamental cost of the reconstructive recollection approach -- quality-latency tradeoff that may be acceptable for async applications but prohibitive for interactive chat.
+
+4. **Context token bloat**: ~3200 tokens per retrieval is 3x what most systems use. High Completion rate with middling Turn=1 accuracy suggests the system retrieves related but not precisely targeted memories. The agentic loop finds *something* but not the *right thing* on first pass.
+
+**Comparison to MemOS (current SOTA on multi-domain)**:
+- MemOS: MCQ 0.811, Turn=1 multi-domain 0.306
+- EverMemOS: MCQ 0.728, Turn=1 multi-domain 0.268
+- EverMemOS trails on every PERMA metric despite having more sophisticated retrieval. MemOS's memory-centric architecture (structured preference state management) outperforms EverMemOS's episode-centric approach for preference tracking specifically.
+
+**Implication for Somnigraph**: EverMemOS's multi-domain collapse validates the hypothesis that graph-conditioned retrieval matters for cross-domain synthesis. Their cluster-based organization is structurally similar to having no cross-cluster links -- exactly the gap that PPR-based graph expansion is designed to bridge. If Somnigraph's typed edges and PPR expansion can connect preferences across domains, the multi-domain Turn=1 metric is where we would expect to see differentiation.
+
+---
+
+## 7. Gap Ratings
 
 ### Layered Memory: 90%
 Five distinct memory types (episodic, foresight, event log, profile/life, group profile) organized through MemCell -> MemScene hierarchy. The three-phase lifecycle provides clear layering from transient traces to consolidated structures. Missing: no explicit short-term / working memory layer, no buffer concept.
@@ -234,10 +249,10 @@ Five distinct memory types (episodic, foresight, event log, profile/life, group 
 Five retrieval strategies (keyword, vector, hybrid, RRF, agentic multi-round). Neural reranking. Multi-query expansion with gap identification. RRF fusion. This is the strongest retrieval pipeline in the survey. Minor gap: no theme-based or categorical filtering as a first-class retrieval dimension.
 
 ### Contradiction Detection: 40%
-Profile merging handles conflicts at the field level (keep highest skill level, merge evidence), and the profile system tracks explicit vs. implicit traits. However, there is no general-purpose contradiction detection across memory types. The `ValueDiscriminator` is a pre-screen for profile-worthiness, not a conflict detector. No contradiction edges or revision tracking. No mechanism to flag when a new episode contradicts a stored one. Profile conflict resolution is merge-by-strategy rather than explicit contradiction detection with provenance.
+Profile merging handles conflicts at the field level (keep highest skill level, merge evidence), and the profile system tracks explicit vs. implicit traits. However, there is no general-purpose contradiction detection across memory types. The `ValueDiscriminator` is a pre-screen for profile-worthiness, not a conflict detector. No contradiction edges or revision tracking. No mechanism to flag when a new episode contradicts a stored one. Profile conflict resolution is merge-by-strategy rather than explicit contradiction detection with provenance. PERMA noise results confirm: the system propagates contradictory inputs without filtering.
 
 ### Relationship Edges: 25%
-No explicit edge/graph structure between memories. MemScenes provide implicit grouping via clustering, and group profiles track engagement metrics. But there are no typed edges (causation, contradiction, derivation), no explicit linking between MemCells, and no graph traversal in retrieval. The hierarchical MemCell -> MemScene structure provides some relational organization, but it is strictly cluster-based, not a knowledge graph.
+No explicit edge/graph structure between memories. MemScenes provide implicit grouping via clustering, and group profiles track engagement metrics. But there are no typed edges (causation, contradiction, derivation), no explicit linking between MemCells, and no graph traversal in retrieval. The hierarchical MemCell -> MemScene structure provides some relational organization, but it is strictly cluster-based, not a knowledge graph. PERMA multi-domain collapse suggests this is a functional limitation, not just an architectural gap.
 
 ### Sleep Process: 55%
 The MemScene clustering functions as an online consolidation mechanism -- incremental centroid updates as new MemCells arrive, with temporal constraints. Profile extraction triggers at cluster thresholds. However, there is no offline batch processing, no periodic consolidation sweep, no gap analysis, no question generation, and no explicit sleep-wake distinction. Consolidation is reactive (triggered by incoming data) rather than proactive. Our NREM (merge similar, create edges) + REM (gap analysis, questions) pipeline is structurally richer.
@@ -253,31 +268,33 @@ The boundary detection returns confidence scores, and the profile discriminator 
 
 ---
 
-## 7. Comparison with claude-memory
+## 8. Comparison with Somnigraph
 
-### Stronger (EverMemOS vs. claude-memory)
+### Stronger (EverMemOS vs. Somnigraph)
 
-**Retrieval depth**: The multi-round agentic retrieval with sufficiency assessment, gap identification, and targeted follow-up queries is substantially more sophisticated than our single-pass RRF + optional curated recall subagent. Their system can identify what's missing and actively search for it, which our system approximates only through the staged curated recall (Sonnet subagent) pathway.
+**Retrieval depth**: The multi-round agentic retrieval with sufficiency assessment, gap identification, and targeted follow-up queries is substantially more sophisticated than our single-pass RRF + reranker. Their system can identify what's missing and actively search for it. However, PERMA results show this depth comes at a cost: 16-26s latency and high context token counts (~3200) without proportional accuracy gains.
 
 **Memory type richness**: Five distinct memory types with specialized extraction pipelines (episode, foresight, event log, profile, group profile) vs. our single memory table with category labels. Their profiles have explicit/implicit trait separation with evidence chains. Their foresight signals have no equivalent in our system.
 
-**Scalability and production infrastructure**: MongoDB + Milvus + Elasticsearch + Redis + Kafka with multi-tenant support, distributed locking, and Prometheus metrics. Enterprise-ready from day one. Our SQLite + sqlite-vec + FTS5 is optimized for single-user simplicity but would not scale to multi-user SaaS deployment.
+**Scalability and production infrastructure**: MongoDB + Milvus + Elasticsearch + Redis + Kafka with multi-tenant support, distributed locking, Prometheus metrics. Our SQLite stack is optimized for single-user simplicity.
 
-**Semantic segmentation**: LLM-based boundary detection for conversation chunking produces more coherent memory units than our approach of storing individual memories as they come. Their MemCells capture complete topical units; our memories are atomistic by design.
+**Semantic segmentation**: LLM-based boundary detection produces more coherent memory units than our atomistic per-memory approach.
 
-### Weaker (EverMemOS vs. claude-memory)
+**Benchmark coverage**: 4 datasets (LoCoMo, LongMemEval, PersonaMem, EverMemBench) with 5 competitor systems. LoCoMo 92.32% overall exceeds their full-context baseline (91.21%). We have LoCoMo only (85.1%).
 
-**Graph structure**: We have `memory_edges` with typed edges (contradiction, revision, derivation), linking context, novelty-scored adjacency expansion, and Hebbian PMI co-retrieval boost. They have no explicit graph -- only implicit MemScene clustering. Our edge-based architecture enables richer traversal and relationship reasoning.
+### Weaker (EverMemOS vs. Somnigraph)
 
-**Feedback loop**: Our `recall_feedback` tool with continuous 0-1 utility + durability scoring, compounding confidence through feedback and support edges, and Hebbian PMI co-retrieval boost creates a learning retrieval system that improves with use. They have no user feedback mechanism.
+**Graph structure**: We have `memory_edges` with typed edges (contradiction, revision, derivation), linking context, novelty-scored adjacency expansion, and Hebbian PMI co-retrieval boost. They have no explicit graph -- only implicit MemScene clustering. PERMA multi-domain collapse (Turn=1: 0.268) suggests this is a real functional gap, not just an architectural one.
 
-**Decay model**: Our per-category exponential decay with configurable half-lives, floors, shadow-load quadratic penalty, retention immunity via pinned flag, and confidence gradient is substantially more nuanced. They have no decay at all -- memories persist indefinitely, which will create retrieval noise at scale.
+**Feedback loop**: Our `recall_feedback` tool with continuous 0-1 utility + durability scoring, compounding confidence through feedback and support edges, and Hebbian PMI co-retrieval boost creates a learning retrieval system that improves with use. They have no user feedback mechanism. Per-query Spearman r=0.70 with ground truth validates that this signal is meaningful.
+
+**Decay model**: Our per-category exponential decay with configurable half-lives, floors, and retention immunity via pinned flag is substantially more nuanced. They have no decay at all -- memories persist indefinitely, which will create retrieval noise at scale.
 
 **Consolidation depth**: Our NREM (cluster similar memories, merge, create edges) + REM (gap analysis, question generation, taxonomy assignment) pipeline is richer than their reactive online clustering. We have offline batch processing that can restructure the memory graph; they consolidate only when new data arrives.
 
-**Scoring optimization**: Our 9-coefficient Bayesian-optimized post-RRF scoring (Optuna TPE, 500 trials) with empirically calibrated parameters (RRF k=14 vs. their default k=60, feedback coefficient, adjacency boost, Hebbian cap, etc.) is more precisely tuned. Their scoring relies on default RRF + neural reranking without systematic optimization.
+**Noise robustness**: Their PERMA results degrade with noise (MCQ 0.728 -> 0.695, Turn=1 0.508 -> 0.274). Our contradiction edges and revision tracking provide a mechanism to handle conflicting information that they lack entirely.
 
-**Contradiction handling**: Our contradiction edges, revision tracking, and confidence decay through contradictions provide explicit conflict management. Their profile merging handles some field-level conflicts but has no general contradiction detection.
+**Learned reranker**: Our 26-feature LightGBM reranker trained on 1032 real queries (NDCG=0.7958, +6.17pp over formula) uses domain-specific features (betweenness centrality, feedback signals, decay scores, co-retrieval PMI). Their neural reranker is a generic model without task-specific feature engineering or feedback integration.
 
 ### Shared Strengths
 
@@ -289,51 +306,55 @@ The boundary detection returns confidence scores, and the profile discriminator 
 
 ---
 
-## 8. Insights Worth Stealing
+## 9. Insights Worth Stealing
 
-### 8.1 Foresight Signals
+### 9.1 Foresight Signals
 **Idea**: Generate forward-looking predictions from conversations with temporal validity intervals. At recall time, filter expired predictions and surface still-valid ones.
 **Effort**: Medium (new memory category + extraction prompt + temporal filter in recall)
 **Impact**: High -- no other system does this, and it would let the memory system proactively surface relevant predictions when their time window arrives. Could be implemented as a new `category="foresight"` with `valid_until` field, plus a filter in `recall()`.
+**PERMA update**: EverMemOS's foresight did not appear to help with preference tracking specifically (their MCQ is lower than MemOS despite having this feature). Foresight's value is likely domain-specific -- more useful for life coaching / personal assistant scenarios than preference state maintenance. Still worth stealing for the right use cases, but not a silver bullet for PERMA-style tasks.
 
-### 8.2 Sufficiency Assessment in Retrieval
+### 9.2 Sufficiency Assessment in Retrieval
 **Idea**: After initial recall, have the LLM evaluate whether retrieved memories are sufficient to answer the query, identify gaps, and generate follow-up queries.
 **Effort**: Medium-High (requires LLM call in the retrieval loop, which adds latency and cost)
-**Impact**: High -- directly addresses the "I know I have this memory but recall didn't find it" problem. Could be integrated into the staged curated recall pathway: Stage 1 retrieves, LLM assesses sufficiency, Stage 2 targets identified gaps.
+**Impact**: Medium (downgraded from High). PERMA results show this approach yields high Completion (0.846) but middling accuracy (Turn=1: 0.508 single, 0.268 multi). The system finds *something* but not the *right thing*. The latency cost (16-26s) is substantial. For Somnigraph's MCP use case where recall latency matters, a cheaper approach (better first-pass retrieval via reranker + graph expansion) may be more effective than an expensive multi-round loop.
 
-### 8.3 Semantic Boundary Detection for Conversation Chunking
+### 9.3 Semantic Boundary Detection for Conversation Chunking
 **Idea**: When ingesting conversation history, use an LLM to detect topical boundaries rather than storing arbitrary chunks.
 **Effort**: Low-Medium (applicable if we ever move to conversation ingestion rather than per-memory `remember()` calls)
 **Impact**: Medium -- our system is designed for explicit memory creation, not conversation streaming, so this is less directly applicable. But if we ever add auto-capture from conversation history, semantic segmentation would be important.
 
-### 8.4 Profile Explicit/Implicit Separation
+### 9.4 Profile Explicit/Implicit Separation
 **Idea**: Separate user profile facts into explicitly stated vs. inferred-from-behavior, tracking confidence differently for each.
 **Effort**: Low (metadata field on memories)
 **Impact**: Medium -- would improve confidence calibration. Explicitly stated facts deserve higher initial confidence than behavioral inferences. Could be implemented as a `source_type` field: "stated" vs "inferred" with different initial confidence values.
 
-### 8.5 Group-Level Importance Scoring
-**Idea**: Score groups/contexts by engagement metrics (speaking count, mention count, conversation count) and use this to prioritize retrieval results from more important contexts.
-**Effort**: Low (query-time metadata)
-**Impact**: Low-Medium -- relevant only if/when we handle multi-group/multi-context memories.
+### 9.5 Transparent Memory Integration (from OpenClaw plugin)
+**Idea**: Memory as context engine -- automatic recall before response, automatic save after turn.
+**Effort/Impact**: Low / Low -- we already have this pattern via startup_load + auto-capture. The subagent tracking detail (deferring saves during tool-use) is a nice touch worth noting.
 
 ---
 
-## 9. What's Not Worth It
+## 10. What's Not Worth It
 
-### Enterprise Infrastructure Stack (MongoDB + Milvus + Elasticsearch + Redis)
-Our SQLite + sqlite-vec + FTS5 stack is purpose-built for single-user MCP operation with near-zero deployment friction. Adopting their polyglot persistence stack would add massive operational complexity for no benefit at our scale (~300 memories, single user). Their architecture solves a different problem (multi-tenant SaaS) that we don't have.
+### Enterprise Infrastructure Stack
+Our SQLite + sqlite-vec + FTS5 stack is purpose-built for single-user MCP operation. Their polyglot persistence solves a different problem (multi-tenant SaaS) that we don't have.
 
-### Neural Reranking
-Adding a neural reranker (DeepInfra or self-hosted vLLM model) to the retrieval pipeline would add latency, cost, and a new dependency for marginal gain at our scale. Our Bayesian-optimized scoring coefficients achieve comparable precision without an additional ML model in the loop. At ~300 memories, the candidate pool is small enough that RRF + post-RRF scoring is sufficient.
+### Multi-Round Agentic Retrieval (as implemented)
+PERMA results make this less attractive than the paper suggested. 16-26s latency, high Completion (0.846) but low Turn=1 (0.268 multi) -- retrieves related but imprecise memories. Our single-pass reranker + graph expansion may achieve better precision at lower latency. The *idea* of sufficiency assessment is still interesting (see 9.2), but their implementation's cost-benefit is unfavorable for interactive use.
 
 ### Spring-like DI Framework
-Their Python codebase mirrors Java enterprise patterns: bean scanning, dependency injection containers, lifecycle management, OXM layers. This adds significant complexity for multi-team development coordination but is unnecessary for a single-developer memory server.
+Java enterprise patterns (bean scanning, DI containers, OXM layers) ported to Python. Unnecessary for a single-developer memory server.
 
 ### Reactive-Only Consolidation
-Their consolidation triggers only when new MemCells arrive and accumulate past a threshold. Our proactive offline consolidation (NREM/REM sleep scripts) is architecturally superior because it can restructure the entire memory graph, detect gaps across all memories, and generate questions -- none of which are possible in a purely reactive model.
+Triggers only when new MemCells accumulate past a threshold. Our proactive NREM/REM pipeline can restructure the entire memory graph, detect gaps, and generate questions -- none possible in a purely reactive model.
 
 ---
 
-## 10. Key Takeaway
+## 11. Key Takeaway
 
-EverMemOS is the most production-engineered memory system in the survey, with enterprise infrastructure, strong benchmark results (92.3% on LoCoMo, exceeding full-context baselines), and a cognitively grounded three-phase architecture that genuinely reflects engram theory. Its standout contributions are the foresight signal concept (forward-looking temporal predictions) and the sufficiency-assessed agentic retrieval loop (identifying and filling retrieval gaps). However, it trades our system's strengths -- graph structure, feedback loops, decay models, and proactive consolidation -- for scalability and multi-tenant deployment. The most transferable ideas are foresight signals (a new memory dimension no one else has) and the sufficiency assessment pattern (making retrieval self-correcting). The enterprise infrastructure is not relevant to our use case, but the cognitive architecture ideas are worth studying.
+EverMemOS is the most production-engineered memory system in the survey, with enterprise infrastructure, strong LoCoMo results (92.32% overall, exceeding full-context baselines), and a cognitively grounded three-phase architecture that genuinely reflects engram theory. Its standout contributions are the foresight signal concept (forward-looking temporal predictions) and the sufficiency-assessed agentic retrieval loop (identifying and filling retrieval gaps).
+
+However, PERMA results reveal structural limitations that LoCoMo did not expose. The multi-domain collapse (Turn=1: 0.268) demonstrates that cluster-based memory organization without explicit cross-cluster linking fails when queries require synthesizing across domains. The noise vulnerability (MCQ drops 4.5% with noise) confirms the absence of contradiction detection has practical consequences. The high latency (16-26s) and context token bloat (~3200 tokens) show that the reconstructive recollection approach is expensive relative to its accuracy.
+
+For Somnigraph, the most important signal from PERMA is the multi-domain collapse. EverMemOS's MemScene clustering is structurally similar to having unconnected memory neighborhoods -- exactly the gap that graph-conditioned retrieval (PPR expansion, typed edges, betweenness centrality) is designed to bridge. If Somnigraph can maintain cross-domain links through its edge detection and graph expansion, the multi-domain PERMA metric is the place to demonstrate that advantage. The foresight concept remains the most transferable idea, but the sufficiency assessment loop is less compelling after seeing its real-world latency-accuracy tradeoff.

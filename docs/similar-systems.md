@@ -1,6 +1,6 @@
 # Similar Systems
 
-An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (91 sources), see `research/sources/index.md`.
+An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (95+ sources), see `research/sources/index.md`.
 
 ## Contents
 
@@ -353,6 +353,109 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What's interesting for us**: Gravity dampening as a cross-signal agreement mechanism — expressible as a reranker feature (`has_bm25_support` or `bm25_embed_agreement`). The tool-augmented retrieval paradigm as a documented design alternative to one-shot recall. Structured fact supersession with `superseded_by` chains (same pattern as memv). LongMemEval as a potential second benchmark.
 
+### MemOS
+
+**What it is**: A memory operating system built around a MemCube abstraction that wraps heterogeneous memory types (parametric, activation, plaintext) with unified metadata and lifecycle management. Neo4j graph + vector + BM25 retrieval. MemTensor (Shanghai), 39 co-authors. arXiv:2507.03724v4.
+
+**What it does well**:
+- Write-path conflict detection (MemFeedback). Before inserting a new memory, searches for similar existing memories and classifies the relationship (conflict/duplicate/update/unrelated). Catches contradictions at write time rather than deferring to offline processing.
+- Dedicated preference extraction pipeline. Separate prompts for explicit vs. implicit preferences, with their own metadata type. This structural distinction contributes to PERMA's best-in-class preference-tracking results.
+- Inline version history per memory — prior content preserved with version numbers and update types.
+- Multi-type retrieval — simultaneous queries across WorkingMemory, LongTermMemory, PreferenceMemory, etc. with per-type top-k controls.
+- PERMA's top-performing memory system: MCQ 0.811, best Memory Score (2.27), best Turn=1 (0.548). Noise *improves* performance (0.811→0.853) by doubling retrieval volume.
+
+**Where it falls short**:
+- Significant paper-code gap. The "unified scheduling across memory types" is mostly plaintext. The graph reorganizer is largely commented out. Lifecycle state machine is partial (no freeze, no rollback, no TTL).
+- No feedback loop. MemFeedback is write-path conflict detection, not retrieval quality feedback.
+- No decay mechanism. Memories persist indefinitely.
+- No offline consolidation. No sleep, no batch processing, no gap analysis.
+- Retrieval fusion is ID-union deduplication, not scored fusion. Cannot leverage complementary channel signals.
+
+**What's interesting for us**: Write-path conflict detection is the most actionable idea — adding a quick vector search + LLM classification before `impl_remember()` would catch obvious contradictions without waiting for sleep. The preference memory type is relevant for PERMA evaluation. The MemOS PERMA noise result (improvement via volume increase) suggests that retrieval depth adaptation could be a reranker-learnable signal.
+
+### EverMemOS
+
+**What it is**: A self-organizing memory operating system grounded in engram theory — three-phase architecture (episodic trace formation → semantic consolidation → reconstructive recollection). MongoDB + Milvus + Elasticsearch + Redis. EverMind AI, ~3.2k stars. arXiv:2601.02163v2.
+
+**What it does well**:
+- Three-phase engram lifecycle is the most biologically grounded architecture in the corpus. Semantic boundary detection for memory segmentation, incremental centroid-based clustering into MemScenes, and multi-round agentic retrieval with sufficiency assessment.
+- Foresight signals — forward-looking predictions with temporal validity intervals. No other system generates anticipatory memory.
+- Agentic retrieval with gap identification — after initial retrieval, assesses sufficiency and generates follow-up queries targeting identified gaps.
+- Highest Completion rate in PERMA Clean Single (0.846).
+- Profile explicit/implicit trait separation with evidence chains.
+
+**Where it falls short**:
+- Massive search latency (16s clean, 26s noisy). The multi-round agentic retrieval is expensive.
+- No feedback loop. No user feedback mechanism for retrieval quality.
+- No decay. Memories persist indefinitely.
+- No typed edges or graph traversal. Only implicit clustering via MemScenes.
+- PERMA noise vulnerability — performance degrades with noise (unlike MemOS which improves). Multi-domain Turn=1 collapses to 0.268.
+- Context token bloat (~3200) compared to other systems.
+
+**What's interesting for us**: Foresight signals remain novel — no other system generates forward-looking predictions. However, PERMA results show foresight didn't specifically help preference tracking. The sufficiency assessment pattern (identifying retrieval gaps and re-querying) is architecturally interesting but the PERMA latency cost (16-26s) argues against adopting it as-is. The OpenClaw integration as a transparent memory plugin is a good deployment pattern.
+
+### LightMem
+
+**What it is**: A cognitive-inspired memory framework (Atkinson-Shiffrin model) that organizes information into sensory memory (pre-compression), short-term memory (topic-aware consolidation), and long-term memory (offline updates). Qdrant + FAISS vector backends. ZJU NLP group. arXiv:2510.18866, accepted ICLR 2026.
+
+**What it does well**:
+- Extreme token efficiency — ~290 context tokens in PERMA (second-lowest), 10-38x token reduction on LongMemEval. The core value proposition is doing more with less.
+- Write-path compression using LLMLingua-2 entropy filtering before extraction. Low-information tokens are dropped before reaching the LLM, reducing extraction cost without losing facts.
+- Hybrid topic segmentation (attention + similarity) at write time produces coherent memory units. >80% segmentation accuracy vs. 45-87% for single methods.
+- Best Turn≤2 in PERMA Clean Single (0.813) — initial retrieval is weak but recovery with one feedback round is excellent, suggesting well-formed individual memory units.
+- Offline update mechanism decouples consolidation from inference, with temporal constraint (only newer entries can update older ones).
+
+**Where it falls short**:
+- Bare cosine similarity retrieval. No BM25, no reranker, no fusion, no graph. The retrieval path is the weakest of any PERMA system.
+- Weak MCQ accuracy (0.605-0.671). Lossy compression means some preference details are inevitably dropped.
+- Multi-domain collapse (Turn=1: 0.274). No cross-memory linking, no entity resolution.
+- No feedback loop. No mechanism to learn from retrieval outcomes.
+- No graph structure. The `GraphMem` class is a single-line stub.
+- No decay or lifecycle management beyond offline delete.
+
+**What's interesting for us**: Entropy-based token filtering for extraction input — during graph extraction, pre-filtering low-information tokens could reduce extraction cost. The temporal constraint on updates (newer only updates older) is a reasonable heuristic worth considering for NREM. The StructMem extension (cross-event summarization) aligns with Somnigraph's graph extraction direction but is unbenchmarked.
+
+### Memobase
+
+**What it is**: A profile-based persistent memory system that extracts structured user profiles (topic/subtopic hierarchies) from conversations via a buffer-flush pipeline. PostgreSQL + pgvector + Redis. No academic paper. memodb-io, open-source.
+
+**What it does well**:
+- Structured profile extraction with configurable schema. Topics like `interest::movies` with LLM-mediated merge (APPEND/UPDATE/ABORT). Produces clean, organized user representations.
+- Buffer-flush batching — accumulates inputs and processes in batch (3 fixed LLM calls per flush), reducing per-interaction cost vs. Mem0's per-message tool-calling.
+- Consistent context token usage (~1033) across all PERMA settings. The profile-dump approach provides predictable cost.
+- Good multi-domain recovery — tied for best Clean Multi Turn=1 (0.331) and strong Clean Single Turn≤2 (0.830, second-best).
+- Event gist decomposition — session summaries broken into individually-embedded fragments for temporal retrieval.
+
+**Where it falls short**:
+- Retrieval is essentially "dump all profiles." No search, no ranking, no fusion. This works at profile scale (50-200 entries) but doesn't scale.
+- No graph, no BM25, no reranker. Retrieval intelligence is near zero.
+- No feedback loop. No mechanism to learn what was useful.
+- No consolidation or sleep. Profiles grow monotonically.
+- No decay. Everything persists equally.
+- Raw conversation blobs deleted after extraction by default — no way to re-extract with better prompts.
+
+**What's interesting for us**: Event gist decomposition (individually-embedded session summary fragments) is a simple, high-value idea for temporal retrieval. Schema-guided extraction with topic descriptions produces cleaner extractions than open-ended extraction — relevant for sleep-time processing. The buffer-flush pattern could reduce LLM call overhead if Somnigraph ever batches `remember()` calls.
+
+### Supermemory
+
+**What it is**: A commercial memory platform (17k GitHub stars) with open-source SDKs and MCP server but proprietary extraction/relationship core. Hierarchical, semantically structured memory with multi-modal document ingestion. TypeScript. No academic paper.
+
+**What it does well**:
+- Most aggressive compression in PERMA (~94 context tokens, >99% reduction). Despite this, MCQ accuracy is competitive (0.655-0.674 single-domain).
+- Rich schema visible through SDK validation types: static/dynamic memory distinction, three relationship types (Updates/Extends/Derives), version chains via parentMemoryId/rootMemoryId/isLatest, temporal expiry via forgetAfter.
+- Broad connector ecosystem — Google Drive, Gmail, Notion, OneDrive, GitHub with real-time webhooks.
+- Multi-modal ingestion — PDFs, images (OCR), videos (transcription), URLs, code (AST-aware chunking).
+- Noise resilience — performance slightly improves with noise across all settings.
+
+**Where it falls short**:
+- Weakest multi-domain Turn=1 in PERMA (0.248). The extreme compression discards cross-domain linkage information.
+- Proprietary core — extraction, relationship discovery, and forgetting logic are all behind the hosted API. Cannot learn from the implementation.
+- Style-aligned multi-domain is catastrophic (0.586 MCQ, 0.541 Turn≤2). Indirect preference expression through communication style is lost in compression.
+- No visible graph traversal algorithm despite relationship types existing in the schema.
+- No feedback loop visible in the open-source components.
+
+**What's interesting for us**: The static/dynamic memory distinction with precomputed profiles could reduce latency for common retrieval patterns. Explicit memory versioning (parentMemoryId → rootMemoryId → isLatest chains) is a more structured model than Somnigraph's contradiction edges — creating version chains during sleep rather than just adding edges would make temporal queries more tractable. The `forgetAfter` field for event-triggered expiry complements continuous decay. The PERMA results are a clean data point for the compression-accuracy tradeoff: extreme compression preserves single-domain performance but destroys cross-domain synthesis.
+
 ---
 
 ## What we borrowed
@@ -407,9 +510,9 @@ Benchmark performance across all systems: 0.025–0.037 F1 on contradiction dete
 
 ### Write-path quality
 
-Most systems accept whatever they're given. Mem0's InformationContent() gating is the closest to write-path quality control, but it only prevents destructive updates — it doesn't evaluate whether a new memory is worth storing. memv's predict-calibrate extraction is the notable exception: by predicting what a conversation should contain and extracting only the gaps, it filters at write time rather than relying on post-hoc consolidation. This is the most principled write-path quality approach in the corpus. AWM takes a different tack: a rule-based salience scorer (novelty × surprise × causal depth × effort) rejects 77% of writes at the door, claiming that pool cleanliness produces better retrieval than post-hoc ranking over a noisy store. The claimed result (23 of 100 events stored, 100% recall accuracy) is internally evaluated but the philosophy is testable.
+Most systems accept whatever they're given. Mem0's InformationContent() gating is the closest to write-path quality control, but it only prevents destructive updates — it doesn't evaluate whether a new memory is worth storing. memv's predict-calibrate extraction is the notable exception: by predicting what a conversation should contain and extracting only the gaps, it filters at write time rather than relying on post-hoc consolidation. This is the most principled write-path quality approach in the corpus. AWM takes a different tack: a rule-based salience scorer (novelty × surprise × causal depth × effort) rejects 77% of writes at the door, claiming that pool cleanliness produces better retrieval than post-hoc ranking over a noisy store. The claimed result (23 of 100 events stored, 100% recall accuracy) is internally evaluated but the philosophy is testable. MemOS's MemFeedback addresses a related but distinct problem: write-path *conflict* detection. Before inserting, it searches for similar existing memories and classifies the relationship (conflict/duplicate/update/unrelated), catching contradictions at write time rather than deferring to offline processing. This is the strongest write-path conflict mechanism in the corpus, and its contribution to MemOS's PERMA-leading performance suggests that even a lightweight version (vector search + binary conflict/not-conflict classification) would be valuable.
 
-The result for most systems: low-value memories accumulate over time. Consolidation (where it exists) can clean up afterward, but preventing low-quality writes in the first place would be more efficient.
+The result for most systems: low-value memories accumulate over time. Consolidation (where it exists) can clean up afterward, but preventing low-quality writes in the first place would be more efficient. LightMem demonstrates a complementary approach: entropy-based token filtering drops low-information tokens before extraction, reducing noise at the input level rather than the storage level.
 
 ### Consolidation evaluation
 
