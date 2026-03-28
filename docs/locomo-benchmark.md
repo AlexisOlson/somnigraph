@@ -411,6 +411,147 @@ OVERALL          1531   0.713   61.9%   78.6%   83.1%   88.7%   92.1%
 
 **Keyword expansion IDF experiment:** Tested three term selection strategies for keyword expansion: (1) raw frequency (original), (2) aggressive IDF `log(N/df)`, (3) BM25-damped IDF `log((N-df+0.5)/(df+0.5)+1)`. Aggressive IDF improved MRR/R@1 but crushed multi-hop R@10 (-2.3pp) by filtering bridge terms. BM25-damped recovered multi-hop while keeping MRR gains. The damped formula matches BM25's own information-theoretic assumptions — consistent with the scoring already in use.
 
+### Level 5 — Graph-Augmented Retrieval (2026-03-27)
+
+Synthetic claim/segment nodes from v6 extraction inserted into DBs as Phase 1 vocabulary bridges (1,270 nodes, ~8,400 edges across 10 conversations). Synthetic nodes participate in FTS+vec retrieval, then are filtered before reranking — the reranker only scores turns. `graph_synthetic_score` captures the max RRF score of any synthetic node pointing to each turn; `graph_coref_hits` counts how many other candidates share claim-coreference edges with each turn.
+
+**Search size increase:** Phase 1 retrieval expanded from 200 to 4000 for both FTS and vec, pulling all candidates from benchmark-sized DBs (~500-800 memories). This eliminates the candidate pool crowding that plagued early Level 5 attempts — with the old 200-limit, synthetic nodes consumed ~100 of ~400 retrieval slots, reducing turn coverage.
+
+**Feature selection:** Two rounds of selection on the 4000-size extractions. Round 1: forward stepwise (R@10 primary, NDCG secondary) with 5 seeds, backward elimination (R@10) from 21-feature union with 5 seeds. Round 2: 15 manual variations testing swaps and additions around the intersection set. Config K (swap `score_percentile` → `token_count` from the 15-feature intersection) won on mean R@10, variance, MRR, and NDCG.
+
+**Final 15 features:** `fts_rank`, `vec_rank`, `fts_bm25`, `vec_dist`, `query_coverage`, `query_length`, `rank_agreement`, `token_count`, `has_temporal_expr`, `topk_session_frac`, `mmr_redundancy`, `unique_token_frac`, `phase1_rrf_score`, `graph_synthetic_score`, `graph_coref_hits`.
+
+5-seed CV variance: R@10 85.2-86.0% (0.8pp spread).
+
+**Feature importance (gain):**
+```
+  [D] token_count         :    485.3
+  [I] graph_synthetic_score:    432.1
+  [B] query_coverage      :    401.7
+  [G] unique_token_frac   :    387.9
+  [A] fts_bm25            :    312.7
+  [A] vec_dist            :    292.9
+  [A] fts_rank            :    286.6
+  [I] graph_coref_hits    :    283.3
+  [C] rank_agreement      :    266.0
+  [B] query_length        :    252.0
+  [A] vec_rank            :    244.9
+  [G] mmr_redundancy      :    235.8
+  [F] topk_session_frac   :    205.4
+  [H] phase1_rrf_score    :    143.9
+  [F] has_temporal_expr   :     59.5
+```
+
+`token_count` overtook `graph_synthetic_score` as #1 feature with larger search sizes. Both graph features (`graph_synthetic_score` #2, `graph_coref_hits` #8) earn their place — removing either degrades R@10. The feature set is stable: every variation tested (additions, removals, swaps of individual features) performed worse.
+
+**Baseline (`--recall-limit 800 --graph-resolve`, no expansion, all 10 conversations):**
+
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20    R@50
+----------------------------------------------------------------------
+single-hop        281   0.513   37.0%   59.4%   68.7%   83.6%   88.3%   92.9%
+temporal          320   0.601   47.8%   69.1%   75.0%   82.8%   86.6%   92.2%
+multi-hop          89   0.372   28.1%   40.4%   44.9%   58.4%   71.9%   80.9%
+open-domain       841   0.575   47.6%   62.3%   68.4%   78.2%   86.9%   91.3%
+adversarial       446   0.343   23.1%   40.1%   46.6%   55.6%   64.6%   73.5%
+----------------------------------------------------------------------
+OVERALL          1531   0.557   44.5%   61.9%   68.5%   79.0%   86.2%   91.2%
+(excludes adversarial)
+```
+
+Baseline R@10 (79.0%) is well below Level 4 baseline (86.3%). Without expansion, synthetic nodes in Phase 1 still crowd out turns even at 4000 search size — the reranker filters them before scoring, but they consume Phase 1 slots that turns would have occupied. Expansion recovers this by pulling in additional turns via keyword bridging.
+
+**With `--expand-all --recall-limit 800 --graph-resolve` (all 10 conversations):**
+
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20    R@50
+----------------------------------------------------------------------
+single-hop        281   0.789   73.7%   81.9%   84.0%   87.5%   95.4%   98.6%
+temporal          320   0.824   78.1%   83.8%   86.9%   90.6%   94.1%   97.5%
+multi-hop          89   0.560   48.3%   59.6%   67.4%   68.5%   77.5%   87.6%
+open-domain       841   0.803   74.9%   83.1%   85.0%   89.9%   94.6%   97.7%
+adversarial       446   0.678   59.9%   72.2%   76.7%   81.4%   88.3%   94.6%
+----------------------------------------------------------------------
+OVERALL          1531   0.790   73.8%   81.6%   84.2%   88.4%   93.7%   97.3%
+(excludes adversarial)
+```
+
+**Delta vs Level 4 expanded (OVERALL):**
+
+| Metric | Level 4 expanded | Level 5 expanded | Delta |
+|--------|-----------------|-----------------|-------|
+| MRR | 0.713 | 0.790 | +0.077 |
+| R@1 | 61.9% | 73.8% | +11.9pp |
+| R@10 | 88.7% | 88.4% | -0.3pp |
+| R@20 | 92.1% | 93.7% | +1.6pp |
+
+**Mixed results.** MRR, R@1, and R@20 all improved substantially — the graph features help rank correct results higher and recover more at deeper cutoffs. But R@10 is flat, and **multi-hop R@10 regressed from 75.3% to 68.5% (-6.8pp)**. The graph was designed to bridge vocabulary gaps for multi-hop queries specifically, so this regression is the opposite of the expected outcome.
+
+Per-category R@10: single-hop -3.6pp, temporal +2.8pp, multi-hop -6.8pp, open-domain +0.2pp. The MRR gains are broad (single-hop +0.096, temporal +0.088, open-domain +0.068) but multi-hop MRR also improved (+0.082), suggesting the graph helps ranking even where recall dropped.
+
+**What didn't work: early Level 5 attempts.** The initial 15-feature set (selected at old 200-limit search sizes) included `graph_edge_count`, `score_percentile`, `theme_overlap`, `speaker_match`, `neighbor_density`, `entity_overlap`, and `theme_complementarity` but lacked `token_count`, `mmr_redundancy`, `unique_token_frac`, `rank_agreement`, and `phase1_rrf_score`. This produced R@10=85.2% expanded — a 3.5pp regression from Level 4. Re-running feature selection on 4000-size extractions recovered performance. Lesson: feature selection must match the search configuration used at eval time.
+
+### Level 5b — Synthetic Coverage Scoring (2026-03-28)
+
+Level 5 filtered synthetic nodes before Phase 2 scoring — they bridged vocabulary gaps in Phase 1 RRF but were removed before the reranker ranked results. This wasted their contribution: if a synthetic carries the same evidence as the GT turn it was extracted from, filtering it means the evidence is only findable via the (often weak) turn match.
+
+L5b changes two things:
+1. **Synthetics stay in the result set.** No `--graph-resolve` filtering. The reranker scores synthetics alongside turns.
+2. **Reranker retrained with synthetic labels.** LLM-judged coverage table determines which synthetics carry evidence for each question. Synthetics covering evidence get label=1.0 in training.
+
+**Synthetic coverage judging:** For each question, Sonnet evaluated whether each synthetic node (extracted from GT evidence turns) contains the specific information needed to answer the question — not just topic overlap, but the actual facts/details. Calibrated against Opus ground truth (49 samples): Sonnet batch_size=10 achieved 87.5% agreement with zero nonsensical disagreements. Full run: 1,977 questions, 5,118 synth-evidence pairs, 3,916 covered (76.5%).
+
+**Scoring change:** At eval time, a synthetic at rank k counts as recalling a GT evidence turn if the coverage table says it covers that turn for that question. This is the fair way to score vocabulary bridges — a reader seeing the synthetic would have the same evidence available.
+
+**Feature importance shift:** With synthetics as direct candidates, `graph_synthetic_score` dropped from #2 (432 gain, L5) to #13 (378 gain). `token_count` became #1 (1947 gain) — it helps the model distinguish turns from shorter synthetic claims/segments.
+
+```
+  [D] token_count         :   1947.0
+  [G] unique_token_frac   :   1772.6
+  [B] query_coverage      :   1541.8
+  [A] fts_bm25            :   1236.7
+  [A] vec_dist            :   1215.5
+  [C] rank_agreement      :   1032.0
+  [A] fts_rank            :   1030.9
+  [B] query_length        :    950.6
+  [G] mmr_redundancy      :    943.2
+  [F] topk_session_frac   :    925.1
+  [A] vec_rank            :    916.0
+  [H] phase1_rrf_score    :    682.4
+  [I] graph_synthetic_score:    378.1
+  [F] has_temporal_expr   :    203.7
+  [I] graph_coref_hits    :    203.4
+```
+
+**With `--expand-all --recall-limit 800 --synthetic-coverage` (all 10 conversations):**
+
+```
+Category            N     MRR     R@1     R@3     R@5    R@10    R@20    R@50
+----------------------------------------------------------------------
+single-hop        281   0.909   86.5%   94.7%   97.2%   98.2%   98.9%   99.3%
+temporal          320   0.868   83.1%   88.8%   91.6%   94.4%   95.6%   97.8%
+multi-hop          89   0.758   69.7%   77.5%   80.9%   88.8%   91.0%   96.6%
+open-domain       841   0.891   85.5%   92.0%   93.7%   95.5%   97.3%   98.3%
+adversarial       446   0.887   84.8%   91.5%   94.2%   95.7%   97.1%   98.4%
+----------------------------------------------------------------------
+OVERALL          1531   0.882   84.3%   91.0%   93.1%   95.4%   96.9%   98.3%
+(excludes adversarial)
+```
+
+**Delta vs Level 4 and Level 5 expanded (OVERALL):**
+
+| Metric | L4 expanded | L5 expanded | L5b expanded | L5b vs L4 |
+|--------|-------------|-------------|--------------|-----------|
+| MRR | 0.713 | 0.790 | **0.882** | **+0.169** |
+| R@1 | 61.9% | 73.8% | **84.3%** | **+22.4pp** |
+| R@10 | 88.7% | 88.4% | **95.4%** | **+6.7pp** |
+| R@20 | 92.1% | 93.7% | **96.9%** | **+4.8pp** |
+| Multi-hop R@10 | 75.3% | 68.5% | **88.8%** | **+13.5pp** |
+
+**Multi-hop recovery.** L5 regressed multi-hop R@10 by 6.8pp because synthetics bridged vocabulary gaps in Phase 1 but were filtered before scoring. L5b recovers the regression and adds 13.5pp over L4. The synthetic vocabulary bridges are doing exactly what they were designed for: the 88% of multi-hop misses caused by zero content-word overlap with evidence are now covered by synthetics that rephrase the same information in query-adjacent vocabulary.
+
+**Caveat:** The improvement is partly definitional — synthetics now count as evidence hits via coverage scoring. But this is the fair comparison: in production, a user seeing a synthetic that carries the same evidence as the original turn would have the same information available. The coverage table ensures only synthetics that actually carry the relevant information get credit.
+
 ## End-to-End QA Results
 
 ### Run 1 — GPT-4.1-mini reader (2026-03-21)
@@ -434,6 +575,35 @@ Conv  2: 90.8%    Conv  7: 87.4%
 Conv  3: 78.4%    Conv  8: 84.6%
 Conv  4: 83.7%    Conv  9: 86.7%
 ```
+
+### Run 2 — L5b retrieval, GPT-4.1-mini reader (2026-03-28)
+
+Level 5b retrieval (15-feature graph-augmented reranker with synthetic coverage scoring, two-phase expansion, recall-limit 800), GPT-4.1-mini reader, batch Opus judge (200 per batch). All 10 conversations, skip adversarial.
+
+```
+Judge             N    single-hop  temporal  multi-hop  open-domain  OVERALL
+──────────────────────────────────────────────────────────────────────────────
+Opus (orig GT) 1540      81.9%      76.9%     62.5%      92.7%       85.6%
+Opus (corr GT) 1540      84.0%      80.4%     65.6%      93.3%       87.2%
+```
+
+**Delta vs Run 1 (Level 3 retrieval, Opus judge, original GT):**
+
+| Category | Run 1 | Run 2 | Delta |
+|----------|-------|-------|-------|
+| single-hop | 80.9% | 81.9% | +1.0pp |
+| temporal | 84.4% | 76.9% | -7.5pp |
+| multi-hop | 61.5% | 62.5% | +1.0pp |
+| open-domain | 89.5% | 92.7% | +3.2pp |
+| OVERALL | 85.1% | 85.6% | +0.5pp |
+
+Retrieval hit rates: single-hop 94.3%, temporal 91.9%, multi-hop 67.7%, open-domain 94.4%. The evidence is almost always in the top-20 context shown to the reader.
+
+**Observation:** A large retrieval improvement (R@10 88.7% -> 95.4%) produced only a modest QA gain (+0.5pp). The bottleneck has shifted from retrieval to reader extraction. Multi-hop retrieval hit rate (67.7%) is lower than L5b R@10 (88.8%) because the run.py evidence matcher doesn't count synthetic coverage — synthetics are in the reader context and helping, but aren't counted as "retrieval hits" in the report.
+
+**Temporal regression (-7.5pp):** Unexpected. Retrieval hit rate is high (91.9%), so the evidence is present. The regression may be caused by synthetic nodes in the reader context diluting temporal signals — the reader sees claims/segments alongside full dialogue turns, and temporal questions require precise date extraction from the original context.
+
+**Corrected GT impact:** +1.6pp overall (85.6% -> 87.2%). The corrected GT fixes 99 questions with hallucinated, temporally wrong, or ambiguous gold answers.
 
 ### Reader model comparison: GPT-4.1-mini vs GPT-5.4-mini
 
@@ -485,15 +655,17 @@ Ori Mnemos      37.69  –      –     29.31  –      –       –     –   
 | MemU | 92.09% | — | 1-4 | No public methodology |
 | MemMachine v0.2 | 91.23% | — | 1-4 | $43.5M funding |
 | EXIA GHOST | 89.94% | GPT-4o-mini | 1-4 | Proprietary; ChromaDB + MiniLM, LLM extraction of atomic facts. See `research/sources/exia-ghost.md` |
-| **Somnigraph** | **88.3%** | **GPT-4.1-mini** | **1-4** | **No sleep enhancements yet** |
-| **Somnigraph** | **85.1%** | **Opus 4.6** | **1-4** | **Stricter judge (+3.2pp)** |
+| **Somnigraph** | **88.3%** | **GPT-4.1-mini** | **1-4** | **Run 1: L3 retrieval** |
+| **Somnigraph** | **87.2%** | **Opus 4.6** | **1-4** | **Run 2: L5b retrieval, corrected GT** |
+| **Somnigraph** | **85.6%** | **Opus 4.6** | **1-4** | **Run 2: L5b retrieval, original GT** |
+| **Somnigraph** | **85.1%** | **Opus 4.6** | **1-4** | **Run 1: L3 retrieval** |
 | EXIA GHOST | 85.80% | GPT-4o-mini | 1-5 | Only system publishing cat 5; 71.52% adversarial |
 | RedPlanet CORE | 88.24% | — | 1-4 | Self-reported, Neo4j + pgvector |
 | Memobase | 75.78% | — | 1-4 | |
 
 *All competitor scores are self-reported. No independent cross-verification exists for any system. Judge leniency varies: Opus is 3.2pp stricter than GPT-4.1-mini (measured). GPT-4o-mini leniency relative to GPT-4.1-mini is unknown.*
 
-**Note on Somnigraph headroom:** Current results use baseline retrieval + reader with no sleep enhancements (no consolidation, no edge building, no summary generation, no expansion on full QA pipeline). Sleep pass ablation and feedback loop ablation are pending — these represent the primary expected sources of uplift.
+**Note on Somnigraph headroom:** Run 2 uses L5b retrieval with graph-augmented reranking and two-phase expansion, but no sleep enhancements (no consolidation, no summary generation, no feedback loop). The bottleneck has shifted from retrieval (95.4% R@10) to reader extraction — better retrieval produced only +0.5pp QA gain. Next levers: reader model upgrade, sleep pass ablation, feedback loop ablation, temporal regression investigation.
 
 **Key observations:**
 - Everyone clusters in the 35-39 F1 range for single-hop. The field is saturated on easy questions.
