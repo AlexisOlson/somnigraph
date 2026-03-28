@@ -425,6 +425,11 @@ def impl_recall(
         vector_input = context.strip() if context and context.strip() else query
         query_embedding = embed_text(vector_input)
 
+        # --- Build rowid→memory_id lookup (one query, replaces per-row lookups) ---
+        _rowid_map = {}
+        for r in db.execute("SELECT rowid, memory_id FROM memory_rowid_map").fetchall():
+            _rowid_map[r["rowid"]] = r["memory_id"]
+
         # --- Vector search ---
         vec_k = max(limit * 5, 200)
         vec_results = db.execute(
@@ -436,17 +441,14 @@ def impl_recall(
             (serialize_f32(query_embedding), vec_k),
         ).fetchall()
 
-        # Map rowids to memory_ids (keep raw distances for reranker)
+        # Map rowids to memory_ids using pre-built dict
         vec_ranked = {}  # memory_id -> rank (0-based)
         vec_distances = {}  # memory_id -> raw cosine distance
         for rank, row in enumerate(vec_results):
-            mapped = db.execute(
-                "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
-                (row["rowid"],),
-            ).fetchone()
-            if mapped:
-                vec_ranked[mapped["memory_id"]] = rank
-                vec_distances[mapped["memory_id"]] = row["distance"]
+            mid = _rowid_map.get(row["rowid"])
+            if mid:
+                vec_ranked[mid] = rank
+                vec_distances[mid] = row["distance"]
 
         # --- Keyword search (keep raw BM25 scores for reranker) ---
         fts_ranked = {}  # memory_id -> rank (0-based)
@@ -464,18 +466,16 @@ def impl_recall(
             ).fetchall()
 
             for rank, row in enumerate(fts_results):
-                mapped = db.execute(
-                    "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
-                    (row["rowid"],),
-                ).fetchone()
-                if mapped:
-                    fts_ranked[mapped["memory_id"]] = rank
-                    fts_bm25_scores[mapped["memory_id"]] = row["rank"]
+                mid = _rowid_map.get(row["rowid"])
+                if mid:
+                    fts_ranked[mid] = rank
+                    fts_bm25_scores[mid] = row["rank"]
         except sqlite3.OperationalError:
             # FTS query syntax error — fall back to vector-only
             pass
 
         # --- Theme channel: rank active memories by theme overlap with query ---
+        # Pre-parse theme tokens once (avoids re-parsing JSON per query in batch use)
         query_tokens = set(query.lower().split())
         theme_ranked: dict[str, int] = {}
         theme_overlap_map: dict[str, int] = {}
@@ -486,7 +486,7 @@ def impl_recall(
             theme_overlaps = []
             for r in theme_rows_all:
                 try:
-                    mem_themes = set(json.loads(r["themes"])) if r["themes"] else set()
+                    mem_themes = json.loads(r["themes"]) if r["themes"] else []
                 except (json.JSONDecodeError, TypeError):
                     continue
                 # Lowercase theme tokens for matching
@@ -644,14 +644,29 @@ def impl_recall(
             sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
             top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
 
-        # Fetch memories and apply filters (post-RRF), capped by limit
+        # Fetch memories in batch (one query instead of per-result)
+        # Take more than limit to allow for filtering
+        fetch_ids = []
+        for mid in sorted_ids:
+            if mid not in exclude_set:
+                fetch_ids.append(mid)
+            if len(fetch_ids) >= limit * 3:
+                break
+
+        mem_cache = {}
+        if fetch_ids:
+            ph = ",".join("?" * len(fetch_ids))
+            for r in db.execute(
+                f"SELECT * FROM memories WHERE id IN ({ph}) AND status = 'active'",
+                fetch_ids,
+            ).fetchall():
+                mem_cache[r["id"]] = r
+
         results = []
         for mid in sorted_ids:
             if mid in exclude_set:
                 continue
-            mem = db.execute(
-                "SELECT * FROM memories WHERE id = ? AND status = 'active'", (mid,)
-            ).fetchone()
+            mem = mem_cache.get(mid)
             if mem is None:
                 continue
             if category and mem["category"] != category:

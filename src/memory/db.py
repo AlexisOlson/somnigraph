@@ -3,6 +3,7 @@
 import json
 import logging
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +13,9 @@ from memory.constants import DATA_DIR
 from memory.fts import _themes_for_fts
 
 logger = logging.getLogger("claude-memory")
+
+_schema_lock = threading.Lock()
+_schema_initialized = False
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -28,6 +32,7 @@ __all__ = ["get_db", "DB_PATH", "DATA_DIR"]
 
 def get_db() -> sqlite3.Connection:
     """Open database connection with sqlite-vec loaded."""
+    global _schema_initialized
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(str(DB_PATH))
     db.enable_load_extension(True)
@@ -37,7 +42,11 @@ def get_db() -> sqlite3.Connection:
     db.execute("PRAGMA busy_timeout=5000")
     db.execute("PRAGMA foreign_keys=ON")
     db.row_factory = sqlite3.Row
-    _init_schema(db)
+    if not _schema_initialized:
+        with _schema_lock:
+            if not _schema_initialized:
+                _init_schema(db)
+                _schema_initialized = True
     return db
 
 
