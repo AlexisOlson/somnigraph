@@ -94,6 +94,8 @@ class ExpansionContext:
     vec_distances: dict[str, float]     # mutable
     fts_scores: dict[str, float]        # mutable
     all_speakers: set[str]              # known speakers (lowercase)
+    rowid_map: dict[int, str] = field(default_factory=dict)  # rowid -> memory_id (optional cache)
+    memories: dict[str, dict] = field(default_factory=dict)   # memory_id -> metadata (optional cache)
 
 
 @dataclass
@@ -166,9 +168,11 @@ def _get_idf(db: sqlite3.Connection) -> tuple[dict[str, float], int]:
 
 
 def _fts_search(db: sqlite3.Connection, query: str, limit: int = 30,
+                rowid_map: dict[int, str] | None = None,
                 ) -> list[tuple[str, float]]:
     """Run an FTS query and return (memory_id, bm25_score) pairs.
 
+    If rowid_map is provided, uses it for rowid->memory_id lookup (no DB hit).
     Handles OperationalError gracefully (returns empty list).
     """
     if not query or not query.strip():
@@ -184,12 +188,16 @@ def _fts_search(db: sqlite3.Connection, query: str, limit: int = 30,
 
     results = []
     for row in rows:
-        mapped = db.execute(
-            "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
-            (row["rowid"],),
-        ).fetchone()
-        if mapped:
-            results.append((mapped["memory_id"], row["score"]))
+        if rowid_map:
+            mid = rowid_map.get(row["rowid"])
+        else:
+            mapped = db.execute(
+                "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
+                (row["rowid"],),
+            ).fetchone()
+            mid = mapped["memory_id"] if mapped else None
+        if mid:
+            results.append((mid, row["score"]))
     return results
 
 
@@ -234,13 +242,13 @@ def expand_entity_focus(ctx: ExpansionContext) -> set[str]:
     new_ids = set()
     for entity in entities:
         # FTS phrase match — generous limit to find candidates outside initial pool
-        results = _fts_search(ctx.db, f'"{entity}"', limit=100)
+        results = _fts_search(ctx.db, f'"{entity}"', limit=100, rowid_map=ctx.rowid_map)
         for mid, score in results:
             if mid not in ctx.existing_ids and mid not in new_ids:
                 new_ids.add(mid)
 
     if new_ids:
-        logger.info("  expand_entity_focus: +%d candidates (entities: %s)",
+        logger.debug("  expand_entity_focus: +%d candidates (entities: %s)",
                      len(new_ids), ", ".join(sorted(entities)))
     return new_ids
 
@@ -307,7 +315,7 @@ def expand_multi_query(ctx: ExpansionContext) -> set[str]:
     RRF_K = 60
 
     for sq in sub_queries:
-        results = _fts_search(ctx.db, sq, limit=20)
+        results = _fts_search(ctx.db, sq, limit=20, rowid_map=ctx.rowid_map)
         for rank, (mid, _score) in enumerate(results):
             if mid not in ctx.existing_ids:
                 rrf_scores[mid] = rrf_scores.get(mid, 0.0) + 1.0 / (RRF_K + rank)
@@ -317,7 +325,7 @@ def expand_multi_query(ctx: ExpansionContext) -> set[str]:
     new_ids = {mid for mid, _ in ranked}
 
     if new_ids:
-        logger.info("  expand_multi_query: +%d candidates (%d sub-queries)",
+        logger.debug("  expand_multi_query: +%d candidates (%d sub-queries)",
                      len(new_ids), len(sub_queries))
     return new_ids
 
@@ -370,7 +378,7 @@ def expand_keyword(ctx: ExpansionContext) -> set[str]:
 
     # Run FTS with OR-joined keywords
     fts_query = " OR ".join(top_terms)
-    results = _fts_search(ctx.db, fts_query, limit=30)
+    results = _fts_search(ctx.db, fts_query, limit=30, rowid_map=ctx.rowid_map)
 
     new_ids = set()
     for mid, score in results:
@@ -378,7 +386,7 @@ def expand_keyword(ctx: ExpansionContext) -> set[str]:
             new_ids.add(mid)
 
     if new_ids:
-        logger.info("  expand_keyword: +%d candidates (terms: %s)",
+        logger.debug("  expand_keyword: +%d candidates (terms: %s)",
                      len(new_ids), ", ".join(top_terms[:5]))
     return new_ids
 
@@ -424,7 +432,7 @@ def expand_session(ctx: ExpansionContext) -> set[str]:
                             break
 
     if new_ids:
-        logger.info("  expand_session: +%d candidates (sessions: %s)",
+        logger.debug("  expand_session: +%d candidates (sessions: %s)",
                      len(new_ids), ", ".join(sorted(sessions_expanded)))
     return new_ids
 
@@ -468,14 +476,14 @@ def expand_entity_bridge(ctx: ExpansionContext) -> set[str]:
     if not entity_query:
         return set()
 
-    results = _fts_search(ctx.db, entity_query, limit=20)
+    results = _fts_search(ctx.db, entity_query, limit=20, rowid_map=ctx.rowid_map)
     new_ids = set()
     for mid, score in results:
         if mid not in ctx.existing_ids:
             new_ids.add(mid)
 
     if new_ids:
-        logger.info("  expand_entity_bridge: +%d candidates (bridge entities: %s)",
+        logger.debug("  expand_entity_bridge: +%d candidates (bridge entities: %s)",
                      len(new_ids), ", ".join(sorted(bridge_entities)[:5]))
     return new_ids
 
@@ -539,7 +547,7 @@ def expand_rocchio(ctx: ExpansionContext) -> set[str]:
             ctx.vec_distances[mid] = rr["distance"]
 
     if new_ids:
-        logger.info("  expand_rocchio: +%d candidates", len(new_ids))
+        logger.debug("  expand_rocchio: +%d candidates", len(new_ids))
     return new_ids
 
 
@@ -552,6 +560,7 @@ def compute_entity_fts_ranks(
     question: str,
     speakers: set[str],
     candidate_ids: set[str],
+    rowid_map: dict[int, str] | None = None,
 ) -> dict[str, int]:
     """Return {memory_id: rank} for entity-focused FTS. -1 if not found.
 
@@ -564,7 +573,7 @@ def compute_entity_fts_ranks(
 
     best_rank: dict[str, int] = {}
     for entity in entities:
-        results = _fts_search(db, f'"{entity}"', limit=100)
+        results = _fts_search(db, f'"{entity}"', limit=100, rowid_map=rowid_map)
         for rank, (mid, _score) in enumerate(results):
             if mid in candidate_ids:
                 if mid not in best_rank or rank < best_rank[mid]:
@@ -578,6 +587,7 @@ def compute_sub_query_hits(
     question: str,
     speakers: set[str],
     candidate_ids: set[str],
+    rowid_map: dict[int, str] | None = None,
 ) -> dict[str, int]:
     """Return {memory_id: hit_count} for sub-query decomposition.
 
@@ -624,7 +634,7 @@ def compute_sub_query_hits(
     # Count how many sub-queries each candidate appears in
     hit_counts: dict[str, int] = {mid: 0 for mid in candidate_ids}
     for sq in sub_queries:
-        results = _fts_search(db, sq, limit=30)
+        results = _fts_search(db, sq, limit=30, rowid_map=rowid_map)
         matched_ids = {mid for mid, _score in results}
         for mid in candidate_ids:
             if mid in matched_ids:
@@ -638,12 +648,15 @@ def compute_seed_keyword_overlap(
     question: str,
     seed_ids: list[str],
     candidate_ids: set[str],
+    memories: dict[str, dict] | None = None,
 ) -> dict[str, float]:
     """Return {memory_id: overlap_fraction} for seed keyword analysis.
 
     Extracts distinctive keywords from seeds (tokens in seeds but not in
     query, excluding stopwords). For each candidate, computes the fraction
     of seed keywords present in its content.
+
+    If memories dict is provided, uses cached content instead of DB lookups.
     """
     if not seed_ids:
         return {mid: 0.0 for mid in candidate_ids}
@@ -651,12 +664,16 @@ def compute_seed_keyword_overlap(
     # Collect tokens from seed content
     seed_tokens: Counter = Counter()
     for seed_id in seed_ids:
-        row = db.execute(
-            "SELECT content FROM memories WHERE id = ?", (seed_id,)
-        ).fetchone()
-        if not row or not row["content"]:
+        if memories and seed_id in memories:
+            content = memories[seed_id].get("content", "")
+        else:
+            row = db.execute(
+                "SELECT content FROM memories WHERE id = ?", (seed_id,)
+            ).fetchone()
+            content = row["content"] if row else ""
+        if not content:
             continue
-        content = re.sub(r"^\[[^\]]+\]\s*", "", row["content"])
+        content = re.sub(r"^\[[^\]]+\]\s*", "", content)
         for tok in content.lower().split():
             clean = re.sub(r"[.,!?\"';:()\[\]]+", "", tok)
             if clean and len(clean) >= 3 and clean not in STOPWORDS:
@@ -684,14 +701,18 @@ def compute_seed_keyword_overlap(
     # For each candidate, compute overlap fraction
     result: dict[str, float] = {}
     for mid in candidate_ids:
-        row = db.execute(
-            "SELECT content FROM memories WHERE id = ?", (mid,)
-        ).fetchone()
-        if not row or not row["content"]:
+        if memories and mid in memories:
+            mem_content = memories[mid].get("content", "")
+        else:
+            row = db.execute(
+                "SELECT content FROM memories WHERE id = ?", (mid,)
+            ).fetchone()
+            mem_content = row["content"] if row else ""
+        if not mem_content:
             result[mid] = 0.0
             continue
         content_tokens = set()
-        for tok in row["content"].lower().split():
+        for tok in mem_content.lower().split():
             clean = re.sub(r"[.,!?\"';:()\[\]]+", "", tok)
             if clean:
                 content_tokens.add(clean)
@@ -752,7 +773,7 @@ def run_expansions(ctx: ExpansionContext, config) -> ExpansionResult:
     total_new = len(result.all_new_ids)
     if total_new > 0:
         methods_used = [m for m, ids in result.per_method.items() if ids]
-        logger.info("  Expansion: %d → %d candidates (+%d net from %d methods: %s)",
+        logger.debug("  Expansion: %d → %d candidates (+%d net from %d methods: %s)",
                      pre_count, pre_count + total_new, total_new,
                      len(methods_used), ", ".join(methods_used))
 

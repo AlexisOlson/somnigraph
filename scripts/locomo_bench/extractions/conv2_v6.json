@@ -1,0 +1,2278 @@
+{
+  "entities": [
+    {
+      "name": "John",
+      "aliases": [],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Maria",
+      "aliases": [],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Kyle",
+      "aliases": [],
+      "type": "person",
+      "grounding": "John's one-year-old son"
+    },
+    {
+      "name": "Sara",
+      "aliases": [],
+      "type": "person",
+      "grounding": "John's daughter"
+    },
+    {
+      "name": "Max",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "John's family dog who passed away after 10 years"
+    },
+    {
+      "name": "Coco",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Maria's puppy"
+    },
+    {
+      "name": "Shadow",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Maria's second adopted dog from a shelter"
+    },
+    {
+      "name": "Rob",
+      "aliases": [],
+      "type": "person",
+      "grounding": "John's colleague who invited him to yoga"
+    },
+    {
+      "name": "David",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Person Maria met at a charity event who shared his story of hardship"
+    },
+    {
+      "name": "Jean",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Woman Maria met while volunteering; went through divorce, job loss, and homelessness"
+    },
+    {
+      "name": "Laura",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Shelter resident who wrote a gratitude letter to volunteers"
+    },
+    {
+      "name": "Cindy",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Shelter resident who wrote a thank-you note"
+    },
+    {
+      "name": "Samuel",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Elderly veteran John met at a veteran's hospital"
+    },
+    {
+      "name": "West County",
+      "aliases": [],
+      "type": "place",
+      "grounding": "John's old neighborhood area"
+    },
+    {
+      "name": "Pacific Northwest",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Region in northwestern United States; John's family road trip destination"
+    },
+    {
+      "name": "London",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Capital of England, United Kingdom"
+    },
+    {
+      "name": "Spain",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Country in southwestern Europe; Maria's solo trip destination"
+    },
+    {
+      "name": "Oregon",
+      "aliases": [],
+      "type": "place",
+      "grounding": "State in northwestern United States; Maria's childhood family road trip destination"
+    },
+    {
+      "name": "Florida",
+      "aliases": [],
+      "type": "place",
+      "grounding": "State in southeastern United States; Maria's vacation destination"
+    },
+    {
+      "name": "California",
+      "aliases": [],
+      "type": "place",
+      "grounding": "State in western United States; John's family vacation destination"
+    }
+  ],
+  "claims": [
+    {
+      "subject": "John",
+      "relation": "has_goal",
+      "object": "getting into local politics to improve education and infrastructure",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 2, 4, 5, 9, 12, 14, 22, 23]},
+      "evidence_turn_ids": ["D1:6", "D1:8", "D5:1", "D9:6", "D12:1", "D14:1", "D22:1"],
+      "retrieval_text": "John wants to enter local politics focused on improving education and infrastructure in his community, motivated by seeing their decline in his neighborhood growing up."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "ran for political office multiple times without success",
+      "attributed_to": "John",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": {"type": "recurring", "sessions": [7, 14]},
+      "evidence_turn_ids": ["D7:2", "D14:1"],
+      "retrieval_text": "John ran for office again in session 7 and session 14, acknowledging he has not been successful before but continues pursuing his dream."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "volunteers regularly at a homeless shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 2, 5, 6, 7, 8, 10, 11, 12, 15, 20, 21, 25, 26, 27, 29, 32]},
+      "evidence_turn_ids": ["D1:3", "D2:1", "D5:6", "D6:3", "D7:3", "D10:10", "D11:10", "D12:18", "D20:7", "D27:4", "D29:1", "D32:14"],
+      "retrieval_text": "Maria volunteers regularly at a homeless shelter, serving meals, organizing events, giving talks, and building relationships with residents. She started about a year before session 27 after seeing a family struggling on the streets."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_skill",
+      "object": "aerial yoga practitioner",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 18]},
+      "evidence_turn_ids": ["D1:3", "D18:15", "D18:17"],
+      "retrieval_text": "Maria does aerial yoga and especially enjoys upside-down poses that make her feel free and light."
+    },
+    {
+      "subject": "John",
+      "relation": "has_skill",
+      "object": "practices kickboxing",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [1]},
+      "evidence_turn_ids": ["D1:4"],
+      "retrieval_text": "John does kickboxing and says it gives him energy."
+    },
+    {
+      "subject": "John",
+      "relation": "has_skill",
+      "object": "practices taekwondo",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [2]},
+      "evidence_turn_ids": ["D2:28"],
+      "retrieval_text": "John mentioned going off to do taekwondo at the end of session 2."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "started weekend beginner yoga class with a colleague",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [7, 10, 25]},
+      "evidence_turn_ids": ["D7:16", "D10:1", "D10:5", "D25:11"],
+      "retrieval_text": "John started a weekend beginner yoga class with colleague Rob. He finds it helps with relaxation and flexibility. He continues going to a yoga studio that also offers kickboxing and circuit training."
+    },
+    {
+      "subject": "John",
+      "relation": "has_trait",
+      "object": "deeply family-oriented, calls family his rock and motivation",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [2, 8, 13, 18, 19, 22, 31]},
+      "evidence_turn_ids": ["D2:10", "D2:14", "D8:2", "D13:13", "D19:16", "D22:5", "D31:17"],
+      "retrieval_text": "John repeatedly describes his family as his rock, motivation, and the reason he never gives up. He frequently shares family photos and talks about family activities."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_trait",
+      "object": "has a small family but values close friendships",
+      "attributed_to": "Maria",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2, 13]},
+      "evidence_turn_ids": ["D2:17", "D13:12"],
+      "retrieval_text": "Maria says her family is small but she loves spending time with friends. She relies on her small family for strength during tough times."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "donated old car to homeless shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [2]},
+      "evidence_turn_ids": ["D2:1"],
+      "retrieval_text": "Maria donated her old car to the homeless shelter she volunteers at."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "joined a service-focused online group",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [3]},
+      "evidence_turn_ids": ["D3:1"],
+      "retrieval_text": "John joined a service-focused online group and found it emotionally inspiring, with members sharing stories and encouragement."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "failed military aptitude test, later retook and passed",
+      "attributed_to": "John",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [3, 8]},
+      "evidence_turn_ids": ["D3:11", "D8:18"],
+      "retrieval_text": "John failed the military aptitude test before session 3, causing stress. By session 8 he retook it with great results and felt drawn to serving his country."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "had a family road trip",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [1]},
+      "evidence_turn_ids": ["D1:2"],
+      "retrieval_text": "John returned from a family road trip just before session 1."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "had an unexpected incident on his way home",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:2", "D4:6"],
+      "retrieval_text": "John had an unexpected incident on his way home before session 4. He stayed calm and asked for assistance to make it back safely."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "became friends with a fellow volunteer",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:1"],
+      "retrieval_text": "Maria became friends with one of her fellow volunteers at the homeless shelter."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "family had financial struggles; aunt helped them",
+      "attributed_to": "Maria",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [5, 6]},
+      "evidence_turn_ids": ["D5:8", "D6:9"],
+      "retrieval_text": "Maria's family had money problems when she was younger and relied on help from her aunt. Her aunt believed in volunteering and inspired Maria to volunteer."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "participated in a charity event serving meals",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [6]},
+      "evidence_turn_ids": ["D6:1", "D6:3"],
+      "retrieval_text": "Maria challenged herself to do a charity event where she served meals and found it heartwarming."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "met David at charity event, connected him with housing services",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [6]},
+      "evidence_turn_ids": ["D6:5", "D6:7"],
+      "retrieval_text": "Maria met David at a charity event, heard his story of hardship, and connected him with a nearby organization offering housing and support for homeless individuals."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "started helping with a food drive for unemployed people",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [6]},
+      "evidence_turn_ids": ["D6:10", "D6:12"],
+      "retrieval_text": "John started helping with a community food drive for people who lost their jobs, motivated by seeing the effect of unemployment on neighbors."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "took a creative writing class",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [7]},
+      "evidence_turn_ids": ["D7:1"],
+      "retrieval_text": "Maria took a creative writing class and found it super enlightening."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "met Jean, a resilient homeless woman, while volunteering",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [7]},
+      "evidence_turn_ids": ["D7:5", "D7:7"],
+      "retrieval_text": "Maria met Jean while volunteering, a woman who went through divorce, job loss, and homelessness yet stayed optimistic and resilient."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "grandmother passed away",
+      "attributed_to": "Maria",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [8]},
+      "evidence_turn_ids": ["D8:1"],
+      "retrieval_text": "Maria's grandmother passed away before session 8 and she was trying to stay positive."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "has a one-year-old son named Kyle",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [8]},
+      "evidence_turn_ids": ["D8:4"],
+      "retrieval_text": "John has a one-year-old son named Kyle. He also has other kids and a wife."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "takes family to the park a few times a week",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [8, 18, 31]},
+      "evidence_turn_ids": ["D8:8", "D18:22", "D31:19"],
+      "retrieval_text": "John takes his family to the park a few times a week for bonding and outdoor play."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "traveled to London, England and was inspired by the architecture",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [8]},
+      "evidence_turn_ids": ["D8:15", "D8:17"],
+      "retrieval_text": "Maria traveled to London a few years ago and was captivated by the castles and architecture. She made a painting inspired by it."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_skill",
+      "object": "painter, created artwork inspired by London trip",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [8]},
+      "evidence_turn_ids": ["D8:15"],
+      "retrieval_text": "Maria made a painting inspired by her trip to London and the castles she saw there."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "taking a poetry class to express feelings",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [9]},
+      "evidence_turn_ids": ["D9:1"],
+      "retrieval_text": "Maria started taking a poetry class to help put her feelings into words."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "finished a degree and graduated",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [9]},
+      "evidence_turn_ids": ["D9:3", "D9:4"],
+      "retrieval_text": "John finished his degree and graduated, considering going into policymaking because of his degree and passion for positive impact."
+    },
+    {
+      "subject": "John",
+      "relation": "has_goal",
+      "object": "considering policymaking career after graduating",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [9]},
+      "evidence_turn_ids": ["D9:6"],
+      "retrieval_text": "John is considering going into policymaking because of his degree and his passion for making a positive impact."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "ran a 5K charity run for a homeless shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [10]},
+      "evidence_turn_ids": ["D10:10"],
+      "retrieval_text": "Maria participated in a 5K charity run for a homeless shelter and found the energy and unity inspiring."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "volunteered at a career fair at a local school",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [10]},
+      "evidence_turn_ids": ["D10:13"],
+      "retrieval_text": "John volunteered at a career fair at a local school and saw how lack of resources affects kids' dreams."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "car broke down, causing financial strain",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [11]},
+      "evidence_turn_ids": ["D11:1"],
+      "retrieval_text": "John's car broke down on the way to work, causing financial strain and difficulty getting it fixed."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "family road trip to Pacific Northwest and national parks",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [11]},
+      "evidence_turn_ids": ["D11:5"],
+      "retrieval_text": "John took a family road trip exploring the coast of the Pacific Northwest and visiting national parks."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "gave talks at the homeless shelter, received compliments",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [11]},
+      "evidence_turn_ids": ["D11:10"],
+      "retrieval_text": "Maria gave talks at the homeless shelter and received lots of compliments from other volunteers."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "bought a cross necklace to feel closer to her faith",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [11]},
+      "evidence_turn_ids": ["D11:10"],
+      "retrieval_text": "Maria bought a cross necklace to feel closer to her faith, which made her happy."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_trait",
+      "object": "religious, values her faith",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [11, 14]},
+      "evidence_turn_ids": ["D11:10", "D14:10"],
+      "retrieval_text": "Maria bought a cross necklace to feel closer to her faith and later joined a nearby church to feel closer to community and faith."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "started blogging about politics and government",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [12]},
+      "evidence_turn_ids": ["D12:1"],
+      "retrieval_text": "John started blogging about politics, researching policies and writing about education reform and infrastructure development."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "attended a tech convention with colleagues",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [12]},
+      "evidence_turn_ids": ["D12:9", "D12:11"],
+      "retrieval_text": "John and colleagues went to a convention about using tech for good in the community. The energy and brainstorming were empowering."
+    },
+    {
+      "subject": "John",
+      "relation": "has_goal",
+      "object": "planning a trip to the East Coast",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [12]},
+      "evidence_turn_ids": ["D12:17"],
+      "retrieval_text": "John mentioned planning a trip to the East Coast."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "family does boot camp workouts three times a week",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:3", "D13:7"],
+      "retrieval_text": "John started going to boot camps with his family three times a week for bonding and fitness. His kids are excited about staying active."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "solo trip to Spain where she tried surfing",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [13]},
+      "evidence_turn_ids": ["D13:24", "D13:30"],
+      "retrieval_text": "Maria took a solo trip to Spain last year where she tried surfing for the first time. She kept falling off but it taught her about perseverance."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_preference",
+      "object": "enjoys banana split sundaes after volunteering",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:18"],
+      "retrieval_text": "Maria's favorite treat is a banana split sundae which she enjoys after a day of volunteering."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "joined a nearby church",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [14]},
+      "evidence_turn_ids": ["D14:10"],
+      "retrieval_text": "Maria joined a nearby church to feel closer to a community and her faith."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "experienced a power cut highlighting infrastructure problems",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [14]},
+      "evidence_turn_ids": ["D14:13"],
+      "retrieval_text": "John experienced a power cut in his area that reinforced the importance of upgrading infrastructure."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "wants to improve his old area West County",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [14]},
+      "evidence_turn_ids": ["D14:21"],
+      "retrieval_text": "John wants to work on improving his old area, West County."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "working on petition to support military veterans",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [15, 16]},
+      "evidence_turn_ids": ["D15:1", "D15:3", "D16:1"],
+      "retrieval_text": "John started a project and petition to support military veterans and their rights. He organized a party for veterans to share stories."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "planning a ring-toss tournament for shelter fundraiser",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [15]},
+      "evidence_turn_ids": ["D15:18"],
+      "retrieval_text": "Maria is planning a ring-toss tournament for the homeless shelter's fundraiser."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "organized a chili cook-off fundraiser for the shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [16]},
+      "evidence_turn_ids": ["D16:2", "D16:4"],
+      "retrieval_text": "Maria organized a chili cook-off at a fundraiser for the homeless shelter."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "family dog Max passed away after 10 years",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [17]},
+      "evidence_turn_ids": ["D17:1", "D17:7"],
+      "retrieval_text": "John's family dog Max passed away after being part of the family for 10 years. Max taught them about love and loyalty."
+    },
+    {
+      "subject": "John",
+      "relation": "has_goal",
+      "object": "considering adopting a rescue dog",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [17, 31]},
+      "evidence_turn_ids": ["D17:11", "D31:7"],
+      "retrieval_text": "John is considering adopting a rescue dog for love and to teach his kids responsibility and compassion."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "started volunteering at a local dog shelter once a month",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [17]},
+      "evidence_turn_ids": ["D17:12"],
+      "retrieval_text": "Maria started volunteering at a local dog shelter once a month."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "went camping with church friends",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [18]},
+      "evidence_turn_ids": ["D18:1"],
+      "retrieval_text": "Maria went camping with friends from church."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "went mountaineering with workmates",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [18]},
+      "evidence_turn_ids": ["D18:2", "D18:4"],
+      "retrieval_text": "John went on a mountaineering trip with workmates and made it to the summit."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "childhood family road trip to Oregon with waterfall",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [18]},
+      "evidence_turn_ids": ["D18:3", "D18:5", "D18:7"],
+      "retrieval_text": "When Maria was younger, her family went on a road trip to Oregon where she saw a waterfall and bridge that felt like a fairy tale."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "joined a gym and is trying kundalini yoga",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:1", "D19:3"],
+      "retrieval_text": "Maria joined a gym and is trying kundalini yoga to get stronger and improve endurance."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "got promoted to assistant manager",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:6", "D19:8"],
+      "retrieval_text": "John got promoted to assistant manager at work after overcoming tech challenges, workplace issues, and self-doubt."
+    },
+    {
+      "subject": "John",
+      "relation": "has_trait",
+      "object": "overcame self-doubt and workplace challenges for promotion",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:12"],
+      "retrieval_text": "John faced technical hurdles, workplace challenges, and self-doubt on his way to promotion but powered through with family support and grit."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "had a vacation in Florida with family",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [19]},
+      "evidence_turn_ids": ["D19:23"],
+      "retrieval_text": "Maria went on a vacation in Florida with her family and shared a photo of the stunning sunset."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "family vacation in California",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [19]},
+      "evidence_turn_ids": ["D19:22"],
+      "retrieval_text": "John had a family vacation in California with a gorgeous sunset and strolling the shore."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "was in a car accident when someone ran a red light",
+      "attributed_to": "Maria",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [21]},
+      "evidence_turn_ids": ["D21:5"],
+      "retrieval_text": "A car ran a red light and hit Maria, but thankfully everyone was okay."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "helping cousin find a new place to live",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [21]},
+      "evidence_turn_ids": ["D21:5", "D21:7"],
+      "retrieval_text": "Maria's cousin had to leave and find a new place in a hurry, and Maria is helping her find housing."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "participated in a marching event for veterans' rights",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [21]},
+      "evidence_turn_ids": ["D21:22"],
+      "retrieval_text": "John participated in a marching event for veterans' rights and found it motivating."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "has a daughter named Sara",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [22]},
+      "evidence_turn_ids": ["D22:7"],
+      "retrieval_text": "John has a daughter named Sara; a family trip was taken for her birthday."
+    },
+    {
+      "subject": "John",
+      "relation": "has_preference",
+      "object": "enjoys weekly sunset walks for peace and disconnection",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [4, 22]},
+      "evidence_turn_ids": ["D4:10", "D22:15", "D22:17"],
+      "retrieval_text": "John enjoys watching sunsets and takes weekly walks to disconnect, think, and find peace. He sees sunsets at least once a week."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_preference",
+      "object": "takes regular me-time walks at a nearby park",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [22]},
+      "evidence_turn_ids": ["D22:18"],
+      "retrieval_text": "Maria takes regular me-time walks at a nearby park and finds it impactful."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "old area West County hit by a flood due to poor infrastructure",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [23]},
+      "evidence_turn_ids": ["D23:1"],
+      "retrieval_text": "John's old area was hit by a flood that ruined many homes due to inadequate infrastructure, reinforcing his drive to fix things."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "has friends from the gym she socializes with",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [23]},
+      "evidence_turn_ids": ["D23:14"],
+      "retrieval_text": "Maria went to dinner with friends from the gym."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "visited a veteran's hospital and met Samuel",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [24]},
+      "evidence_turn_ids": ["D24:1", "D24:3"],
+      "retrieval_text": "John visited a veteran's hospital and met an elderly veteran named Samuel whose stories were both inspiring and heartbreaking."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "picnic with church friends playing charades and scavenger hunt",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [24]},
+      "evidence_turn_ids": ["D24:6", "D24:8"],
+      "retrieval_text": "Maria had a picnic with friends from church where they played charades and a scavenger hunt."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "hiked with church friends to a summit",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [25]},
+      "evidence_turn_ids": ["D25:2", "D25:6"],
+      "retrieval_text": "Maria went hiking with church friends and found reaching the top breathtaking, giving her a sense of peace."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "enjoys his yoga studio that offers kickboxing and circuit training",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [25]},
+      "evidence_turn_ids": ["D25:11", "D25:13", "D25:17"],
+      "retrieval_text": "John goes to a yoga studio that also offers kickboxing, circuit training, and weight training."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "baked and delivered goods to the homeless shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [26]},
+      "evidence_turn_ids": ["D26:1"],
+      "retrieval_text": "Maria baked goods and dropped them off at the homeless shelter."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "joined a fire-fighting brigade",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [26, 32]},
+      "evidence_turn_ids": ["D26:2", "D26:4", "D32:1"],
+      "retrieval_text": "John joined a fire-fighting brigade. On his first call-out he helped save a family from a burning building. He compares the bond to his time in the military."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "has military background or connection",
+      "attributed_to": "John",
+      "polarity": "neutral",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [3, 8, 15, 24, 26]},
+      "evidence_turn_ids": ["D3:11", "D8:18", "D15:3", "D24:3", "D26:10"],
+      "retrieval_text": "John took a military aptitude test (failed then passed), is passionate about veterans' rights, visited veteran hospitals, and compares firefighting bonds to his time in the military."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "asked family and friends to join virtual military support group",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [27]},
+      "evidence_turn_ids": ["D27:1"],
+      "retrieval_text": "John asked family and friends to join his virtual support group and be advocates for the military."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "took family to a military memorial that impacted his kids",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [27]},
+      "evidence_turn_ids": ["D27:9", "D27:11"],
+      "retrieval_text": "John took his family to a military memorial and his kids were awestruck and humbled."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "lost job at mechanical engineering company",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [28]},
+      "evidence_turn_ids": ["D28:1"],
+      "retrieval_text": "John lost his job when his mechanical engineering company went under. He is looking into the tech industry."
+    },
+    {
+      "subject": "John",
+      "relation": "has_skill",
+      "object": "mechanical engineering background",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [28]},
+      "evidence_turn_ids": ["D28:1", "D28:5"],
+      "retrieval_text": "John worked at a mechanical engineering company and found a potential tech job that needs his mechanical skills for their hardware team."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "helped renovate a rundown community center in his hometown",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [28]},
+      "evidence_turn_ids": ["D28:11"],
+      "retrieval_text": "John helped renovate a rundown community center in his hometown last year."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "received a medal for volunteering at the shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [29]},
+      "evidence_turn_ids": ["D29:1"],
+      "retrieval_text": "Maria received a medal from the homeless shelter for her volunteer work."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "organized a 5K charity run for veterans and their families",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [29]},
+      "evidence_turn_ids": ["D29:4", "D29:6"],
+      "retrieval_text": "John organized a 5K charity run in his neighborhood to help veterans and their families, getting sponsors and coordinating with the city."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "worked with organization helping domestic abuse victims",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [29]},
+      "evidence_turn_ids": ["D29:10"],
+      "retrieval_text": "John worked with a local organization helping victims of domestic abuse, raising awareness and funds."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "got a puppy named Coco",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:1"],
+      "retrieval_text": "Maria got a puppy named Coco who brings joy to her life."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "best memory with Max was a camping trip with hiking and swimming",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [30]},
+      "evidence_turn_ids": ["D30:6"],
+      "retrieval_text": "John's best memory with Max was a camping trip last summer where they hiked, swam, and made great memories."
+    },
+    {
+      "subject": "John",
+      "relation": "has_trait",
+      "object": "questions whether he is making enough impact",
+      "attributed_to": "John",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:14", "D30:16"],
+      "retrieval_text": "John expressed feeling stuck and questioning whether he is making enough of an impact, wanting to find a better way to channel his passion."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "volunteering as mentor at local school",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [31]},
+      "evidence_turn_ids": ["D31:1", "D31:9"],
+      "retrieval_text": "John is volunteering as a mentor for a local school. One student proudly showed him their essay, a proud moment."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "adopted a second dog named Shadow from a shelter",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [31]},
+      "evidence_turn_ids": ["D31:2", "D31:4"],
+      "retrieval_text": "Maria adopted a dog named Shadow from a shelter. Shadow is full of energy and gets along great with Coco."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_trait",
+      "object": "did not have pets growing up",
+      "attributed_to": "Maria",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [31]},
+      "evidence_turn_ids": ["D31:6"],
+      "retrieval_text": "Maria did not have any pets growing up."
+    },
+    {
+      "subject": "John",
+      "relation": "has_preference",
+      "object": "enjoys hiking, park visits, picnics, board games, movie nights with family",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [31]},
+      "evidence_turn_ids": ["D31:19"],
+      "retrieval_text": "John's family enjoys hiking, park visits, picnics, board games, and movie nights at home."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "fire brigade raised donations including a new fire truck",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [32]},
+      "evidence_turn_ids": ["D32:7", "D32:11"],
+      "retrieval_text": "John's fire brigade raised donations of canned food, toiletries, and clothes, and even got a brand new fire truck."
+    },
+    {
+      "subject": "John",
+      "relation": "has_trait",
+      "object": "passionate about community service and helping others",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [1, 3, 6, 10, 15, 21, 26, 29, 31]},
+      "evidence_turn_ids": ["D1:6", "D3:5", "D6:10", "D10:13", "D15:1", "D21:22", "D26:2", "D29:4", "D31:1"],
+      "retrieval_text": "John is consistently passionate about community service across all sessions: politics, food drives, veteran support, fire brigade, school mentoring, charity runs."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_trait",
+      "object": "compassionate and dedicated to helping others through volunteering",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [1, 5, 6, 7, 10, 11, 17, 20, 27, 29]},
+      "evidence_turn_ids": ["D1:3", "D5:8", "D6:1", "D10:10", "D11:10", "D17:12", "D20:7", "D27:4", "D29:1"],
+      "retrieval_text": "Maria is consistently compassionate and dedicated to helping others through volunteering at homeless shelters, dog shelters, charity runs, and community work."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "had a film camera as a kid, took beach pictures",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [3]},
+      "evidence_turn_ids": ["D3:15"],
+      "retrieval_text": "John had a film camera as a kid and took plenty of beach pictures."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "had a childhood doll that comforted him",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [5]},
+      "evidence_turn_ids": ["D5:13"],
+      "retrieval_text": "John had a little doll as a child that always made him feel better."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_preference",
+      "object": "finds balance through exercise, music, and time with loved ones",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [13, 18]},
+      "evidence_turn_ids": ["D13:20", "D18:15"],
+      "retrieval_text": "Maria takes care of herself through exercise, music, and spending time with loved ones. She also enjoys aerial yoga and moments of solitude."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_preference",
+      "object": "enjoys watching movies, hiking, and game nights with friends",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2]},
+      "evidence_turn_ids": ["D2:17"],
+      "retrieval_text": "Maria enjoys watching movies, hiking, and having game nights with friends. Quality connections matter most to her."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "has siblings she made memories with as a child",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [8]},
+      "evidence_turn_ids": ["D8:13"],
+      "retrieval_text": "Maria loved doing similar activities with her siblings when she was young, making lasting memories."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "found a violin concert for family to enjoy",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [8]},
+      "evidence_turn_ids": ["D8:12"],
+      "retrieval_text": "John found a violin concert that his whole family enjoyed as part of making memories together."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "did community work with church friends",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [28]},
+      "evidence_turn_ids": ["D28:8"],
+      "retrieval_text": "Maria took up community work with friends from church and found it rewarding."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "enjoying new job with encouraging team",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [25]},
+      "evidence_turn_ids": ["D25:1"],
+      "retrieval_text": "John is enjoying his new job where his team has been super encouraging and inspiring."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "cooked dinner with her mom",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:16"],
+      "retrieval_text": "Maria and her mom made dinner together."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "made apple pie for the kids",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:17"],
+      "retrieval_text": "John made an apple pie for his kids."
+    },
+    {
+      "subject": "John",
+      "relation": "has_experience",
+      "object": "went on a hiking trip with workmates",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [16]},
+      "evidence_turn_ids": ["D16:1"],
+      "retrieval_text": "John went on a hiking trip with workmates who keep him motivated."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_experience",
+      "object": "took a beach sunset photo in Maria's life",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [3]},
+      "evidence_turn_ids": ["D3:14"],
+      "retrieval_text": "Maria took a peaceful sunset photo at the beach last month and shared it with John."
+    },
+    {
+      "subject": "Maria",
+      "relation": "has_preference",
+      "object": "inspired by chatting to people, volunteering, and listening to music",
+      "attributed_to": "Maria",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [22]},
+      "evidence_turn_ids": ["D22:10"],
+      "retrieval_text": "Maria stays inspired through talking to people, volunteering, and listening to music."
+    },
+    {
+      "subject": "John",
+      "relation": "has_preference",
+      "object": "stays inspired through family, exercise, and time with friends",
+      "attributed_to": "John",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [22]},
+      "evidence_turn_ids": ["D22:11"],
+      "retrieval_text": "John stays inspired through his family, exercise, and spending time with friends."
+    }
+  ],
+  "segments": [
+    {
+      "session_number": 1,
+      "turns": ["D1:1", "D1:2", "D1:3", "D1:4", "D1:5", "D1:6", "D1:7", "D1:8", "D1:9", "D1:10", "D1:11", "D1:12", "D1:13", "D1:14", "D1:15", "D1:16"],
+      "topic": "Catching up: workouts, political ambitions, and education funding",
+      "surface_events": [
+        "John returned from a family road trip",
+        "Maria volunteers at homeless shelter and started aerial yoga",
+        "John does kickboxing",
+        "John wants to get into local politics focused on education and infrastructure",
+        "John saw how lack of education affected his neighborhood growing up",
+        "A school got funding that enabled repairs and renovations",
+        "John plans to talk with local leaders for his campaign"
+      ],
+      "categories": ["fitness", "politics", "education", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John and Maria reconnect. Maria does aerial yoga and volunteers. John does kickboxing and shares his goal of entering local politics to improve education and infrastructure.",
+      "retrieval_text": "John returned from family road trip. Maria started aerial yoga and volunteers at homeless shelter. John does kickboxing. John wants to enter local politics to improve education and infrastructure. School funding enabled repairs. John plans to network with local leaders for political campaign.",
+      "bridging_terms": ["road trip", "aerial yoga", "kickboxing", "local politics", "education", "infrastructure", "volunteering", "homeless shelter", "school funding", "community improvement"],
+      "latent_concepts": ["civic engagement", "fitness as stress relief", "childhood experiences shaping values", "community investment", "grassroots organizing", "altruism", "social mobility", "educational equity"]
+    },
+    {
+      "session_number": 2,
+      "turns": ["D2:1", "D2:2", "D2:3", "D2:4", "D2:5", "D2:6", "D2:7", "D2:8", "D2:9", "D2:10", "D2:11", "D2:12", "D2:13", "D2:14"],
+      "topic": "Campaign networking, family as motivation, and personal connections",
+      "surface_events": [
+        "Maria donated her old car to the homeless shelter",
+        "John has been networking for his campaign",
+        "John talked to someone whose stories fired up his passion for education",
+        "John shared a family photo calling them his reason to never give up",
+        "John says family is his rock"
+      ],
+      "categories": ["politics", "family", "charity", "motivation"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as having impressive enthusiasm and commitment to education (evidence: D2:7)",
+        "Maria expresses belief in John's power to make a positive difference (evidence: D2:9)"
+      ],
+      "literal_summary": "Maria donated her car to the shelter. John networks for his campaign and shares inspiring conversations about education. He shares family photos, describing them as his motivation and rock.",
+      "retrieval_text": "Maria donated old car to homeless shelter she volunteers at. John networking for political campaign, talked to someone who fired up his education passion. John shared family photo, says family is his reason to never give up and his rock. Maria impressed by John's enthusiasm.",
+      "bridging_terms": ["car donation", "networking", "campaign", "education passion", "family photo", "motivation", "encouragement", "support system", "never give up", "community"],
+      "latent_concepts": ["generosity", "intrinsic motivation", "family as anchor", "political activism", "peer encouragement", "educational reform", "emotional support"]
+    },
+    {
+      "session_number": 2,
+      "turns": ["D2:15", "D2:16", "D2:17", "D2:18", "D2:19", "D2:20", "D2:21", "D2:22", "D2:23", "D2:24", "D2:25", "D2:26", "D2:27", "D2:28"],
+      "topic": "Family activities, cooking together, and leisure time",
+      "surface_events": [
+        "John and family enjoy playground activities like climbing and sliding",
+        "Maria's family is small but she enjoys movies, hikes, and game nights with friends",
+        "John's family had dinner together and shared a photo",
+        "John's family made pizza together",
+        "Maria made peach cobbler recently",
+        "John is going to do taekwondo"
+      ],
+      "categories": ["family", "leisure", "cooking", "fitness"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John and family enjoy the playground and making pizza together. Maria has a small family but loves movie nights, hikes, and game nights with friends. She made peach cobbler. John heads off to taekwondo.",
+      "retrieval_text": "John's family enjoys playground climbing and sliding. Maria's family is small but she loves movies, hikes, game nights with friends. John's family made pizza together. Maria made peach cobbler. John does taekwondo. Quality connections matter most to Maria.",
+      "bridging_terms": ["playground", "pizza making", "peach cobbler", "taekwondo", "game nights", "movie nights", "hiking", "family bonding", "cooking together", "small family"],
+      "latent_concepts": ["quality time", "found family", "shared meals as bonding", "recreational activities", "martial arts", "domestic life", "introversion vs extroversion"]
+    },
+    {
+      "session_number": 3,
+      "turns": ["D3:1", "D3:2", "D3:3", "D3:4", "D3:5", "D3:6", "D3:7", "D3:8", "D3:9", "D3:10", "D3:11"],
+      "topic": "Online service group, community events, and military aptitude test failure",
+      "surface_events": [
+        "John joined a service-focused online group",
+        "Group held events including volunteering at a homeless shelter and organizing a toy drive",
+        "Group brainstorming projects for education, mentorship, job training, and resume building",
+        "John failed the military aptitude test and feels stressed"
+      ],
+      "categories": ["community service", "volunteering", "military", "stress"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John joined a service-focused online group that volunteered at shelters and organized toy drives. They are brainstorming education and mentorship projects. John reveals he failed the military aptitude test.",
+      "retrieval_text": "John joined service-focused online group. Group volunteered at homeless shelter distributing food and supplies, organized toy drive for kids. Brainstorming education, mentorship, job training, resume building projects. John failed military aptitude test and feels stressed about it.",
+      "bridging_terms": ["online group", "toy drive", "homeless shelter", "mentorship", "job training", "military aptitude test", "community events", "education access", "empowerment", "service"],
+      "latent_concepts": ["peer support networks", "collective action", "workforce development", "military aspirations", "setback and resilience", "underserved communities", "social capital"]
+    },
+    {
+      "session_number": 3,
+      "turns": ["D3:12", "D3:13", "D3:14", "D3:15", "D3:16", "D3:17"],
+      "topic": "Nature photography and appreciating small moments",
+      "surface_events": [
+        "Maria shares a beach sunset photo she took last month",
+        "John reminisces about a film camera he had as a kid and beach photos he took"
+      ],
+      "categories": ["nature", "photography", "nostalgia"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria shares a peaceful beach sunset photo. John is reminded of the film camera he had as a kid and the beach pictures he took. They discuss appreciating small joys.",
+      "retrieval_text": "Maria shared beach sunset photo she took last month, found it peaceful and connecting. John reminisces about having a film camera as a kid and taking plenty of beach pictures. They discuss appreciating nature and small joys especially when life gets busy.",
+      "bridging_terms": ["beach", "sunset", "film camera", "photography", "childhood nostalgia", "nature appreciation", "peace", "small moments"],
+      "latent_concepts": ["mindfulness", "nostalgia", "nature as therapy", "gratitude", "childhood memories"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:1", "D4:2", "D4:3", "D4:4", "D4:5", "D4:6", "D4:7", "D4:8", "D4:9", "D4:10"],
+      "topic": "Maria's new volunteer friend, John's unexpected incident, and resilience",
+      "surface_events": [
+        "Maria became friends with a fellow volunteer",
+        "John had an unexpected incident on his way home",
+        "John stayed calm and asked for help to handle it",
+        "John enjoys watching sunsets to calm down"
+      ],
+      "categories": ["friendship", "adversity", "resilience", "mindfulness"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as showing resilience and resourcefulness in handling the incident (evidence: D4:7)"
+      ],
+      "literal_summary": "Maria became friends with a fellow volunteer. John had an unexpected incident on his way home but stayed calm and asked for help. He finds watching sunsets calming during difficult times.",
+      "retrieval_text": "Maria befriended fellow volunteer at shelter. John had unexpected incident on way home, stayed calm and asked for assistance to make it back safely. Maria praises John's resilience. John enjoys watching sunsets to de-stress and appreciate small things.",
+      "bridging_terms": ["volunteer friend", "unexpected incident", "resilience", "staying calm", "sunsets", "inner strength", "coping", "resourcefulness"],
+      "latent_concepts": ["crisis management", "emotional regulation", "peer support", "mindfulness through nature", "gratitude practice"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:11", "D4:12", "D4:13", "D4:14", "D4:15", "D4:16", "D4:17", "D4:18", "D4:19", "D4:20", "D4:21", "D4:22", "D4:23", "D4:24", "D4:25", "D4:26"],
+      "topic": "John's political progress and upcoming community meeting",
+      "surface_events": [
+        "John has been exploring local politics and talking to community leaders",
+        "Maria has been taking notes about local politics in her notebook",
+        "John has a community meeting next week about education and infrastructure upgrades",
+        "They discuss working together for community change"
+      ],
+      "categories": ["politics", "education", "infrastructure", "teamwork"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John's dedication to community as amazing and admirable (evidence: D4:19)"
+      ],
+      "literal_summary": "John has been networking with community leaders about local politics. Maria takes notes on local politics. John has an upcoming community meeting on education and infrastructure. They commit to working together for community change.",
+      "retrieval_text": "John exploring local politics, talking to community leaders about neighborhood needs. Maria taking notes about local politics in notebook. John has community meeting next week about education and infrastructure upgrades. They pledge to work together as a team for positive community change.",
+      "bridging_terms": ["local politics", "community leaders", "notebook", "community meeting", "education", "infrastructure upgrades", "teamwork", "neighborhood", "campaign", "collaboration"],
+      "latent_concepts": ["grassroots politics", "civic participation", "collaborative governance", "political organizing", "infrastructure advocacy"]
+    },
+    {
+      "session_number": 5,
+      "turns": ["D5:1", "D5:2", "D5:3", "D5:4", "D5:5", "D5:6", "D5:7", "D5:8", "D5:9", "D5:10", "D5:11"],
+      "topic": "Community meeting follow-up, education inequality, and volunteering at shelter",
+      "surface_events": [
+        "John attended the community meeting and was upset about education conditions",
+        "John has kids and recognizes the inequality in resources",
+        "Maria volunteered at a shelter event for kids",
+        "Maria's aunt inspired her to volunteer through helping Maria's struggling family",
+        "Maria comforted a lonely 8-year-old girl at the shelter"
+      ],
+      "categories": ["education", "inequality", "volunteering", "family history", "children"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John attended the community meeting and was upset about education inequality. Maria volunteered at a shelter kids' event, inspired by her aunt who helped her family when they struggled. She comforted a lonely 8-year-old girl.",
+      "retrieval_text": "John attended community meeting, upset about state of education for kids. John has kids and sees inequality. Maria volunteered at shelter event for children. Maria's aunt helped her struggling family and inspired her to volunteer. Maria comforted a lonely 8-year-old girl at shelter who had no family.",
+      "bridging_terms": ["community meeting", "education inequality", "kids", "shelter event", "aunt", "family struggles", "volunteering inspiration", "lonely child", "comfort", "generational impact"],
+      "latent_concepts": ["educational equity", "socioeconomic inequality", "intergenerational influence", "compassion for children", "paying it forward", "poverty awareness"]
+    },
+    {
+      "session_number": 5,
+      "turns": ["D5:12", "D5:13", "D5:14", "D5:15", "D5:16"],
+      "topic": "Childhood memories and the power of kindness",
+      "surface_events": [
+        "John shares a photo reminiscent of a childhood doll that comforted him",
+        "They discuss the importance of kindness and supporting each other"
+      ],
+      "categories": ["nostalgia", "kindness", "childhood"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John shares a photo that reminds him of a childhood doll that always made him feel better. They discuss spreading kindness and support, especially when people are feeling down.",
+      "retrieval_text": "John shares photo reminiscent of childhood doll that comforted him. Doll reminds him to always look out for others feeling down. They discuss importance of kindness, compassion, and supporting each other during difficult times.",
+      "bridging_terms": ["childhood doll", "comfort", "kindness", "compassion", "support", "feeling down", "looking out for others"],
+      "latent_concepts": ["comfort objects", "childhood emotional development", "empathy", "prosocial behavior", "emotional support"]
+    },
+    {
+      "session_number": 6,
+      "turns": ["D6:1", "D6:2", "D6:3", "D6:4", "D6:5", "D6:6", "D6:7", "D6:8", "D6:9"],
+      "topic": "Charity event, meeting David, and family financial struggles",
+      "surface_events": [
+        "Maria did a charity event serving meals",
+        "John explains his motivation for politics as urge to serve country and community",
+        "Maria met David at the event who shared his story of hardship",
+        "Maria connected David with a housing organization",
+        "Maria's family had money problems when she was young and relied on her aunt"
+      ],
+      "categories": ["charity", "homelessness", "family history", "politics"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria served meals at a charity event and met David, connecting him with housing services. John explains politics is about serving his country. Maria shares that her family relied on outside help from her aunt when struggling financially.",
+      "retrieval_text": "Maria did charity event serving meals, felt heartwarming. Maria met David who shared hardship story, connected him with housing organization for homeless. John's political motivation is urge to serve country and community. Maria's family had money problems and relied on auntie's help when young.",
+      "bridging_terms": ["charity event", "serving meals", "David", "housing organization", "homelessness", "family struggles", "aunt", "financial hardship", "public service", "compassion"],
+      "latent_concepts": ["social services", "lived experience with poverty", "connecting people to resources", "service motivation", "empathy from personal experience"]
+    },
+    {
+      "session_number": 6,
+      "turns": ["D6:10", "D6:11", "D6:12", "D6:13", "D6:14", "D6:15", "D6:16", "D6:17", "D6:18", "D6:19", "D6:20", "D6:21", "D6:22"],
+      "topic": "John's food drive and community collaboration",
+      "surface_events": [
+        "John started helping with a community food drive for unemployed people",
+        "Unemployment in the community was the motivation",
+        "Strong volunteer response to the food drive",
+        "Maria offers to help with networking and future events"
+      ],
+      "categories": ["community service", "unemployment", "food drive", "collaboration"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John started a community food drive for people who lost jobs, motivated by seeing unemployment's impact. The response and volunteers were overwhelming. Maria offers to help with networking at future events.",
+      "retrieval_text": "John started community food drive for people who lost jobs, motivated by unemployment affecting neighbors. Overwhelming volunteer response. Maria offers to help with networking and future events. They affirm friendship and shared goals for community betterment.",
+      "bridging_terms": ["food drive", "unemployment", "volunteers", "community response", "networking", "future events", "friendship", "mutual support", "giving back"],
+      "latent_concepts": ["food insecurity", "economic hardship", "community mobilization", "volunteerism", "collaborative problem-solving"]
+    },
+    {
+      "session_number": 7,
+      "turns": ["D7:1", "D7:2", "D7:3", "D7:4", "D7:5", "D7:6", "D7:7", "D7:8", "D7:9", "D7:10", "D7:11", "D7:12", "D7:13", "D7:14"],
+      "topic": "Creative writing class, running for office again, and meeting Jean",
+      "surface_events": [
+        "Maria took a creative writing class",
+        "John is running for office again",
+        "Maria met Jean, a homeless woman who went through divorce, job loss, and homelessness but stayed optimistic",
+        "They discuss positivity and optimism"
+      ],
+      "categories": ["creative writing", "politics", "volunteering", "resilience"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John's enthusiasm for making a better future as inspiring (evidence: D7:5)"
+      ],
+      "literal_summary": "Maria took a creative writing class. John announces he is running for office again. Maria met Jean while volunteering, a woman who survived divorce, job loss, and homelessness yet stayed optimistic. They discuss positivity's power.",
+      "retrieval_text": "Maria took creative writing class, found it enlightening. John running for office again, motivated by impact he can make through politics. Maria met Jean volunteering at shelter - woman went through divorce, lost job, became homeless but stayed optimistic and resilient. They discuss power of kindness and optimism.",
+      "bridging_terms": ["creative writing", "running for office", "Jean", "divorce", "job loss", "homelessness", "optimism", "resilience", "positivity", "volunteering"],
+      "latent_concepts": ["self-expression through writing", "political perseverance", "resilience in adversity", "human dignity", "hope in hardship"]
+    },
+    {
+      "session_number": 7,
+      "turns": ["D7:15", "D7:16", "D7:17"],
+      "topic": "Upcoming activities and yoga class invitation",
+      "surface_events": [
+        "John's colleague Rob invited him to a beginner's yoga class",
+        "They plan to work together for community improvement"
+      ],
+      "categories": ["fitness", "yoga", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John mentions his colleague Rob invited him to a beginner's yoga class. They plan to continue working together for community improvement.",
+      "retrieval_text": "John's colleague Rob invited him to a beginner's yoga class. They commit to working together to make things better for their community.",
+      "bridging_terms": ["Rob", "colleague", "beginner yoga", "yoga class", "community improvement"],
+      "latent_concepts": ["workplace friendships", "trying new activities", "wellness practices"]
+    },
+    {
+      "session_number": 8,
+      "turns": ["D8:1", "D8:2", "D8:3", "D8:4", "D8:5", "D8:6", "D8:7", "D8:8", "D8:9", "D8:10", "D8:11", "D8:12", "D8:13"],
+      "topic": "Grandmother's death, Kyle the baby, and family outings",
+      "surface_events": [
+        "Maria's grandmother passed away",
+        "John had a picnic with his wife and kids",
+        "John's one-year-old son is named Kyle",
+        "John takes family to the park a few times a week",
+        "John found a violin concert for the family",
+        "Maria loved doing similar activities with her siblings as a child"
+      ],
+      "categories": ["grief", "family", "parenting", "leisure"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria's grandmother passed away. John had a family picnic and introduces his one-year-old son Kyle. He takes the family to the park several times a week and found a violin concert for them. Maria recalls similar activities with siblings growing up.",
+      "retrieval_text": "Maria's grandmother passed away, she's trying to stay positive. John had picnic with wife and kids. John's one-year-old son named Kyle. John takes family to park a few times a week for bonding. John found violin concert family enjoyed. Maria loved similar activities with siblings as a child.",
+      "bridging_terms": ["grandmother", "death", "grief", "picnic", "Kyle", "baby", "park", "violin concert", "siblings", "family bonding", "childhood memories"],
+      "latent_concepts": ["bereavement", "parenting joy", "family traditions", "creating memories", "intergenerational connection", "coping through routine"]
+    },
+    {
+      "session_number": 8,
+      "turns": ["D8:14", "D8:15", "D8:16", "D8:17", "D8:18", "D8:19", "D8:20", "D8:21"],
+      "topic": "London painting, retaking the aptitude test, and volunteer connections",
+      "surface_events": [
+        "Maria was inspired by a trip to London and the castles there",
+        "Maria made a painting inspired by London architecture",
+        "John retook the military aptitude test with great results",
+        "John discussed military volunteering with supportive family and friends"
+      ],
+      "categories": ["travel", "art", "military", "support system"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria shares her London-inspired painting, captivated by castles and architecture. John retook the military aptitude test with great results and feels drawn to serving his country. His family and friends are supportive.",
+      "retrieval_text": "Maria traveled to London a few years ago, captivated by castles and architecture. Maria made a painting inspired by London. John retook military aptitude test with great results, feels drawn to serving country. Family and friends supportive of John's military volunteering aspiration.",
+      "bridging_terms": ["London", "castles", "painting", "architecture", "military aptitude test", "retake", "great results", "serving country", "family support", "volunteering"],
+      "latent_concepts": ["travel as inspiration", "creative expression", "military service", "second chances", "personal growth", "supportive relationships"]
+    },
+    {
+      "session_number": 8,
+      "turns": ["D8:22", "D8:23", "D8:24", "D8:25", "D8:26"],
+      "topic": "Building connections at the homeless shelter",
+      "surface_events": [
+        "Maria built connections at the shelter through listening and compassion",
+        "They discuss the importance of trust and real relationships"
+      ],
+      "categories": ["volunteering", "relationships", "compassion"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "John characterizes Maria as making a big impact at the homeless shelter with awesome connections (evidence: D8:22)"
+      ],
+      "literal_summary": "Maria describes how she built shelter connections through listening and showing compassion. They agree that building trust and real relationships through small acts makes the biggest impact.",
+      "retrieval_text": "Maria built connections at homeless shelter through listening and showing compassion over time. Building trust and forming real relationships is key to making a difference. John praises Maria's impact at the shelter. Small acts like listening make the biggest impact.",
+      "bridging_terms": ["shelter connections", "listening", "compassion", "trust", "real relationships", "making a difference", "small acts", "impact"],
+      "latent_concepts": ["active listening", "relational trust", "incremental change", "authentic connection", "service through presence"]
+    },
+    {
+      "session_number": 9,
+      "turns": ["D9:1", "D9:2", "D9:3", "D9:4", "D9:5", "D9:6", "D9:7", "D9:8", "D9:9", "D9:10", "D9:11", "D9:12", "D9:13", "D9:14", "D9:15", "D9:16", "D9:17", "D9:18"],
+      "topic": "Poetry class, graduation, policymaking, and community involvement",
+      "surface_events": [
+        "Maria is taking a poetry class to express feelings",
+        "John graduated and finished his degree",
+        "John is considering policymaking because of his degree and passion",
+        "John is focused on improving education and infrastructure",
+        "Community meetings gave John firsthand understanding of challenges",
+        "They recall volunteering together last year"
+      ],
+      "categories": ["education", "career", "politics", "creative writing", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as showing dedication and commitment through firsthand experience (evidence: D9:11)"
+      ],
+      "literal_summary": "Maria is taking a poetry class. John graduated and is considering policymaking focused on education and infrastructure. Community meetings gave him firsthand understanding of the challenges. They recall volunteering together.",
+      "retrieval_text": "Maria taking poetry class to put feelings into words. John graduated and finished degree. John considering policymaking career due to degree and passion for positive impact, focused on education and infrastructure. Community meetings gave John firsthand understanding of challenges. They recall volunteering together last year.",
+      "bridging_terms": ["poetry class", "graduation", "degree", "policymaking", "education", "infrastructure", "community meetings", "firsthand experience", "volunteering together", "dedication"],
+      "latent_concepts": ["self-expression", "academic achievement", "career transition", "policy advocacy", "experiential learning", "collaborative volunteering"]
+    },
+    {
+      "session_number": 10,
+      "turns": ["D10:1", "D10:2", "D10:3", "D10:4", "D10:5", "D10:6", "D10:7", "D10:8", "D10:9"],
+      "topic": "Starting yoga class and its benefits",
+      "surface_events": [
+        "John started a weekend yoga class with a colleague",
+        "It is a beginner class focusing on poses and breathing",
+        "John finds yoga helps with relaxation and flexibility",
+        "Yoga is part of John's daily routine now"
+      ],
+      "categories": ["fitness", "yoga", "wellness", "mindfulness"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John started a weekend beginner yoga class with a colleague, focusing on poses and breathing. He finds it helps with relaxation, flexibility, and mindfulness, making it part of his daily routine.",
+      "retrieval_text": "John started weekend beginner yoga class with colleague, focusing on fundamental poses and breathing. Great instructor creates relaxed welcoming environment. John finds yoga helps relaxation, flexibility, and feeling connected. Yoga now part of John's daily routine for physical and mental benefits.",
+      "bridging_terms": ["yoga class", "beginner", "poses", "breathing", "relaxation", "flexibility", "daily routine", "mindfulness", "wellbeing", "colleague"],
+      "latent_concepts": ["mind-body connection", "wellness habits", "physical fitness", "mental health maintenance", "social exercise"]
+    },
+    {
+      "session_number": 10,
+      "turns": ["D10:10", "D10:11", "D10:12", "D10:13", "D10:14", "D10:15", "D10:16", "D10:17", "D10:18"],
+      "topic": "5K charity run and career fair volunteering",
+      "surface_events": [
+        "Maria ran a 5K charity run for a homeless shelter",
+        "John volunteered at a career fair at a local school",
+        "John saw how lack of resources affects kids' dreams",
+        "Sign at school said 'Always look on the bright side of life'"
+      ],
+      "categories": ["charity", "education", "volunteering", "children"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria ran a 5K charity run for a homeless shelter and found the unity inspiring. John volunteered at a school career fair, seeing how lack of resources impacts kids' dreams. A sign said 'Always look on the bright side of life.'",
+      "retrieval_text": "Maria participated in 5K charity run for homeless shelter, inspiring energy and unity. John volunteered at career fair at local school, saw how lack of resources affects kids' dreams. Sign said 'Always look on the bright side of life.' They commit to helping kids in the community.",
+      "bridging_terms": ["5K run", "charity run", "homeless shelter", "career fair", "local school", "resources", "kids' dreams", "bright side", "community", "volunteering"],
+      "latent_concepts": ["athletic fundraising", "educational opportunity gap", "youth mentorship", "community solidarity", "optimism"]
+    },
+    {
+      "session_number": 11,
+      "turns": ["D11:1", "D11:2", "D11:3", "D11:4", "D11:5", "D11:6", "D11:7", "D11:8", "D11:9"],
+      "topic": "Car breakdown and Pacific Northwest road trip memories",
+      "surface_events": [
+        "John's car broke down on the way to work, causing financial strain",
+        "John shares a photo from a family road trip to the Pacific Northwest",
+        "They explored the coast and national parks"
+      ],
+      "categories": ["adversity", "travel", "nature", "family"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as impressively positive despite tough car trouble and money problems (evidence: D11:2)"
+      ],
+      "literal_summary": "John's car broke down causing financial strain but he stays positive. He shares photos from a family road trip to the Pacific Northwest coast and national parks. They discuss finding beauty in nature during tough times.",
+      "retrieval_text": "John's car broke down on way to work, putting strain on wallet. Staying positive despite difficulty. John shares family road trip photo from Pacific Northwest coast and national parks. Nature's beauty was breathtaking. Maria impressed by John's positivity during tough times.",
+      "bridging_terms": ["car breakdown", "financial strain", "staying positive", "road trip", "Pacific Northwest", "national parks", "coast", "nature", "beauty", "tough times"],
+      "latent_concepts": ["financial hardship", "resilience", "nature as solace", "travel memories as comfort", "positivity under pressure"]
+    },
+    {
+      "session_number": 11,
+      "turns": ["D11:10", "D11:11", "D11:12", "D11:13", "D11:14", "D11:15", "D11:16", "D11:17", "D11:18", "D11:19", "D11:20", "D11:21"],
+      "topic": "Shelter talks, cross necklace, and organizing shelter meals",
+      "surface_events": [
+        "Maria gave talks at the homeless shelter and received compliments",
+        "Maria bought a cross necklace to feel closer to her faith",
+        "Shelter residents feel like family to Maria",
+        "Maria organized a meal for shelter residents"
+      ],
+      "categories": ["volunteering", "faith", "community", "leadership"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "John characterizes Maria's kindness as creating incredible relationships (evidence: D11:13)"
+      ],
+      "literal_summary": "Maria gave talks at the shelter and received compliments. She bought a cross necklace for her faith. The shelter residents feel like family. She organized a meal for residents, bringing people together.",
+      "retrieval_text": "Maria gave talks at homeless shelter, received lots of compliments from volunteers. Maria bought cross necklace to feel closer to faith. Shelter people became like family to Maria. Maria organized meal for shelter residents, everyone eating and supporting each other. John praises Maria's incredible kindness.",
+      "bridging_terms": ["talks", "shelter", "compliments", "cross necklace", "faith", "family-like bonds", "organized meal", "community", "kindness", "support"],
+      "latent_concepts": ["public speaking", "spiritual practice", "belonging", "community building", "servant leadership", "found family"]
+    },
+    {
+      "session_number": 12,
+      "turns": ["D12:1", "D12:2", "D12:3", "D12:4", "D12:5", "D12:6", "D12:7"],
+      "topic": "Political blogging about education reform and infrastructure",
+      "surface_events": [
+        "John started blogging about politics and government",
+        "John is researching policies on education reform and infrastructure development",
+        "John is getting positive feedback on his blog posts"
+      ],
+      "categories": ["politics", "blogging", "education", "infrastructure"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John's passion and dedication as inspiring (evidence: D12:6)"
+      ],
+      "literal_summary": "John started blogging about politics, researching education reform and infrastructure development policies. He's getting good feedback and feels empowered to make a difference through writing.",
+      "retrieval_text": "John started blogging about politics and government, finding it satisfying. Researching policies on education reform and infrastructure development. Getting positive feedback on blog posts. Maria finds John's passion and dedication inspiring. John hopes to raise awareness and start conversations for positive change.",
+      "bridging_terms": ["blogging", "politics", "education reform", "infrastructure development", "policy research", "positive feedback", "awareness", "conversations", "positive change"],
+      "latent_concepts": ["political writing", "digital advocacy", "policy analysis", "public discourse", "media influence"]
+    },
+    {
+      "session_number": 12,
+      "turns": ["D12:8", "D12:9", "D12:10", "D12:11", "D12:12", "D12:13", "D12:14", "D12:15", "D12:16", "D12:17", "D12:18", "D12:19", "D12:20", "D12:21", "D12:22", "D12:23"],
+      "topic": "Tech convention, continued shelter volunteering, and East Coast trip plans",
+      "surface_events": [
+        "John and colleagues went to a convention about using tech for good",
+        "John is planning a trip to the East Coast",
+        "Maria continues volunteering at the homeless shelter",
+        "Maria finds the growing need for help overwhelming"
+      ],
+      "categories": ["technology", "community", "travel", "volunteering"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John and colleagues attended a tech convention focused on using technology for community good. John plans a trip to the East Coast. Maria continues volunteering at the shelter but finds the growing need overwhelming.",
+      "retrieval_text": "John and colleagues went to convention about using tech for good in community, brainstormed ideas and felt empowered. John planning trip to East Coast. Maria still volunteering at homeless shelter, finds it rewarding but growing need for help can be overwhelming. Every act of kindness matters.",
+      "bridging_terms": ["tech convention", "technology for good", "East Coast trip", "shelter volunteering", "overwhelming need", "brainstorming", "like-minded people", "empowerment", "dedication"],
+      "latent_concepts": ["technology as social tool", "compassion fatigue", "professional networking", "sustained volunteerism", "travel planning"]
+    },
+    {
+      "session_number": 13,
+      "turns": ["D13:1", "D13:2", "D13:3", "D13:4", "D13:5", "D13:6", "D13:7", "D13:8", "D13:9", "D13:10", "D13:11", "D13:12", "D13:13", "D13:14", "D13:15"],
+      "topic": "Family boot camp workouts and the importance of family",
+      "surface_events": [
+        "John started family boot camps three times a week",
+        "Family showing gains in strength and endurance",
+        "Kids are excited about staying active",
+        "Maria's family is small but she relies on them for strength",
+        "John says family is the most important thing for him"
+      ],
+      "categories": ["fitness", "family", "parenting", "support"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John and his family as awesome for staying consistent and motivated with healthy habits (evidence: D13:8)"
+      ],
+      "literal_summary": "John started family boot camps three times a week, seeing fitness gains and excited kids. Maria has a small family but relies on them for strength. John says family is his most important thing and biggest support.",
+      "retrieval_text": "John started boot camp workouts with family three times a week. Family gaining strength and endurance, kids excited about staying active. Maria's family is small but she relies on them during tough times. John says family is most important thing, his biggest support through good and bad times.",
+      "bridging_terms": ["boot camp", "family workouts", "three times a week", "strength", "endurance", "kids active", "small family", "biggest support", "family importance", "healthy habits"],
+      "latent_concepts": ["family fitness", "modeling healthy behavior", "family cohesion", "exercise as bonding", "support systems"]
+    },
+    {
+      "session_number": 13,
+      "turns": ["D13:16", "D13:17", "D13:18", "D13:19", "D13:20", "D13:21", "D13:22"],
+      "topic": "Cooking together and finding balance in life",
+      "surface_events": [
+        "Maria and her mom made dinner together",
+        "John made apple pie for the kids",
+        "Maria's favorite treat is banana split sundae after volunteering",
+        "Maria finds balance through exercise, music, and loved ones"
+      ],
+      "categories": ["cooking", "family", "self-care", "balance"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria cooked dinner with her mom. John made apple pie for kids. Maria's favorite is banana split sundae after volunteering. She finds balance through exercise, music, and time with loved ones.",
+      "retrieval_text": "Maria and her mom made dinner together. John made apple pie for his kids. Maria's favorite treat is banana split sundae after volunteering. Maria finds balance through exercise, music, and spending time with loved ones. Self-care helps her stay positive and strong for tough times.",
+      "bridging_terms": ["dinner with mom", "apple pie", "banana split sundae", "self-care", "exercise", "music", "balance", "volunteering", "loved ones"],
+      "latent_concepts": ["intergenerational bonding", "domestic life", "work-life balance", "self-care practices", "reward after service"]
+    },
+    {
+      "session_number": 13,
+      "turns": ["D13:23", "D13:24", "D13:25", "D13:26", "D13:27", "D13:28", "D13:29", "D13:30", "D13:31", "D13:32", "D13:33", "D13:34", "D13:35", "D13:36", "D13:37"],
+      "topic": "Solo trip to Spain and trying surfing",
+      "surface_events": [
+        "Maria took a solo trip to Spain",
+        "Maria tried surfing for the first time and kept falling off",
+        "Maria learned about the value of different perspectives, solitude, and letting go",
+        "They discuss pushing boundaries and growth"
+      ],
+      "categories": ["travel", "adventure", "personal growth", "surfing"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria took a solo trip to Spain where she tried surfing for the first time, learning about perseverance despite falling. She valued different perspectives, solitude, and letting go. They discuss pushing boundaries.",
+      "retrieval_text": "Maria took solo trip to Spain last year. Tried surfing for first time, kept falling off but learned about perseverance and trying new things. Realized importance of different perspectives, power of solitude, and trusting life. They discuss pushing comfort zones for growth and self-discovery.",
+      "bridging_terms": ["Spain", "solo trip", "surfing", "first time", "falling", "perseverance", "solitude", "different perspectives", "letting go", "pushing boundaries", "self-discovery"],
+      "latent_concepts": ["solo travel", "adventure sports", "resilience through failure", "self-discovery", "comfort zone expansion", "mindfulness through travel"]
+    },
+    {
+      "session_number": 14,
+      "turns": ["D14:1", "D14:2", "D14:3", "D14:4", "D14:5", "D14:6", "D14:7", "D14:8", "D14:9", "D14:10", "D14:11", "D14:12"],
+      "topic": "Running for office again, charity work, and joining a church",
+      "surface_events": [
+        "John decided to run for office again despite past failures",
+        "Maria is doing charity work that feels rewarding",
+        "Maria joined a nearby church for community and faith",
+        "Life has been rough for Maria lately"
+      ],
+      "categories": ["politics", "charity", "faith", "resilience"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as great at sticking with his dream and always dreaming up ways to make a difference (evidence: D14:2)"
+      ],
+      "literal_summary": "John decided to run for office again despite past failures. Maria is doing rewarding charity work and just joined a nearby church for community and faith. She acknowledges life has been rough.",
+      "retrieval_text": "John decided to run for office again despite not being successful before, can't let go of dream to make a difference. Maria proud of John for sticking with it. Maria doing rewarding charity work. Maria joined nearby church for community and faith. Life has been rough for Maria but she's reflecting and finding balance.",
+      "bridging_terms": ["running for office", "past failures", "dream", "persistence", "charity work", "church", "faith", "community", "balance", "self-care"],
+      "latent_concepts": ["political perseverance", "coping through faith", "community belonging", "resilience after setback", "spiritual growth"]
+    },
+    {
+      "session_number": 14,
+      "turns": ["D14:13", "D14:14", "D14:15", "D14:16", "D14:17", "D14:18", "D14:19", "D14:20", "D14:21", "D14:22", "D14:23"],
+      "topic": "Power cut, potholes, infrastructure project, and West County",
+      "surface_events": [
+        "Power cut in John's area highlighted infrastructure problems",
+        "Roads are full of potholes and dangerous",
+        "John thinking about starting a community infrastructure project",
+        "John wants to improve his old area West County",
+        "They discuss fighting for affordable housing"
+      ],
+      "categories": ["infrastructure", "community", "politics", "housing"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "A power cut in John's area highlighted infrastructure needs. Roads have dangerous potholes. John plans a community infrastructure project and wants to improve West County. They discuss fighting for affordable housing.",
+      "retrieval_text": "Power cut in John's area showed importance of infrastructure upgrades. Roads full of dangerous potholes needing repair. John thinking about starting community infrastructure project, wants Maria to help get neighborhood backing. John wants to improve old area West County. They discuss fighting for better housing and living conditions.",
+      "bridging_terms": ["power cut", "potholes", "infrastructure", "community project", "West County", "affordable housing", "neighborhood", "dangerous roads", "living conditions", "improvements"],
+      "latent_concepts": ["infrastructure decay", "public safety", "urban planning", "community organizing", "housing equity", "civic responsibility"]
+    },
+    {
+      "session_number": 15,
+      "turns": ["D15:1", "D15:2", "D15:3", "D15:4", "D15:5", "D15:6", "D15:7", "D15:8", "D15:9", "D15:10", "D15:11", "D15:12", "D15:13", "D15:14", "D15:15", "D15:16", "D15:17", "D15:18", "D15:19"],
+      "topic": "Veterans support petition and shelter fundraiser planning",
+      "surface_events": [
+        "John working on a petition to support military veterans",
+        "John threw a small party for veterans to share stories",
+        "Veterans made new connections and friendships",
+        "Maria is planning a ring-toss tournament for shelter fundraiser"
+      ],
+      "categories": ["veterans", "activism", "fundraising", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John is working on a veterans support petition and organized a party for veterans to share stories and build connections. Maria is planning a ring-toss tournament for the shelter's fundraiser.",
+      "retrieval_text": "John working on petition project to support military veterans and their rights. Threw small party inviting veterans to share stories, saw new connections and friendships form. Maria planning ring-toss tournament for homeless shelter fundraiser. They commit to supporting each other's causes.",
+      "bridging_terms": ["veterans", "petition", "military", "party", "stories", "connections", "ring-toss tournament", "shelter fundraiser", "support", "giving back"],
+      "latent_concepts": ["veteran advocacy", "community storytelling", "social connection", "fundraising creativity", "mutual support"]
+    },
+    {
+      "session_number": 16,
+      "turns": ["D16:1", "D16:2", "D16:3", "D16:4", "D16:5", "D16:6", "D16:7", "D16:8", "D16:9", "D16:10", "D16:11", "D16:12", "D16:13", "D16:14", "D16:15", "D16:16", "D16:17", "D16:18", "D16:19"],
+      "topic": "Petition progress, chili cook-off fundraiser, and beach moments",
+      "surface_events": [
+        "John continuing petition work and reconnecting with friends",
+        "John went hiking with workmates",
+        "Maria preparing a chili cook-off fundraiser for the shelter",
+        "John offers to spread the word and find volunteers",
+        "John shares a family beach photo"
+      ],
+      "categories": ["activism", "fundraising", "hiking", "family"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John continues his petition, reconnecting with friends. He hiked with workmates. Maria is organizing a chili cook-off fundraiser for the shelter. John offers to help spread the word. He shares a family beach photo.",
+      "retrieval_text": "John continues veterans petition work, reconnecting with friends for support. John hiked with workmates. Maria preparing chili cook-off fundraiser at homeless shelter, shared poster. John offers to spread word and recruit volunteers. John shares family beach photo reminding them to cherish little moments.",
+      "bridging_terms": ["petition", "hiking", "workmates", "chili cook-off", "fundraiser", "shelter", "volunteers", "beach photo", "little moments", "teamwork"],
+      "latent_concepts": ["sustained activism", "workplace friendships", "event planning", "volunteer recruitment", "appreciating moments"]
+    },
+    {
+      "session_number": 17,
+      "turns": ["D17:1", "D17:2", "D17:3", "D17:4", "D17:5", "D17:6", "D17:7", "D17:8", "D17:9", "D17:10", "D17:11", "D17:12", "D17:13", "D17:14", "D17:15", "D17:16"],
+      "topic": "Max the dog passing away and considering adopting a rescue dog",
+      "surface_events": [
+        "John's family dog Max passed away after 10 years",
+        "Max was peaceful, happy, and taught them about love and loyalty",
+        "John wants his kids to learn unconditional love and loyalty",
+        "Considering adopting a rescue dog",
+        "Maria just started volunteering at a local dog shelter once a month"
+      ],
+      "categories": ["pets", "grief", "family", "animal welfare"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John's family dog Max passed away after 10 years. They find comfort in good memories. Max taught love and loyalty which John wants to pass to his kids. They consider adopting a rescue dog. Maria volunteers at a dog shelter.",
+      "retrieval_text": "John's family dog Max passed away after being part of family for 10 years. Comforted by good memories. Max taught love and loyalty, John wants kids to learn this. Considering adopting rescue dog for love and teaching responsibility. Maria started volunteering at local dog shelter once a month.",
+      "bridging_terms": ["Max", "dog", "passed away", "10 years", "love and loyalty", "rescue dog", "adoption", "dog shelter", "grief", "memories", "children's lessons"],
+      "latent_concepts": ["pet loss", "grief processing", "unconditional love", "teaching values through pets", "animal rescue", "compassion for animals"]
+    },
+    {
+      "session_number": 18,
+      "turns": ["D18:1", "D18:2", "D18:3", "D18:4", "D18:5", "D18:6", "D18:7", "D18:8", "D18:9", "D18:10", "D18:11", "D18:12", "D18:13"],
+      "topic": "Camping, mountaineering, and Oregon road trip memories",
+      "surface_events": [
+        "Maria went camping with church friends",
+        "John went mountaineering with workmates and reached the summit",
+        "Maria's family went on a road trip to Oregon when she was young",
+        "Maria saw a waterfall and bridge in Oregon that felt like a fairy tale"
+      ],
+      "categories": ["outdoors", "travel", "nature", "nostalgia"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria went camping with church friends. John went mountaineering with workmates and reached the summit. Maria recalls a childhood family road trip to Oregon where a waterfall and bridge felt like a fairy tale.",
+      "retrieval_text": "Maria went camping with church friends. John went mountaineering with workmates, made it to summit with stunning view. Maria's family went on childhood road trip to Oregon, saw waterfall and bridge that felt like fairy tale. They discuss nature as calming and restorative force.",
+      "bridging_terms": ["camping", "church friends", "mountaineering", "summit", "Oregon", "road trip", "waterfall", "bridge", "fairy tale", "nature", "childhood memory"],
+      "latent_concepts": ["outdoor recreation", "physical challenge", "childhood wonder", "nature as therapy", "spiritual friendships"]
+    },
+    {
+      "session_number": 18,
+      "turns": ["D18:14", "D18:15", "D18:16", "D18:17", "D18:18", "D18:19", "D18:20", "D18:21", "D18:22", "D18:23"],
+      "topic": "Aerial yoga, finding peace, and family park day",
+      "surface_events": [
+        "Maria finds peace through alone time, music, and aerial yoga",
+        "Maria loves upside-down poses in aerial yoga",
+        "John had an awesome day at the park with family",
+        "Kids had fun on the playground"
+      ],
+      "categories": ["yoga", "wellness", "family", "leisure"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria finds Zen through solitude, music, and aerial yoga, especially upside-down poses that make her feel free. John had a great family day at the park with kids enjoying the playground.",
+      "retrieval_text": "Maria finds peace through moments alone plus favorite tunes and aerial yoga. Maria loves upside-down aerial yoga poses that make her feel free and light. John had awesome day at park with family, kids had fun on playground. They discuss finding peaceful moments amidst chaos.",
+      "bridging_terms": ["aerial yoga", "upside-down poses", "solitude", "music", "freedom", "park day", "playground", "family time", "peace", "wellness"],
+      "latent_concepts": ["mind-body wellness", "meditative movement", "sensory regulation", "family recreation", "stress management"]
+    },
+    {
+      "session_number": 19,
+      "turns": ["D19:1", "D19:2", "D19:3", "D19:4", "D19:5", "D19:6", "D19:7", "D19:8", "D19:9", "D19:10", "D19:11", "D19:12", "D19:13", "D19:14", "D19:15", "D19:16"],
+      "topic": "Gym membership, promotion to assistant manager, and overcoming self-doubt",
+      "surface_events": [
+        "Maria joined a gym and is trying kundalini yoga",
+        "Maria wants to get stronger and improve endurance",
+        "John interested in trying rock climbing",
+        "John got promoted to assistant manager",
+        "John overcame tech challenges, workplace issues, and self-doubt",
+        "Trophy commemorates John's journey"
+      ],
+      "categories": ["fitness", "career", "perseverance", "personal growth"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John's perseverance and determination as incredible and inspiring (evidence: D19:13)"
+      ],
+      "literal_summary": "Maria joined a gym and tries kundalini yoga. John got promoted to assistant manager after overcoming tech challenges, workplace issues, and self-doubt. A trophy symbolizes his journey of perseverance.",
+      "retrieval_text": "Maria joined gym, trying kundalini yoga to get stronger and improve endurance. John interested in rock climbing. John promoted to assistant manager at work. John overcame tech hurdles, workplace challenges, and self-doubt with family support and grit. Trophy commemorates his journey of overcoming obstacles.",
+      "bridging_terms": ["gym", "kundalini yoga", "rock climbing", "promotion", "assistant manager", "self-doubt", "perseverance", "trophy", "challenges", "determination"],
+      "latent_concepts": ["career advancement", "impostor syndrome", "grit", "fitness goals", "symbolic achievement", "workplace resilience"]
+    },
+    {
+      "session_number": 19,
+      "turns": ["D19:17", "D19:18", "D19:19", "D19:20", "D19:21", "D19:22", "D19:23", "D19:24", "D19:25", "D19:26"],
+      "topic": "Work-life balance and vacation beach memories",
+      "surface_events": [
+        "John works regular hours but sometimes brings work home",
+        "John had a family vacation in California with a gorgeous sunset",
+        "Maria had a vacation in Florida with stunning colors",
+        "John shares photo of kids splashing in waves"
+      ],
+      "categories": ["work-life balance", "travel", "family", "beaches"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John tries to balance work and family time. He recalls a California family vacation. Maria shares a Florida vacation photo with amazing sunset colors. John shares a photo of his kids splashing in waves.",
+      "retrieval_text": "John works regular hours, sometimes brings work home, tries to organize time for important things. John recalls family vacation in California with gorgeous sunset and shore strolling. Maria shares Florida vacation photo with amazing colors and feeling of gratitude with family. Kids splashing in waves at the beach.",
+      "bridging_terms": ["work-life balance", "California", "Florida", "vacation", "sunset", "beach", "waves", "family memories", "gratitude", "special moments"],
+      "latent_concepts": ["work-life integration", "beach vacations", "family travel", "memory making", "gratitude practice"]
+    },
+    {
+      "session_number": 20,
+      "turns": ["D20:1", "D20:2", "D20:3", "D20:4", "D20:5", "D20:6", "D20:7", "D20:8", "D20:9", "D20:10", "D20:11", "D20:12", "D20:13", "D20:14", "D20:15", "D20:16", "D20:17", "D20:18"],
+      "topic": "Struggling but staying positive, live music, and shelter memories",
+      "surface_events": [
+        "Maria has been struggling but focusing on positive",
+        "Maria's family has been her support rock",
+        "John's family went to a live music event and had a blast",
+        "Maria volunteered at the shelter and saw a sad person laugh while she played with kids",
+        "That moment stands out as most impactful for Maria"
+      ],
+      "categories": ["adversity", "family support", "music", "volunteering"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria has been struggling but stays positive with family support. John's family went to a live music event. Maria's most impactful shelter memory was making a sad person laugh while playing with kids.",
+      "retrieval_text": "Maria struggling but focusing on positive, family has been her rock giving encouragement. John's family went to live music event, danced and made memories. Maria's most impactful shelter memory: someone who'd been sad for months suddenly laughed when she was playing with kids. Brief moments with someone can make a difference.",
+      "bridging_terms": ["struggling", "staying positive", "family support", "live music", "dancing", "shelter", "playing with kids", "laughter", "impactful moment", "making a difference"],
+      "latent_concepts": ["emotional resilience", "family as anchor", "music as joy", "unexpected impact", "laughter as healing", "presence as gift"]
+    },
+    {
+      "session_number": 21,
+      "turns": ["D21:1", "D21:2", "D21:3", "D21:4", "D21:5", "D21:6", "D21:7", "D21:8", "D21:9", "D21:10", "D21:11", "D21:12", "D21:13", "D21:14"],
+      "topic": "Car accident, helping cousin find housing, and shelter gratitude letter",
+      "surface_events": [
+        "Maria was in a car accident when someone ran a red light",
+        "Everyone was okay after the accident",
+        "Maria's cousin had to leave and find a new place urgently",
+        "Maria is helping her cousin find housing",
+        "John offers to find resources to help",
+        "Shelter resident Laura wrote a gratitude letter"
+      ],
+      "categories": ["accident", "housing", "family support", "volunteering"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria was in a car accident (red light runner) but everyone was okay. Her cousin needs help finding new housing urgently. John offers to find resources. Shelter resident Laura wrote a gratitude letter to volunteers.",
+      "retrieval_text": "Maria hit by car that ran a red light, thankfully everyone okay. Maria's cousin had to leave and find new place in hurry, Maria helping her. John offers to find housing resources and organizations. Shelter resident Laura wrote gratitude letter showing impact of volunteer support. Maria loves volunteering for making a difference.",
+      "bridging_terms": ["car accident", "red light", "cousin", "housing search", "urgent relocation", "resources", "Laura", "gratitude letter", "shelter", "helping family"],
+      "latent_concepts": ["road safety", "housing instability", "family obligation", "resource navigation", "volunteer appreciation", "mutual aid"]
+    },
+    {
+      "session_number": 21,
+      "turns": ["D21:15", "D21:16", "D21:17", "D21:18", "D21:19", "D21:20", "D21:21", "D21:22", "D21:23", "D21:24", "D21:25", "D21:26", "D21:27", "D21:28", "D21:29"],
+      "topic": "Marching event for veterans' rights and activism motivation",
+      "surface_events": [
+        "John participated in a marching event for veterans' rights",
+        "John has always had great respect for the military",
+        "Being around people with shared values motivated him",
+        "They discuss the importance of activism"
+      ],
+      "categories": ["veterans", "activism", "community", "motivation"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as great for standing up for his beliefs (evidence: D21:25)"
+      ],
+      "literal_summary": "John participated in a marching event for veterans' rights, finding it motivating to be around people sharing the same values. He has always respected the military. They discuss the importance of activism.",
+      "retrieval_text": "John participated in marching event for veterans' rights, reminded of how much veterans sacrifice. John has great respect for military and believes in standing up for beliefs. Being around others with same values and passion was motivating. Maria characterizes John as great for standing up for beliefs.",
+      "bridging_terms": ["marching event", "veterans' rights", "military respect", "activism", "shared values", "passion", "motivation", "standing up", "sacrifice", "making a difference"],
+      "latent_concepts": ["veteran advocacy", "collective action", "moral conviction", "social movement participation", "solidarity"]
+    },
+    {
+      "session_number": 22,
+      "turns": ["D22:1", "D22:2", "D22:3", "D22:4", "D22:5", "D22:6", "D22:7", "D22:8", "D22:9", "D22:10", "D22:11", "D22:12", "D22:13", "D22:14", "D22:15", "D22:16", "D22:17", "D22:18", "D22:19", "D22:20", "D22:21"],
+      "topic": "Education and infrastructure reflection, Sara's birthday trip, and sources of inspiration",
+      "surface_events": [
+        "John reflects on how education and infrastructure shape communities",
+        "John sometimes doubts if he's making a difference",
+        "Family trip photo was from daughter Sara's birthday",
+        "Maria inspired by chatting, volunteering, and music",
+        "John inspired by family, exercise, and friends",
+        "John sees sunsets on walks at least once a week",
+        "Maria takes regular walks at a nearby park"
+      ],
+      "categories": ["politics", "family", "inspiration", "wellness", "self-doubt"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as really making a difference and something to be proud of (evidence: D22:4)"
+      ],
+      "literal_summary": "John reflects on education and infrastructure's community impact, sometimes doubting his impact. He shares a family trip photo from Sara's birthday. They discuss inspiration sources. John sees sunsets weekly on walks. Maria takes park walks.",
+      "retrieval_text": "John reflects on how education and infrastructure shape communities, sometimes doubts if making a difference. Family photo from daughter Sara's birthday trip. Maria inspired by chatting, volunteering, music. John inspired by family, exercise, friends. John sees sunsets weekly on walks for peace. Maria takes regular me-time walks at park.",
+      "bridging_terms": ["education", "infrastructure", "self-doubt", "Sara", "birthday", "inspiration sources", "sunset walks", "park walks", "music", "volunteering", "me-time"],
+      "latent_concepts": ["sustained motivation", "self-doubt in activism", "personal inspiration", "nature rituals", "introspection", "work-life balance"]
+    },
+    {
+      "session_number": 23,
+      "turns": ["D23:1", "D23:2", "D23:3", "D23:4", "D23:5", "D23:6", "D23:7", "D23:8", "D23:9", "D23:10", "D23:11", "D23:12", "D23:13", "D23:14"],
+      "topic": "Flood in John's old area and community organizing response",
+      "surface_events": [
+        "Flood hit John's old area due to poor infrastructure",
+        "Many homes were ruined",
+        "John organizing a community meeting to discuss solutions",
+        "Maria agrees to join the meeting",
+        "Maria going to dinner with friends from the gym"
+      ],
+      "categories": ["disaster", "infrastructure", "community organizing", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John's commitment to helping others as inspiring (evidence: D23:6)"
+      ],
+      "literal_summary": "A flood hit John's old area due to poor infrastructure, ruining homes. John is organizing a community meeting to discuss solutions. Maria joins. She also has dinner with gym friends.",
+      "retrieval_text": "Flood hit John's old area, infrastructure wasn't great so lots of homes ruined. John organizing community meeting to discuss potential solutions. Maria agrees to join meeting and contribute. They commit to small actions making big differences. Maria going to dinner with friends from gym.",
+      "bridging_terms": ["flood", "infrastructure failure", "ruined homes", "community meeting", "solutions", "teamwork", "gym friends", "dinner", "positive change", "neighborhood"],
+      "latent_concepts": ["natural disaster response", "infrastructure vulnerability", "community resilience", "collective problem-solving", "social networks"]
+    },
+    {
+      "session_number": 24,
+      "turns": ["D24:1", "D24:2", "D24:3", "D24:4", "D24:5", "D24:6", "D24:7", "D24:8", "D24:9", "D24:10", "D24:11", "D24:12", "D24:13", "D24:14", "D24:15", "D24:16", "D24:17"],
+      "topic": "Veteran hospital visit, church picnic, and community events",
+      "surface_events": [
+        "John visited a veteran's hospital and met elderly veteran Samuel",
+        "Samuel's stories were inspiring and heartbreaking",
+        "Maria had a picnic with church friends playing charades and scavenger hunt",
+        "John found arts and crafts at a community event and adapted for family",
+        "John wants to set up similar activities for his kids"
+      ],
+      "categories": ["veterans", "faith community", "leisure", "family activities"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John visited a veteran's hospital and met Samuel, whose stories were inspiring and heartbreaking. Maria had a church picnic with charades and scavenger hunt. John found community event activities to adapt for his family.",
+      "retrieval_text": "John visited veteran's hospital, met elderly veteran Samuel whose stories were inspiring and heartbreaking, filled John with hope. Maria had picnic with church friends playing charades and scavenger hunt. John found arts and crafts at community event, adapting activities for his family and friends.",
+      "bridging_terms": ["veteran hospital", "Samuel", "elderly veteran", "inspiring stories", "church picnic", "charades", "scavenger hunt", "arts and crafts", "community event", "family activities"],
+      "latent_concepts": ["honoring service", "intergenerational storytelling", "faith community bonding", "creative recreation", "adapting social activities"]
+    },
+    {
+      "session_number": 25,
+      "turns": ["D25:1", "D25:2", "D25:3", "D25:4", "D25:5", "D25:6", "D25:7", "D25:8", "D25:9"],
+      "topic": "New job satisfaction and church hiking trip",
+      "surface_events": [
+        "John enjoying new job with encouraging team",
+        "Maria went hiking with church friends",
+        "Maria reached the summit with breathtaking views",
+        "Maria felt part of something special and at peace"
+      ],
+      "categories": ["career", "hiking", "faith community", "nature"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John enjoys his new job with an encouraging team. Maria went hiking with church friends and found reaching the summit breathtaking, feeling part of something special and at peace.",
+      "retrieval_text": "John enjoying new job with super encouraging and inspiring team. Maria hiked with church friends, reaching summit with breathtaking view. Maria felt part of something special, gained real sense of peace from seeing how huge the world is. Maria plans to explore more and volunteer at shelters next month.",
+      "bridging_terms": ["new job", "encouraging team", "hiking", "church friends", "summit", "breathtaking view", "peace", "connection", "exploring", "volunteering"],
+      "latent_concepts": ["job satisfaction", "team dynamics", "spiritual hiking", "transcendence through nature", "sense of belonging"]
+    },
+    {
+      "session_number": 25,
+      "turns": ["D25:10", "D25:11", "D25:12", "D25:13", "D25:14", "D25:15", "D25:16", "D25:17", "D25:18", "D25:19", "D25:20"],
+      "topic": "Yoga studio classes and trying new workouts",
+      "surface_events": [
+        "John goes to a yoga studio often with chill vibe",
+        "Studio offers yoga, kickboxing, circuit training",
+        "John also done weight training",
+        "Maria going to bake cakes"
+      ],
+      "categories": ["fitness", "yoga", "variety of exercise"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John frequents a yoga studio with great vibe that offers yoga, kickboxing, and circuit training. He has also tried weight training. Maria is off to bake cakes.",
+      "retrieval_text": "John goes to yoga studio often with chill vibe and awesome instructors. Studio offers yoga, kickboxing, and circuit training. John also tried weight training, found it challenging but peaceful like yoga. Maria heading off to bake cakes. They discuss trying new workout classes.",
+      "bridging_terms": ["yoga studio", "kickboxing", "circuit training", "weight training", "variety", "chill vibe", "baking cakes", "trying new things"],
+      "latent_concepts": ["cross-training", "fitness variety", "studio community", "domestic hobbies"]
+    },
+    {
+      "session_number": 26,
+      "turns": ["D26:1", "D26:2", "D26:3", "D26:4", "D26:5", "D26:6", "D26:7", "D26:8", "D26:9", "D26:10", "D26:11", "D26:12", "D26:13", "D26:14", "D26:15", "D26:16", "D26:17"],
+      "topic": "Baked goods delivery, joining fire brigade, and first rescue",
+      "surface_events": [
+        "Maria delivered baked goods to the homeless shelter",
+        "John joined a fire-fighting brigade",
+        "Training was intense and taxing",
+        "First call-out: saved a family from a burning building",
+        "Fire brigade team feels like family to John",
+        "Bond similar to his time in the military"
+      ],
+      "categories": ["volunteering", "fire brigade", "rescue", "teamwork"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John's firefighting as gutsy and inspiring (evidence: D26:7)"
+      ],
+      "literal_summary": "Maria delivered baked goods to the shelter. John joined a fire brigade, did intense training, and on his first call saved a family from a burning building. The team bond reminds him of his military time.",
+      "retrieval_text": "Maria dropped off baked goods at homeless shelter, more motivated than ever. John joined fire-fighting brigade, training was intense and taxing. First call-out: saved family from burning building with team. Fire brigade team became like family. Bond similar to John's time in the military. Maria characterizes John as gutsy and inspiring.",
+      "bridging_terms": ["baked goods", "shelter delivery", "fire brigade", "intense training", "first call-out", "burning building", "rescue", "team bond", "military bond", "adrenaline"],
+      "latent_concepts": ["emergency services", "first responder experience", "team cohesion", "military camaraderie parallel", "courage under pressure", "community protection"]
+    },
+    {
+      "session_number": 27,
+      "turns": ["D27:1", "D27:2", "D27:3", "D27:4", "D27:5", "D27:6", "D27:7", "D27:8", "D27:9", "D27:10", "D27:11", "D27:12", "D27:13", "D27:14", "D27:15", "D27:16"],
+      "topic": "Virtual military support group, shelter volunteering origins, and military memorial visit",
+      "surface_events": [
+        "John asked family and friends to join his virtual military support group",
+        "Maria started volunteering about a year ago after seeing a struggling family",
+        "Shelter resident Cindy wrote a heartfelt gratitude note",
+        "John took family to a military memorial that impacted his kids",
+        "Kids were awestruck and humbled at the memorial"
+      ],
+      "categories": ["veterans", "volunteering", "family", "gratitude"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "John characterizes Maria's volunteer impact as admirable (evidence: D27:5)"
+      ],
+      "literal_summary": "John recruited family and friends to a virtual military support group. Maria explains she started volunteering a year ago after seeing a struggling family on the streets. Cindy wrote a gratitude note. John's kids were awed at a military memorial.",
+      "retrieval_text": "John asked family and friends to join virtual military support group as advocates. Maria started volunteering about a year ago after witnessing family struggling on streets. Shelter resident Cindy wrote heartfelt gratitude note. John took family to military memorial, kids were awestruck and humbled. Teaching kids about veterans' sacrifice is important.",
+      "bridging_terms": ["virtual support group", "military advocates", "shelter origins", "struggling family", "Cindy", "gratitude note", "military memorial", "awestruck kids", "veteran respect", "teaching children"],
+      "latent_concepts": ["digital advocacy", "origin stories of service", "gratitude expression", "patriotic education", "intergenerational values"]
+    },
+    {
+      "session_number": 28,
+      "turns": ["D28:1", "D28:2", "D28:3", "D28:4", "D28:5", "D28:6", "D28:7", "D28:8", "D28:9", "D28:10", "D28:11", "D28:12", "D28:13", "D28:14", "D28:15", "D28:16", "D28:17", "D28:18", "D28:19"],
+      "topic": "Job loss, tech industry pivot, community center renovation, and church community work",
+      "surface_events": [
+        "John lost his job when mechanical engineering company went under",
+        "John looking into tech industry, found hardware team role",
+        "Maria did community work with church friends",
+        "John helped renovate a community center in his hometown last year"
+      ],
+      "categories": ["career", "job loss", "volunteering", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as adaptable and confident he'll do great (evidence: D28:6)"
+      ],
+      "literal_summary": "John lost his job at a mechanical engineering company. He is pivoting to the tech industry, finding a role needing mechanical skills. Maria did community work with church friends. John helped renovate a community center in his hometown.",
+      "retrieval_text": "John lost job when mechanical engineering company tanked, looking into tech industry. Found potential job at tech company needing mechanical skills for hardware team. Maria did community work with church friends, found it rewarding. John helped renovate rundown community center in hometown last year, seeing community impact was worth it.",
+      "bridging_terms": ["job loss", "mechanical engineering", "tech industry", "hardware team", "career pivot", "church friends", "community work", "community center", "renovation", "hometown"],
+      "latent_concepts": ["career disruption", "transferable skills", "industry transition", "faith-based service", "community revitalization", "adaptability"]
+    },
+    {
+      "session_number": 29,
+      "turns": ["D29:1", "D29:2", "D29:3", "D29:4", "D29:5", "D29:6", "D29:7", "D29:8", "D29:9", "D29:10", "D29:11", "D29:12", "D29:13", "D29:14", "D29:15", "D29:16", "D29:17", "D29:18"],
+      "topic": "Volunteer medal, 5K veterans charity run, and domestic abuse awareness",
+      "surface_events": [
+        "Maria received a medal from the homeless shelter",
+        "John organized a 5K charity run for veterans and their families",
+        "Getting sponsors was the biggest challenge",
+        "John also worked with an organization helping domestic abuse victims",
+        "They raised awareness and funds for domestic abuse"
+      ],
+      "categories": ["recognition", "charity", "veterans", "domestic abuse", "fundraising"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as someone who takes initiative and is an honor to know (evidence: D29:5)"
+      ],
+      "literal_summary": "Maria received a medal for her shelter volunteering. John organized a 5K charity run for veterans, facing challenges getting sponsors. He also worked with a domestic abuse organization to raise awareness and funds.",
+      "retrieval_text": "Maria received medal from homeless shelter for volunteer work, humbling experience. John organized 5K charity run in neighborhood for veterans and families. Getting sponsors was hardest part, reached out to many businesses. John also worked with organization helping domestic abuse victims, raised awareness and funds. Maria characterizes John as taking initiative.",
+      "bridging_terms": ["medal", "shelter recognition", "5K charity run", "veterans", "sponsors", "domestic abuse", "awareness", "fundraising", "initiative", "community event"],
+      "latent_concepts": ["volunteer recognition", "event management", "corporate sponsorship", "domestic violence awareness", "multi-cause activism", "persistence in organizing"]
+    },
+    {
+      "session_number": 30,
+      "turns": ["D30:1", "D30:2", "D30:3", "D30:4", "D30:5", "D30:6", "D30:7", "D30:8", "D30:9", "D30:10", "D30:11", "D30:12", "D30:13", "D30:14", "D30:15", "D30:16", "D30:17", "D30:18", "D30:19", "D30:20", "D30:21", "D30:22", "D30:23"],
+      "topic": "New puppy Coco, memories of Max, self-doubt about impact, and exploring local organizations",
+      "surface_events": [
+        "Maria got a puppy named Coco",
+        "John still thinks about Max and shares a photo",
+        "John's best memory with Max was a camping trip with hiking and swimming",
+        "John feels stuck and questions whether he's making an impact",
+        "John considering joining local organizations or volunteering programs",
+        "Maria suggests researching organizations"
+      ],
+      "categories": ["pets", "grief", "self-doubt", "community service", "nature"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Maria got puppy Coco. John misses Max and recalls their best camping trip. John feels stuck and questions his impact, considering joining local organizations. Maria encourages him to research organizations aligned with his beliefs.",
+      "retrieval_text": "Maria got puppy named Coco who brings joy and greets her at home. John still thinking about Max, shares photo. Best memory with Max was camping trip last summer with hiking and swimming. John feels stuck, questions if making enough impact, wants to channel passion better. Considering joining local organizations or volunteering programs.",
+      "bridging_terms": ["Coco", "puppy", "Max", "camping trip", "hiking", "swimming", "self-doubt", "impact", "stuck", "local organizations", "volunteering programs", "research"],
+      "latent_concepts": ["pet companionship", "continuing grief", "existential questioning", "purpose seeking", "organizational engagement", "peer encouragement"]
+    },
+    {
+      "session_number": 31,
+      "turns": ["D31:1", "D31:2", "D31:3", "D31:4", "D31:5", "D31:6", "D31:7", "D31:8", "D31:9", "D31:10", "D31:11", "D31:12", "D31:13", "D31:14", "D31:15", "D31:16"],
+      "topic": "School mentoring, adopting Shadow, and the joy of pets",
+      "surface_events": [
+        "John volunteering as mentor at a local school",
+        "A student proudly showed John their essay",
+        "Maria adopted Shadow from a shelter",
+        "Shadow is full of energy and gets along with Coco",
+        "Maria had no pets growing up",
+        "John looking into shelters for a new pup"
+      ],
+      "categories": ["education", "mentoring", "pets", "adoption"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John is mentoring at a local school; a student proudly showed him their essay. Maria adopted Shadow from a shelter who gets along with Coco. Maria had no pets growing up. John is looking into shelters for a dog.",
+      "retrieval_text": "John volunteering as mentor at local school, students showing real improvement in confidence and skills. One student proudly showed essay, a proud moment. Maria adopted dog named Shadow from shelter, full of energy and gets along great with Coco. Maria had no pets growing up. John looking into shelters near him for a new pup.",
+      "bridging_terms": ["mentoring", "local school", "student essay", "Shadow", "shelter adoption", "Coco", "no pets growing up", "new pup", "confidence improvement", "companionship"],
+      "latent_concepts": ["educational mentorship", "student achievement", "animal adoption", "pet bonding", "childhood without pets", "animal shelter support"]
+    },
+    {
+      "session_number": 31,
+      "turns": ["D31:17", "D31:18", "D31:19", "D31:20", "D31:21", "D31:22", "D31:23"],
+      "topic": "Family activities and quality time",
+      "surface_events": [
+        "John describes his family: himself, wife, and kids",
+        "Family enjoys hiking, park visits, picnics, board games, and movie nights",
+        "Family always has his back even in hard times"
+      ],
+      "categories": ["family", "leisure", "quality time"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "John describes his family (wife and kids) as always having his back. They enjoy hiking, park visits, picnics, board games, and movie nights at home.",
+      "retrieval_text": "John's family is him, his wife, and kids. Family always has his back even in hard times. They enjoy being outdoors hiking, park visits, picnics, plus board games and movie nights at home. Spending time with family is most important.",
+      "bridging_terms": ["wife", "kids", "hiking", "park", "picnics", "board games", "movie nights", "family time", "support", "quality time"],
+      "latent_concepts": ["family cohesion", "domestic recreation", "outdoor family activities", "unconditional support", "work-life balance"]
+    },
+    {
+      "session_number": 32,
+      "turns": ["D32:1", "D32:2", "D32:3", "D32:4", "D32:5", "D32:6", "D32:7", "D32:8", "D32:9", "D32:10", "D32:11", "D32:12", "D32:13", "D32:14", "D32:15", "D32:16", "D32:17"],
+      "topic": "Fire brigade community work, donations, and shelter front desk volunteering",
+      "surface_events": [
+        "John now part of fire-fighting brigade",
+        "Brigade raised donations: canned food, toiletries, clothes",
+        "Donations helped get a new fire truck",
+        "John feels firefighting is his true calling",
+        "Maria volunteered at shelter front desk",
+        "They commit to continuing spreading kindness"
+      ],
+      "categories": ["fire brigade", "donations", "volunteering", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Maria characterizes John as having an awesome newfound passion and doing great things (evidence: D32:10)"
+      ],
+      "literal_summary": "John is enthusiastic about the fire brigade, which raised donations including canned food and a new fire truck. He feels it's his true calling. Maria volunteered at the shelter front desk, seeing smiles when residents got help.",
+      "retrieval_text": "John part of fire-fighting brigade, everyone working hard together. Brigade raised donations: canned food, toiletries, clothes, even a new fire truck. John feels firefighting is his true calling, gives him purpose and passion. Maria volunteered at shelter front desk, seeing smiles when residents got food or bed. They commit to spreading kindness in community.",
+      "bridging_terms": ["fire brigade", "donations", "canned food", "fire truck", "true calling", "shelter front desk", "smiles", "purpose", "kindness", "community impact"],
+      "latent_concepts": ["vocational calling", "community fundraising", "emergency services", "direct service impact", "finding purpose", "sustained volunteerism"]
+    }
+  ]
+}

@@ -1,0 +1,288 @@
+{
+  "claims": [
+    {
+      "subject": "Melanie",
+      "relation": "has_experience",
+      "object": "Melanie is busy managing both kids and work responsibilities",
+      "attributed_to": "Melanie",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:2"],
+      "retrieval_text": "Melanie told Caroline she is swamped with her kids and work."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_experience",
+      "object": "Caroline attended an LGBTQ support group the day before this conversation",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:3", "D1:5"],
+      "retrieval_text": "Caroline told Melanie she went to an LGBTQ support group and found the transgender stories inspiring."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_experience",
+      "object": "Caroline found the transgender stories at the LGBTQ support group inspiring and felt thankful for the support",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:5"],
+      "retrieval_text": "Caroline described the transgender stories at the LGBTQ support group as inspiring and expressed happiness and thankfulness."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_trait",
+      "object": "Caroline feels accepted and has gained courage to embrace herself through the support group",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:7"],
+      "retrieval_text": "Caroline said the LGBTQ support group made her feel accepted and gave her courage to embrace herself."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_goal",
+      "object": "Caroline plans to continue her education and explore career options",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:9"],
+      "retrieval_text": "Caroline told Melanie she plans to continue her education and check out career options."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_goal",
+      "object": "Caroline is interested in counseling or working in mental health to support people with similar issues",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:11"],
+      "retrieval_text": "Caroline told Melanie she is interested in counseling or mental health careers to support people with similar issues."
+    },
+    {
+      "subject": "Melanie",
+      "relation": "opinion_of",
+      "object": "Melanie believes Caroline would be a great counselor due to her empathy and understanding",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:12"],
+      "retrieval_text": "Melanie told Caroline she would be a great counselor and praised her empathy and understanding."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_trait",
+      "object": "Caroline has empathy and understanding, as recognized by Melanie",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "stable",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:12"],
+      "retrieval_text": "Melanie described Caroline as having empathy and understanding that would help people she works with."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_trait",
+      "object": "Caroline has courage and guts, as recognized by Melanie",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "stable",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:8"],
+      "retrieval_text": "Melanie told Caroline she has guts for embracing herself and attending the support group."
+    },
+    {
+      "subject": "Melanie",
+      "relation": "has_skill",
+      "object": "Melanie paints; she painted a lake sunrise scene",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "stable",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:14", "D1:16"],
+      "retrieval_text": "Melanie told Caroline she painted a lake sunrise last year and that painting is a fun way to express feelings and get creative."
+    },
+    {
+      "subject": "Melanie",
+      "relation": "has_experience",
+      "object": "Melanie painted a lake sunrise scene last year that is special to her",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "historical",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:14"],
+      "retrieval_text": "Melanie said she painted a lake sunrise last year and it is special to her."
+    },
+    {
+      "subject": "Melanie",
+      "relation": "has_preference",
+      "object": "Melanie uses painting as a way to relax after a long day and express her feelings",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "stable",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:16"],
+      "retrieval_text": "Melanie told Caroline that painting is a great way for her to relax after a long day and express her feelings creatively."
+    },
+    {
+      "subject": "Melanie",
+      "relation": "has_experience",
+      "object": "Melanie has children and was going swimming with them",
+      "attributed_to": "Melanie",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "stable",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:2", "D1:18"],
+      "retrieval_text": "Melanie mentioned having kids and said she was going swimming with them after the conversation."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "has_experience",
+      "object": "Caroline was heading off to do research after the conversation",
+      "attributed_to": "Caroline",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:17"],
+      "retrieval_text": "Caroline told Melanie she was going to do some research after their conversation."
+    },
+    {
+      "subject": "Caroline",
+      "relation": "opinion_of",
+      "object": "Caroline complimented Melanie's painting, noting the colors blend nicely",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "this_session",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:15"],
+      "retrieval_text": "Caroline complimented Melanie's lake sunrise painting, saying the colors blend nicely and painting is a great outlet for self-expression."
+    },
+    {
+      "subject": "Melanie",
+      "relation": "nickname",
+      "object": "Mel",
+      "attributed_to": "Caroline",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": "stable",
+      "session_number": 1,
+      "evidence_turn_ids": ["D1:17"],
+      "retrieval_text": "Caroline called Melanie by the nickname Mel."
+    }
+  ],
+  "entities": [
+    {
+      "name": "Melanie",
+      "aliases": ["Mel"],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Caroline",
+      "aliases": [],
+      "type": "person",
+      "grounding": null
+    }
+  ],
+  "segments": [
+    {
+      "session_number": 1,
+      "turns": ["D1:1", "D1:2"],
+      "topic": "Greeting and catching up",
+      "surface_events": [
+        "Caroline greeted Melanie",
+        "Melanie said she is swamped with kids and work",
+        "Melanie asked Caroline what is new"
+      ],
+      "categories": ["greeting", "life update", "parenting", "work-life balance"],
+      "implied_traits": [null],
+      "literal_summary": "Caroline and Melanie greeted each other. Melanie said she is swamped with kids and work and asked Caroline what is new.",
+      "retrieval_text": "Caroline and Melanie greeted each other and began catching up. Melanie told Caroline she is busy managing her kids and work. Melanie asked Caroline if anything new was happening in her life.",
+      "bridging_terms": ["busy parent", "work-life balance", "life update", "how are you", "catching up with friends", "overwhelmed"],
+      "latent_concepts": ["time scarcity", "parental responsibility", "friendship maintenance", "social check-in"]
+    },
+    {
+      "session_number": 1,
+      "turns": ["D1:3", "D1:4", "D1:5", "D1:6", "D1:7", "D1:8"],
+      "topic": "LGBTQ support group experience",
+      "surface_events": [
+        "Caroline attended an LGBTQ support group yesterday",
+        "Caroline found transgender stories inspiring",
+        "Caroline felt happy and thankful for the support",
+        "Caroline said the group made her feel accepted",
+        "Caroline said the group gave her courage to embrace herself",
+        "Melanie praised Caroline for having guts",
+        "Melanie noticed a painting during conversation"
+      ],
+      "categories": ["LGBTQ support", "transgender experience", "self-acceptance", "community support", "personal growth"],
+      "implied_traits": ["Caroline values community belonging", "Caroline is on a journey of self-acceptance"],
+      "literal_summary": "Caroline told Melanie about attending an LGBTQ support group where transgender stories inspired her. Caroline said the group made her feel accepted and gave her courage to embrace herself. Melanie praised Caroline's courage.",
+      "retrieval_text": "Caroline described attending an LGBTQ support group where she found transgender stories inspiring and felt thankful for the support. Caroline said the group gave her acceptance and courage to embrace herself. Melanie praised Caroline for having guts. Melanie also referenced a painting during this exchange.",
+      "bridging_terms": ["coming out", "transgender support", "self-discovery", "identity", "belonging", "LGBTQ community", "acceptance journey", "queer identity", "bravery"],
+      "latent_concepts": ["identity formation", "community belonging", "vulnerability", "self-actualization", "social support", "courage", "minority stress"]
+    },
+    {
+      "session_number": 1,
+      "turns": ["D1:9", "D1:10", "D1:11", "D1:12", "D1:13"],
+      "topic": "Caroline's career aspirations in counseling",
+      "surface_events": [
+        "Caroline plans to continue her education",
+        "Caroline wants to explore career options",
+        "Caroline is interested in counseling or mental health work",
+        "Caroline wants to support people with similar issues",
+        "Melanie said Caroline would be a great counselor",
+        "Melanie praised Caroline's empathy and understanding",
+        "Melanie showed Caroline a painting"
+      ],
+      "categories": ["career planning", "education", "mental health profession", "counseling", "peer support"],
+      "implied_traits": ["Caroline is driven by desire to help others", "Caroline connects personal experience to career goals"],
+      "literal_summary": "Caroline told Melanie she plans to continue her education and is interested in counseling or mental health careers to support others. Melanie encouraged Caroline, saying her empathy and understanding would make her a great counselor. Melanie showed Caroline a painting.",
+      "retrieval_text": "Caroline told Melanie she plans to continue her education and explore career options, specifically counseling or mental health work to support people with similar issues. Melanie encouraged Caroline by saying her empathy and understanding would make her a great counselor. Melanie also showed Caroline one of her paintings.",
+      "bridging_terms": ["career change", "helping profession", "therapist", "social work", "mental health career", "lived experience", "education goals", "vocational identity"],
+      "latent_concepts": ["prosocial motivation", "career identity", "lived experience as qualification", "mentorship", "encouragement", "vocational calling"]
+    },
+    {
+      "session_number": 1,
+      "turns": ["D1:14", "D1:15", "D1:16", "D1:17", "D1:18"],
+      "topic": "Melanie's painting hobby and farewell",
+      "surface_events": [
+        "Melanie painted a lake sunrise last year",
+        "The painting is special to Melanie",
+        "Caroline complimented the colors in the painting",
+        "Melanie said painting helps her express feelings and relax",
+        "Caroline agreed about importance of relaxation and self-expression",
+        "Caroline left to do research",
+        "Melanie left to go swimming with her kids"
+      ],
+      "categories": ["art hobby", "painting", "self-care", "relaxation", "parenting activities"],
+      "implied_traits": ["Melanie values creative expression as self-care", "Melanie is an active parent"],
+      "literal_summary": "Melanie told Caroline she painted a lake sunrise last year that is special to her. Caroline complimented the colors. Melanie said painting helps her express feelings and relax. They parted ways — Caroline to do research, Melanie to swim with her kids.",
+      "retrieval_text": "Melanie described painting a lake sunrise last year that is special to her. Caroline complimented the blending of colors. Melanie explained that painting is her way to express feelings, get creative, and relax after long days. They said goodbye — Caroline went to do research and Melanie went swimming with her kids.",
+      "bridging_terms": ["landscape painting", "creative outlet", "stress relief", "artistic hobby", "lake scene", "nature art", "swimming with children", "self-care routine", "goodbye"],
+      "latent_concepts": ["emotional regulation through art", "creative identity", "work-life balance", "parental recreation", "therapeutic expression", "friendship ritual"]
+    }
+  ]
+}

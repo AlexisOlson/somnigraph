@@ -61,11 +61,65 @@ _locomo_feature_names = None
 
 _expansion_flags: dict[str, bool] = {}
 _n_seeds: int = 10
+_graph_resolve: bool = False
+_synthetic_coverage: dict | None = None  # {qkey: {synth_id: [covered_turn_ids]}}
+
+# Per-conversation cache for reranker (avoids reloading metadata per query)
+_conv_cache: dict = {}  # keys: memories, all_speakers, ordinal_map, syn_to_turns, db_path
 
 
 def enable_expansion(**kwargs):
     """Enable specific expansion methods for two-phase reranking."""
     _expansion_flags.update(kwargs)
+
+
+def _resolve_synthetic_nodes(db, candidate_list, preds, memories, all_speakers,
+                             syn_to_turns=None):
+    """Replace synthetic nodes with their source turns via EXTRACTED_FROM edges.
+
+    Uses pre-cached syn_to_turns mapping (built once per conversation) instead of
+    per-query DB lookups. The memories dict already has is_synthetic flags and
+    metadata for all turns (loaded at conversation start).
+
+    Returns (resolved_candidate_list, resolved_preds, newly_added_turn_ids).
+    """
+    # Identify synthetic candidates from pre-cached flag
+    synthetic_ids = set()
+    for mid in candidate_list:
+        mem = memories.get(mid)
+        if mem and mem.get("is_synthetic", False):
+            synthetic_ids.add(mid)
+
+    if not synthetic_ids:
+        return candidate_list, preds, set()
+
+    # Build score map
+    score_map = dict(zip(candidate_list, preds))
+
+    # Resolve synthetic → source turns using pre-cached mapping
+    existing_turns = set(candidate_list) - synthetic_ids
+    new_turn_ids = set()
+
+    if syn_to_turns is None:
+        syn_to_turns = {}
+
+    for syn_id in synthetic_ids:
+        syn_score = score_map[syn_id]
+        for turn_id in syn_to_turns.get(syn_id, set()):
+            if turn_id in existing_turns:
+                score_map[turn_id] = max(score_map.get(turn_id, 0), syn_score)
+            elif turn_id in memories:
+                score_map[turn_id] = max(score_map.get(turn_id, 0), syn_score)
+                new_turn_ids.add(turn_id)
+                existing_turns.add(turn_id)
+
+    # Remove synthetic nodes, keep only turns
+    for syn_id in synthetic_ids:
+        score_map.pop(syn_id, None)
+
+    resolved_list = sorted(score_map.keys())
+    resolved_preds = [score_map[mid] for mid in resolved_list]
+    return resolved_list, resolved_preds, new_turn_ids
 
 
 def _install_locomo_reranker():
@@ -122,31 +176,28 @@ def _install_locomo_reranker():
             logger.error("_locomo_rerank FAILED: %s", e, exc_info=True)
             return None  # fall back to RRF
 
-    def _locomo_rerank_inner(db, query, fts_ranked, vec_ranked, fts_scores,
-                              vec_distances, theme_ranked, theme_overlap_map,
-                              candidate_ids):
-        from memory.reranker import _compute_proximity
+    def _load_conv_cache(db):
+        """Load all per-conversation metadata once; reuse across queries."""
         from locomo_bench.train_locomo_reranker import (
-            _extract_entities, NUM_FEATURES, _count_temporal_exprs,
+            _extract_entities, _count_temporal_exprs,
         )
         import numpy as _np
-        RRF_K = 60
+        import re as _re
+        from collections import defaultdict as _ddict
 
-        # Load memory metadata (including embeddings for phase 2 vec scoring)
         rows = db.execute("""
             SELECT m.id, m.content, m.themes, m.token_count, m.created_at,
-                   v.embedding
+                   m.source, v.embedding
             FROM memories m
             LEFT JOIN memory_vec v ON v.rowid = m.rowid
             WHERE m.status = 'active'
         """).fetchall()
 
-        # First pass: collect speakers for entity extraction
+        # First pass: collect speakers
         all_speakers = set()
         parsed_rows = []
         for r in rows:
             content = r["content"] or ""
-            import re as _re
             sp_match = _re.match(r"^\[([^\]]+)\]", content)
             speaker = sp_match.group(1).lower() if sp_match else ""
             if speaker:
@@ -154,6 +205,8 @@ def _install_locomo_reranker():
             parsed_rows.append((r, content, speaker))
 
         memories = {}
+        from memory.vectors import deserialize_f32 as _deser_init
+        from datetime import datetime, timezone
         for r, content, speaker in parsed_rows:
             themes_list = []
             if r["themes"]:
@@ -162,13 +215,11 @@ def _install_locomo_reranker():
                 except json.JSONDecodeError:
                     pass
             try:
-                from datetime import datetime, timezone
                 created = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
                 age_days = (datetime.now(timezone.utc) - created).total_seconds() / 86400
             except Exception:
                 age_days = 0.0
 
-            # Parse session from themes
             session = None
             for t in themes_list:
                 if isinstance(t, str) and t.startswith("session_"):
@@ -178,7 +229,6 @@ def _install_locomo_reranker():
             emb = None
             if r["embedding"]:
                 try:
-                    from memory.vectors import deserialize_f32 as _deser_init
                     emb = _np.array(_deser_init(r["embedding"]), dtype=_np.float32)
                 except Exception:
                     pass
@@ -193,18 +243,91 @@ def _install_locomo_reranker():
                 "entities": _extract_entities(content, all_speakers),
                 "session": session,
                 "embedding": emb,
+                "is_synthetic": r["source"] == "extraction",
             }
 
-        # Ordinal map for neighbor density
+        # Graph data
+        _graph_edges = _ddict(int)
+        _graph_syn_targets = _ddict(set)
+        _graph_coref_nbrs = _ddict(set)
+        _syn_ids = set()
+
+        try:
+            _edge_rows = db.execute("""
+                SELECT source_id, target_id, linking_context
+                FROM memory_edges
+            """).fetchall()
+            for _er in _edge_rows:
+                _src, _tgt, _ctx = _er["source_id"], _er["target_id"], _er["linking_context"] or ""
+                _graph_edges[_src] += 1
+                _graph_edges[_tgt] += 1
+                if _ctx.startswith("extracted_from:"):
+                    _graph_syn_targets[_tgt].add(_src)
+                    _syn_ids.add(_src)
+                elif _ctx.startswith("claim_coref:"):
+                    _graph_coref_nbrs[_src].add(_tgt)
+                    _graph_coref_nbrs[_tgt].add(_src)
+        except Exception:
+            pass
+
+        _syn_to_turns = _ddict(set)
+        for turn_id, syn_set in _graph_syn_targets.items():
+            for syn_id in syn_set:
+                _syn_to_turns[syn_id].add(turn_id)
+
+        for _mid in memories:
+            memories[_mid]["graph_edge_count"] = _graph_edges.get(_mid, 0)
+            memories[_mid]["graph_synthetic_ids"] = _graph_syn_targets.get(_mid, set())
+            memories[_mid]["graph_coref_neighbors"] = _graph_coref_nbrs.get(_mid, set())
+
         sorted_mids = sorted(memories.keys(), key=lambda m: memories[m]["age_days"], reverse=True)
         ordinal_map = {mid: i for i, mid in enumerate(sorted_mids)}
+
+        # Build rowid -> memory_id map for FTS/vec lookups
+        rowid_map = {}
+        for r in db.execute("SELECT rowid, memory_id FROM memory_rowid_map").fetchall():
+            rowid_map[r["rowid"]] = r["memory_id"]
+
+        return {
+            "memories": memories,
+            "all_speakers": all_speakers,
+            "ordinal_map": ordinal_map,
+            "syn_to_turns": dict(_syn_to_turns),
+            "rowid_map": rowid_map,
+        }
+
+    def _locomo_rerank_inner(db, query, fts_ranked, vec_ranked, fts_scores,
+                              vec_distances, theme_ranked, theme_overlap_map,
+                              candidate_ids):
+        from memory.reranker import _compute_proximity
+        from locomo_bench.train_locomo_reranker import (
+            _extract_entities, NUM_FEATURES, _count_temporal_exprs,
+        )
+        import numpy as _np
+        RRF_K = 60
+
+        # Use per-conversation cache (loaded once, reused across queries)
+        global _conv_cache
+        import memory.db as _db_mod
+        db_path = str(_db_mod.DB_PATH)
+        if _conv_cache.get("db_path") != db_path:
+            logger.info("  Loading conv cache for %s (%d memories in DB)",
+                        db_path, db.execute("SELECT COUNT(*) FROM memories").fetchone()[0])
+            _conv_cache = _load_conv_cache(db)
+            _conv_cache["db_path"] = db_path
+
+        memories = _conv_cache["memories"]
+        all_speakers = _conv_cache["all_speakers"]
+        ordinal_map = _conv_cache["ordinal_map"]
+        _syn_to_turns = _conv_cache["syn_to_turns"]
+        _rowid_map = _conv_cache["rowid_map"]
 
         query_tokens = set(query.lower().split())
         query_terms = [t for t in query.lower().split() if len(t) > 1]
         query_lower = query.lower()
         query_entities = _extract_entities(query, all_speakers)
 
-        # RRF scores for percentile
+        # RRF scores for all candidates (including synthetic — needed for graph_synthetic_score)
         rrf_scores = {}
         for mid in candidate_ids:
             score = 0.0
@@ -213,10 +336,17 @@ def _install_locomo_reranker():
             if mid in vec_ranked:
                 score += 1.0 / (RRF_K + vec_ranked[mid])
             rrf_scores[mid] = score
+
+        # Filter synthetic nodes from candidate pool (they bridged in Phase 1, now drop)
+        # Their RRF scores remain available for graph_synthetic_score computation
+        if _graph_resolve:
+            candidate_ids = {mid for mid in candidate_ids
+                             if not memories.get(mid, {}).get("is_synthetic", False)}
+
         all_rrf = sorted(rrf_scores.values())
         n_rrf = len(all_rrf)
 
-        # Session co-occurrence: top-20 RRF candidates
+        # Session co-occurrence: top-20 RRF candidates (synthetic already removed)
         top20_rrf = sorted(candidate_ids, key=lambda m: rrf_scores.get(m, 0), reverse=True)[:20]
         top20_set = set(top20_rrf)
         from collections import defaultdict as _defaultdict
@@ -279,7 +409,7 @@ def _install_locomo_reranker():
                 features[i, 16] = session_counts.get(mem_session, 1) - 1
 
             # Group F: has_temporal_expr (17), entity_density (18)
-            features[i, 17] = _count_temporal_exprs(content)
+            features[i, 17] = _count_temporal_exprs(mem["content"])
             features[i, 18] = len(mem.get("entities", set())) / max(mem["token_count"], 1)
 
         # Second pass: features that depend on top-10 RRF
@@ -293,19 +423,12 @@ def _install_locomo_reranker():
             if t10_mem:
                 top10_query_coverage |= set(query_terms) & set(t10_mem["content_tokens"])
 
-        # centroid_distance (24): load embeddings from DB via rowid map
-        from memory.vectors import deserialize_f32
-        emb_rows = db.execute("""
-            SELECT m.memory_id, v.embedding
-            FROM memory_rowid_map m
-            JOIN memory_vec v ON v.rowid = m.rowid
-        """).fetchall()
-        all_embs = {r["memory_id"]: deserialize_f32(r["embedding"]) for r in emb_rows}
-
+        # centroid_distance (24): use cached embeddings from memories dict
         top10_embs = []
         candidate_embs = {}
         for mid in candidate_list:
-            emb = all_embs.get(mid)
+            mem = memories.get(mid)
+            emb = mem.get("embedding") if mem else None
             if emb is not None:
                 candidate_embs[mid] = emb
                 if mid in top10_set:
@@ -345,9 +468,21 @@ def _install_locomo_reranker():
             features[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score
             features[i, 31] = 0     # is_seed
 
+            # Group I: Graph features
+            features[i, 32] = mem.get("graph_edge_count", 0)
+            syn_ids = mem.get("graph_synthetic_ids", set())
+            if syn_ids:
+                features[i, 33] = max(rrf_scores.get(sid, 0.0) for sid in syn_ids)
+            coref_nbrs = mem.get("graph_coref_neighbors", set())
+            if coref_nbrs:
+                features[i, 34] = len(coref_nbrs & candidate_ids)
+            features[i, 35] = 0     # is_graph_resolved (set to 1 after resolution)
+
         # --- Phase 1 prediction ---
         X = features[:, _locomo_feature_indices]
         preds = _locomo_model.predict(X)
+
+        # (Graph resolution already done pre-feature-extraction above)
 
         # If no expansion flags, return phase 1 results directly
         if not any(_expansion_flags.values()):
@@ -389,6 +524,8 @@ def _install_locomo_reranker():
             vec_distances=exp_vec_distances,
             fts_scores=exp_fts_scores,
             all_speakers=all_speakers,
+            rowid_map=_rowid_map,
+            memories=memories,
         )
         exp_result = run_expansions(exp_ctx, _expansion_flags)
         exp_method_counts = exp_result.method_counts()
@@ -510,9 +647,9 @@ def _install_locomo_reranker():
             exp_rrf_scores[mid] = score
 
         # Compute Group H features
-        entity_fts_ranks = compute_entity_fts_ranks(db, query, all_speakers, expanded_ids)
-        sub_query_hits = compute_sub_query_hits(db, query, all_speakers, expanded_ids)
-        seed_keyword_overlaps = compute_seed_keyword_overlap(db, query, top_seeds, expanded_ids)
+        entity_fts_ranks = compute_entity_fts_ranks(db, query, all_speakers, expanded_ids, rowid_map=_rowid_map)
+        sub_query_hits = compute_sub_query_hits(db, query, all_speakers, expanded_ids, rowid_map=_rowid_map)
+        seed_keyword_overlaps = compute_seed_keyword_overlap(db, query, top_seeds, expanded_ids, memories=memories)
 
         # Build phase 2 feature matrix
         exp_candidate_list = sorted(expanded_ids)
@@ -581,6 +718,16 @@ def _install_locomo_reranker():
             features2[i, 29] = exp_method_counts.get(mid, 0)
             features2[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score (0 if new)
             features2[i, 31] = 1.0 if mid in top_seeds_set else 0.0
+
+            # Group I: Graph features
+            features2[i, 32] = mem.get("graph_edge_count", 0)
+            syn_ids = mem.get("graph_synthetic_ids", set())
+            if syn_ids:
+                features2[i, 33] = max(exp_rrf_scores.get(sid, 0.0) for sid in syn_ids)
+            coref_nbrs = mem.get("graph_coref_neighbors", set())
+            if coref_nbrs:
+                features2[i, 34] = len(coref_nbrs & expanded_ids)
+            features2[i, 35] = 0  # is_graph_resolved (TODO: track resolution)
 
         # Group F second-pass (inter-passage based on expanded top-10)
         exp_top10 = sorted(exp_candidate_list, key=lambda m: exp_rrf_scores.get(m, 0), reverse=True)[:10]
@@ -686,6 +833,12 @@ def _install_locomo_reranker():
         # Phase 2 prediction
         X2 = features2[:, _locomo_feature_indices]
         preds2 = _locomo_model.predict(X2)
+
+        # Resolve any synthetic nodes that expansion brought in
+        if _graph_resolve:
+            exp_candidate_list, preds2, _ = _resolve_synthetic_nodes(
+                db, exp_candidate_list, preds2, memories, all_speakers,
+                syn_to_turns=_syn_to_turns)
 
         scored = sorted(zip(exp_candidate_list, preds2), key=lambda x: -x[1])
         scores_dict = {mid: float(s) for mid, s in scored}
@@ -858,6 +1011,22 @@ def eval_locomo(
         with open(dia_map_path, "w") as f:
             json.dump({f"{k[0]}:{k[1]}": v for k, v in dia_map.items()}, f)
 
+    # Auto-build graph if --graph-resolve and no synthetic nodes yet
+    if _graph_resolve:
+        db = get_db()
+        syn_count = db.execute(
+            "SELECT COUNT(*) FROM memories WHERE source = 'extraction'"
+        ).fetchone()[0]
+        db.close()
+        if syn_count == 0:
+            from locomo_bench.build_graph import build_graph, load_dia_map as _load_graph_dia_map
+            logger.info("Building graph nodes for conv %d...", conv_idx)
+            graph_dia_map = _load_graph_dia_map(run_dir)
+            build_graph(
+                conv_idx, graph_dia_map,
+                embed_cache_path=bench_config.embed_cache,
+            )
+
     # Run evaluation
     from memory.tools import impl_recall
     records = []
@@ -866,13 +1035,32 @@ def eval_locomo(
     for qi, q in enumerate(conv_questions):
         # Map evidence dia_ids to short memory IDs
         evidence_short = set()
+        evidence_full_to_short = {}
         for eid in q.get("evidence", []):
             key = (q["conv_id"], eid)
             if key in dia_map:
-                evidence_short.add(dia_map[key][:8])
+                full_id = dia_map[key]
+                short_id = full_id[:8]
+                evidence_short.add(short_id)
+                evidence_full_to_short[full_id] = short_id
 
         if not evidence_short:
             continue
+
+        # Build synthetic coverage map for this question
+        synth_covers = {}
+        if _synthetic_coverage is not None:
+            qkey = f"{conv_idx}:{qi}"
+            cov = _synthetic_coverage.get(qkey, {})
+            for synth_full_id, covered_turn_ids in cov.items():
+                if covered_turn_ids:
+                    short_synth = synth_full_id[:8]
+                    covered_short = set()
+                    for tid in covered_turn_ids:
+                        if tid in evidence_full_to_short:
+                            covered_short.add(evidence_full_to_short[tid])
+                    if covered_short:
+                        synth_covers[short_synth] = covered_short
 
         result = impl_recall(
             query=q["question"],
@@ -884,7 +1072,8 @@ def eval_locomo(
         retrieved = _parse_ids(result)
 
         # Score
-        scores = _score_locomo(retrieved, evidence_short, recall_limit)
+        scores = _score_locomo(retrieved, evidence_short, recall_limit,
+                               synth_covers=synth_covers)
         records.append({
             "config": config_name,
             "dataset": "locomo",
@@ -908,13 +1097,21 @@ def _score_locomo(
     retrieved: list[str],
     evidence_short: set[str],
     limit: int,
+    synth_covers: dict[str, set[str]] | None = None,
 ) -> dict:
-    """Score a single LoCoMo question."""
+    """Score a single LoCoMo question.
+
+    If synth_covers is provided, a synthetic node at rank k counts as recalling
+    the GT evidence turns it covers (per LLM-judged coverage table).
+    """
     first_hit = None
     for i, rid in enumerate(retrieved):
-        if rid in evidence_short:
-            if first_hit is None:
-                first_hit = i + 1
+        is_hit = rid in evidence_short
+        if not is_hit and synth_covers and rid in synth_covers:
+            # Synthetic covers some evidence turns for this question
+            is_hit = True
+        if is_hit and first_hit is None:
+            first_hit = i + 1
 
     scores = {
         "mrr": 1.0 / first_hit if first_hit else 0.0,
@@ -926,7 +1123,10 @@ def _score_locomo(
     for k in [1, 3, 5, 10, 20, 50]:
         if k <= limit:
             top_k_set = set(retrieved[:k])
-            scores[f"r@{k}"] = bool(top_k_set & evidence_short)
+            hit = bool(top_k_set & evidence_short)
+            if not hit and synth_covers:
+                hit = bool(top_k_set & synth_covers.keys())
+            scores[f"r@{k}"] = hit
 
     return scores
 
@@ -1358,6 +1558,10 @@ def main():
                         help="Enable all expansion methods")
     parser.add_argument("--n-seeds", type=int, default=10,
                         help="Number of phase 1 seeds for phase 2 expansion (default: 10)")
+    parser.add_argument("--graph-resolve", action="store_true",
+                        help="Resolve synthetic graph nodes to source turns after Phase 1")
+    parser.add_argument("--synthetic-coverage", type=str, default=None,
+                        help="Path to synthetic_coverage.json for L5b scoring")
 
     args = parser.parse_args()
 
@@ -1380,8 +1584,17 @@ def main():
         enable_expansion(**expand_methods)
         logger.info("Expansion methods enabled: %s", ", ".join(active_methods))
 
-    global _n_seeds
+    global _n_seeds, _graph_resolve, _synthetic_coverage
     _n_seeds = args.n_seeds
+    _graph_resolve = args.graph_resolve
+
+    if args.synthetic_coverage:
+        cov_path = Path(args.synthetic_coverage)
+        if not cov_path.exists():
+            logger.error("Synthetic coverage file not found: %s", cov_path)
+            sys.exit(1)
+        _synthetic_coverage = json.loads(cov_path.read_text())
+        logger.info("Loaded synthetic coverage: %d questions", len(_synthetic_coverage))
 
     benchmark_dir = Path.home() / ".somnigraph" / "benchmark"
     snapshot_path = benchmark_dir / "production_snapshot.db"
@@ -1418,6 +1631,14 @@ def main():
 
     all_records = []
 
+    # Open JSONL for incremental writes
+    if args.output:
+        out_path = Path(args.output)
+    else:
+        out_path = benchmark_dir / f"eval_{args.dataset}_{'_'.join(args.configs)}.jsonl"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_file = open(out_path, "w")
+
     for limit in limits:
         for config_name in args.configs:
             logger.info("=== Config: %s, limit: %d ===", config_name, limit)
@@ -1429,6 +1650,9 @@ def main():
                         args.enrich,
                     )
                     all_records.extend(records)
+                    for r in records:
+                        out_file.write(json.dumps(r, default=str) + "\n")
+                    out_file.flush()
             else:
                 # Production
                 db_path = snapshot_path
@@ -1440,23 +1664,18 @@ def main():
                     limit, args.recall_budget,
                 )
                 all_records.extend(records)
+                for r in records:
+                    out_file.write(json.dumps(r, default=str) + "\n")
+                out_file.flush()
+
+    out_file.close()
+    logger.info("Results saved to %s (%d records)", out_path, len(all_records))
 
     # Report
     if args.dataset == "locomo":
         report_locomo(all_records, args.configs, limits[-1])
     else:
         report_production(all_records, args.configs)
-
-    # Save JSONL
-    if args.output:
-        out_path = Path(args.output)
-    else:
-        out_path = benchmark_dir / f"eval_{args.dataset}_{'_'.join(args.configs)}.jsonl"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w") as f:
-        for r in all_records:
-            f.write(json.dumps(r, default=str) + "\n")
-    logger.info("Results saved to %s (%d records)", out_path, len(all_records))
 
 
 if __name__ == "__main__":

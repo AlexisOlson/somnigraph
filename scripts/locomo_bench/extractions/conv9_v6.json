@@ -1,0 +1,1507 @@
+{
+  "entities": [
+    {
+      "name": "Calvin",
+      "aliases": ["Cal"],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Dave",
+      "aliases": [],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Frank Ocean",
+      "aliases": [],
+      "type": "person",
+      "grounding": "American singer, songwriter, and rapper"
+    },
+    {
+      "name": "Aerosmith",
+      "aliases": [],
+      "type": "organization",
+      "grounding": "American rock band"
+    },
+    {
+      "name": "The Fireworks",
+      "aliases": [],
+      "type": "organization",
+      "grounding": "Music act; headlined a festival Dave attended"
+    },
+    {
+      "name": "Tupac",
+      "aliases": [],
+      "type": "person",
+      "grounding": "American rapper (Tupac Shakur)"
+    },
+    {
+      "name": "Dr. Dre",
+      "aliases": [],
+      "type": "person",
+      "grounding": "American rapper and producer"
+    },
+    {
+      "name": "Ratatouille",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Pixar animated film about following your dreams"
+    },
+    {
+      "name": "California Love",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Hit song by Tupac and Dr. Dre"
+    },
+    {
+      "name": "Japan",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Country in East Asia"
+    },
+    {
+      "name": "Tokyo",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Capital city of Japan"
+    },
+    {
+      "name": "Boston",
+      "aliases": [],
+      "type": "place",
+      "grounding": "City in Massachusetts, United States"
+    },
+    {
+      "name": "Miami",
+      "aliases": [],
+      "type": "place",
+      "grounding": "City in Florida, United States"
+    },
+    {
+      "name": "San Francisco",
+      "aliases": ["San Francsico"],
+      "type": "place",
+      "grounding": "City in California, United States"
+    },
+    {
+      "name": "Detroit",
+      "aliases": [],
+      "type": "place",
+      "grounding": "City in Michigan, United States"
+    },
+    {
+      "name": "Shibuya Crossing",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Famous pedestrian crossing in Tokyo, Japan"
+    },
+    {
+      "name": "Shinjuku",
+      "aliases": [],
+      "type": "place",
+      "grounding": "District in Tokyo, Japan"
+    },
+    {
+      "name": "Paradise Rock Club",
+      "aliases": ["Paradise Rock"],
+      "type": "place",
+      "grounding": "Music venue in Boston, Massachusetts"
+    },
+    {
+      "name": "House of Blues",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Music venue chain; Boston location mentioned"
+    },
+    {
+      "name": "Fenway Park",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Sports and events venue in Boston, Massachusetts"
+    },
+    {
+      "name": "Ferrari",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Italian luxury sports car brand; Calvin owns one"
+    },
+    {
+      "name": "Ford Mustang",
+      "aliases": ["vintage Mustang"],
+      "type": "thing",
+      "grounding": "American muscle car; Dave restores one from a junkyard"
+    }
+  ],
+  "claims": [
+    {
+      "subject": "Calvin",
+      "relation": "has_skill",
+      "object": "musician, rapper, and performer",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30]},
+      "evidence_turn_ids": ["D1:13","D2:17","D3:9","D7:11","D8:1","D12:11","D18:1"],
+      "retrieval_text": "Calvin is a musician rapper and performer who writes songs records albums and performs live"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "touring with Frank Ocean",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [3,7,9,14,15,23,24,25]},
+      "evidence_turn_ids": ["D3:9","D7:1","D7:15","D9:15","D14:4","D15:2","D23:10","D24:1","D24:3"],
+      "retrieval_text": "Calvin toured with Frank Ocean performing concerts in Tokyo and other cities as a collaborating artist"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "located_in",
+      "object": "owns a mansion in Japan",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1,9,10,11,28]},
+      "evidence_turn_ids": ["D1:3","D1:5","D1:9","D9:13","D10:6","D10:8","D11:4","D28:1"],
+      "retrieval_text": "Calvin owns a mansion in Japan with mountain and city views which he is converting into a recording studio"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_preference",
+      "object": "fascinated by Japanese culture and traditions",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1,5,10,20]},
+      "evidence_turn_ids": ["D1:5","D1:7","D5:10","D10:10","D20:4"],
+      "retrieval_text": "Calvin is fascinated by Japanese culture traditions food and wants to explore and immerse himself"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "owns a Ferrari luxury car",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2,5,12,20,23]},
+      "evidence_turn_ids": ["D2:1","D2:5","D5:8","D12:1","D12:7","D23:16"],
+      "retrieval_text": "Calvin owns a Ferrari luxury car that he bought as a reward for his hard work and uses for relaxing drives"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_goal",
+      "object": "expand brand worldwide and grow global fanbase",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [3,12,18]},
+      "evidence_turn_ids": ["D3:9","D12:11","D18:7"],
+      "retrieval_text": "Calvin wants to expand his music brand worldwide grow his fanbase and reach a global audience"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "released an album on September 11",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [18]},
+      "evidence_turn_ids": ["D18:1","D18:3"],
+      "retrieval_text": "Calvin released his album on September 11 and received positive reception from fans and listeners"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "had a car accident on a Friday",
+      "attributed_to": "Calvin",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [9]},
+      "evidence_turn_ids": ["D9:1","D9:3","D9:5"],
+      "retrieval_text": "Calvin had a car accident on a Friday nobody was hurt insurance sorted in one week car repaired"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "place got flooded, saved music gear and mic",
+      "attributed_to": "Calvin",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [6]},
+      "evidence_turn_ids": ["D6:3","D6:5"],
+      "retrieval_text": "Calvin's place got flooded he saved his music gear and favorite microphone waiting on insurance for repairs"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "attended music festival in Tokyo",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [3,15]},
+      "evidence_turn_ids": ["D3:1","D3:3","D15:4","D15:6"],
+      "retrieval_text": "Calvin attended a music festival in Tokyo where he met Frank Ocean and industry professionals"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "shot music video on Miami beach",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [16]},
+      "evidence_turn_ids": ["D16:6","D16:8"],
+      "retrieval_text": "Calvin started shooting a music video for his new album on a beach in Miami"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_trait",
+      "object": "custom guitar with octopus design from Japanese artist friend",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [16]},
+      "evidence_turn_ids": ["D16:14","D16:16","D16:20"],
+      "retrieval_text": "Calvin has a custom shiny purple guitar with octopus design made by a Japanese artist friend representing art and sea"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "received diamond pendant necklace from another artist",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:24","D4:26"],
+      "retrieval_text": "Calvin received a diamond pendant necklace as a gift from another artist reminder of why he keeps hustling"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "recorded a podcast about the rap industry",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [15]},
+      "evidence_turn_ids": ["D15:12"],
+      "retrieval_text": "Calvin recorded a podcast with friends discussing the rapidly evolving rap industry"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "mentoring young musicians from a music program",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [29]},
+      "evidence_turn_ids": ["D29:9","D29:11","D29:13"],
+      "retrieval_text": "Calvin supports and mentors young musicians from a music program making beats for them plans long-term support"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_preference",
+      "object": "California Love by Tupac and Dr. Dre is a nostalgic childhood song",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [20]},
+      "evidence_turn_ids": ["D20:6","D20:8"],
+      "retrieval_text": "Calvin loves California Love by Tupac and Dr Dre nostalgic song from childhood road trips with his dad"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_preference",
+      "object": "Ratatouille is one of his favorite movies",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [19]},
+      "evidence_turn_ids": ["D19:6"],
+      "retrieval_text": "Calvin says Ratatouille is one of his favorite movies loves the message about following your dreams"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "converting Japanese mansion into a recording studio",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [11]},
+      "evidence_turn_ids": ["D11:4"],
+      "retrieval_text": "Calvin is transforming his Japanese mansion into a recording studio to create music with other artists"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "experimenting with electronic music elements",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [11]},
+      "evidence_turn_ids": ["D11:6"],
+      "retrieval_text": "Calvin has been experimenting with different genres adding electronic elements to his songs for a fresh vibe"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "visited Boston sights with high school friend",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [26,29]},
+      "evidence_turn_ids": ["D26:1","D26:3","D29:1","D29:3"],
+      "retrieval_text": "Calvin visited Boston sights with a high school friend who attended his performance nostalgic about freestyling as teenagers"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "threw album release party at Japanese mansion",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [28]},
+      "evidence_turn_ids": ["D28:1","D28:3","D28:5"],
+      "retrieval_text": "Calvin threw a party at his Japanese mansion for his new album release with family and friends"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "attended a fancy gala in Boston",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:2","D30:4"],
+      "retrieval_text": "Calvin attended a fancy gala in Boston met an artist bonded over music and art felt creatively inspired"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "booked to perform at an upcoming show in Boston",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:20"],
+      "retrieval_text": "Calvin accepted an invitation to perform at an upcoming show in Boston"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_trait",
+      "object": "uses music as therapy and emotional expression",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [7,11,25]},
+      "evidence_turn_ids": ["D7:11","D11:10","D25:12"],
+      "retrieval_text": "Calvin uses music as therapy and emotional expression performing live fuels his soul cathartic outlet"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "experienced creative block while in Japan",
+      "attributed_to": "Calvin",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [5]},
+      "evidence_turn_ids": ["D5:10"],
+      "retrieval_text": "Calvin experienced a creative block while in Japan his creativity felt frozen Dave advised taking a break"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_preference",
+      "object": "watches music videos concerts and artist documentaries",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [28]},
+      "evidence_turn_ids": ["D28:31"],
+      "retrieval_text": "Calvin watches music videos concerts and documentaries about artists and their creative process for inspiration"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_trait",
+      "object": "values staying true to himself and sounding unique",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [3,11,16]},
+      "evidence_turn_ids": ["D3:7","D11:8","D16:24"],
+      "retrieval_text": "Calvin values staying true to himself and having a unique sound a producer advised him to do so"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_skill",
+      "object": "automotive engineer and car restorer",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1,3,4,5,6,7,13,14,17,19,21,22,25,26]},
+      "evidence_turn_ids": ["D1:2","D3:12","D4:1","D4:5","D5:5","D13:3","D22:5","D25:15","D26:6"],
+      "retrieval_text": "Dave is an automotive engineer who restores classic cars does engine swaps suspension mods and body modifications"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "opened his own car maintenance shop",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [4,6]},
+      "evidence_turn_ids": ["D4:1","D4:3","D4:19","D6:8"],
+      "retrieval_text": "Dave opened his own car maintenance shop working on all kinds of cars from regular maintenance to full classic car restorations"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "teamed up with a local garage",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [5]},
+      "evidence_turn_ids": ["D5:1","D5:3"],
+      "retrieval_text": "Dave teamed up with a local garage working with mechanics and sharing knowledge about cars"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "selected for a car modification workshop",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:1","D13:3","D13:7"],
+      "retrieval_text": "Dave was selected for a car mod workshop doing engine swaps suspension mods and body modifications on a classic muscle car"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "attended car workshop in San Francisco",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [14,17]},
+      "evidence_turn_ids": ["D14:1","D17:1"],
+      "retrieval_text": "Dave attended a car workshop in San Francisco learning about car restoration techniques and car modification"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "attended a music festival in Boston, saw Aerosmith",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [2]},
+      "evidence_turn_ids": ["D2:8","D2:10","D2:12"],
+      "retrieval_text": "Dave attended a music festival in Boston and saw Aerosmith perform live his favorite band incredible performance"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "joined a rock band and practices guitar",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [9,19,28]},
+      "evidence_turn_ids": ["D9:18","D19:1","D28:22","D28:24"],
+      "retrieval_text": "Dave joined a rock band practices guitar jams with bandmates and created a band logo"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "took up photography as a hobby",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [27,30]},
+      "evidence_turn_ids": ["D27:2","D27:8","D30:1","D30:5","D30:9"],
+      "retrieval_text": "Dave took up photography bought a vintage camera captures nature sunsets beaches and Boston scenery"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "started a blog on car modifications",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [28]},
+      "evidence_turn_ids": ["D28:8","D28:10"],
+      "retrieval_text": "Dave started a blog on car mods sharing his passion inspiring others to start DIY projects"
+    },
+    {
+      "subject": "Dave",
+      "relation": "located_in",
+      "object": "lives in or near Boston",
+      "attributed_to": "Dave",
+      "polarity": "neutral",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [2,3,8,10,19,26,27]},
+      "evidence_turn_ids": ["D2:8","D3:10","D8:4","D10:3","D19:1","D26:2","D27:6"],
+      "retrieval_text": "Dave lives in or near Boston visits parks there offers to show Calvin around Boston"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_trait",
+      "object": "grew up working on cars with his dad",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [12,22,25,26]},
+      "evidence_turn_ids": ["D12:2","D12:4","D22:5","D25:15","D26:6"],
+      "retrieval_text": "Dave grew up working on cars with his dad spent hours in garage tinkering with engines dad took him to first car show at age 10"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_goal",
+      "object": "build a custom car from scratch",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [5,13]},
+      "evidence_turn_ids": ["D5:5","D13:3"],
+      "retrieval_text": "Dave dreams of building a custom car from scratch someday his ultimate goal in auto engineering"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "restored a Ford Mustang from a junkyard",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [20,21]},
+      "evidence_turn_ids": ["D20:1","D21:4","D21:6"],
+      "retrieval_text": "Dave found a Ford Mustang in a junkyard and restored it had engine trouble with weird noise initially"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "competing shop snagged a deal he was pursuing",
+      "attributed_to": "Dave",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [23]},
+      "evidence_turn_ids": ["D23:1"],
+      "retrieval_text": "Dave felt bummed when a competing car maintenance shop snagged a deal he had been pursuing for months"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "booked a trip to a mountainous region",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [8]},
+      "evidence_turn_ids": ["D8:10"],
+      "retrieval_text": "Dave booked a trip to a mountainous region for the following month to see majestic peaks"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "went on a road trip with friends through countryside",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [11]},
+      "evidence_turn_ids": ["D11:1","D11:3"],
+      "retrieval_text": "Dave went on a road trip with friends through stunning countryside winding roads recharged from work stress"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "attended conference in Detroit",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [26]},
+      "evidence_turn_ids": ["D26:2"],
+      "retrieval_text": "Dave attended a conference in Detroit and learned a lot"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_preference",
+      "object": "enjoys walking in parks to relax and destress",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [1,5,8,10]},
+      "evidence_turn_ids": ["D1:16","D5:9","D8:4","D8:6","D10:3"],
+      "retrieval_text": "Dave enjoys walking in parks for relaxation takes regular walks with friends in Boston parks to destress and recharge"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_preference",
+      "object": "passionate about classic cars and their charm",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1,3,4,7,22]},
+      "evidence_turn_ids": ["D1:2","D3:12","D4:5","D4:7","D22:5"],
+      "retrieval_text": "Dave is passionate about classic cars loves their unique charm design and engineering finds restoring them therapeutic"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_preference",
+      "object": "listens to classic rock music",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [28]},
+      "evidence_turn_ids": ["D28:40","D28:42"],
+      "retrieval_text": "Dave has been getting into classic rock music considers it timeless listens while working on cars"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_preference",
+      "object": "wants to visit Japan someday",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [6,10,24]},
+      "evidence_turn_ids": ["D6:16","D6:18","D10:11","D24:12","D24:16"],
+      "retrieval_text": "Dave has never been to Japan but wants to visit excited about the culture food tech and music"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "had card night with friends",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [15]},
+      "evidence_turn_ids": ["D15:1"],
+      "retrieval_text": "Dave had a card night with friends on a Friday lots of fun and laughter"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_trait",
+      "object": "finds fixing things therapeutic and purposeful",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [7,12,22,25]},
+      "evidence_turn_ids": ["D7:4","D7:6","D12:2","D22:5","D25:13"],
+      "retrieval_text": "Dave finds fixing and restoring things therapeutic giving him sense of purpose achievement and calm like meditation"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_trait",
+      "object": "uses writing lyrics and notes to stay motivated",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [28]},
+      "evidence_turn_ids": ["D28:34"],
+      "retrieval_text": "Dave writes lyrics and notes in a notebook to boost motivation and stay connected to creative process"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "plans trip from Japan to Boston after tour",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [1,3,7,8,15,17]},
+      "evidence_turn_ids": ["D1:15","D3:9","D7:15","D8:5","D15:10","D17:6"],
+      "retrieval_text": "Calvin planned to travel from Japan to Boston after finishing the Frank Ocean tour booked a flight"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "met artists in Boston to collaborate on new music",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [21]},
+      "evidence_turn_ids": ["D21:1","D21:3"],
+      "retrieval_text": "Calvin met incredible artists in Boston through a mutual friend to collaborate on new music excited about their individual styles"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "collaborating with Japanese artists on music",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [10]},
+      "evidence_turn_ids": ["D10:12","D10:14"],
+      "retrieval_text": "Calvin working on music collaborations with Japanese artists excited to create something unique"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "went to networking event to meet more artists",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [27]},
+      "evidence_turn_ids": ["D27:1"],
+      "retrieval_text": "Calvin attended a networking event to meet more artists and build up his fanbase"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "arranged regular park walks with friends",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [10]},
+      "evidence_turn_ids": ["D10:3","D10:5"],
+      "retrieval_text": "Dave arranged regular walks in the park with friends to spend time together and stay active"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "attended music festival headlined by The Fireworks",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [23]},
+      "evidence_turn_ids": ["D23:5","D23:7","D23:9"],
+      "retrieval_text": "Dave attended a music festival headlined by The Fireworks felt alive loved the energy and crowd"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "fixes neighbor's cars",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [7]},
+      "evidence_turn_ids": ["D7:2","D7:4"],
+      "retrieval_text": "Dave fixed his neighbor's car engine not difficult for him helps neighbors with car problems"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_trait",
+      "object": "uses long drives in his car to relax and clear his head",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [5,7,20]},
+      "evidence_turn_ids": ["D5:8","D7:5","D20:4"],
+      "retrieval_text": "Calvin uses long drives in his car to relax clear his head and feel free also finds working on cars calming"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "attended rock concert in Boston",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:1"],
+      "retrieval_text": "Dave attended a rock concert in Boston last weekend with an amazing electrifying atmosphere"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "has a music studio setup with high-quality sound system",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:15"],
+      "retrieval_text": "Dave has a music studio setup with high-quality sound system offered to let Calvin use it"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_experience",
+      "object": "performed in Tokyo during Frank Ocean tour",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "range", "sessions": [6,7,14,24]},
+      "evidence_turn_ids": ["D6:11","D7:1","D14:4","D14:6","D24:11"],
+      "retrieval_text": "Calvin performed in Tokyo during the Frank Ocean tour crowd sang along magical moment felt alive"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "restored a car and sold it to a collector",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [25]},
+      "evidence_turn_ids": ["D25:17"],
+      "retrieval_text": "Dave restored a car last year and sold it to a collector now working on a new challenging project"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_experience",
+      "object": "had a conversation with neighbors about politics",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [25]},
+      "evidence_turn_ids": ["D25:7"],
+      "retrieval_text": "Dave had a good conversation with neighbors about current events and politics hearing different perspectives"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_preference",
+      "object": "values relationships and supportive people",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [25,29]},
+      "evidence_turn_ids": ["D25:6","D29:5","D29:7"],
+      "retrieval_text": "Calvin values having a strong support system friends and team keep him on track supportive people key for artist development"
+    },
+    {
+      "subject": "Calvin",
+      "relation": "has_preference",
+      "object": "inspired by people's struggles for deeper music",
+      "attributed_to": "Calvin",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [25]},
+      "evidence_turn_ids": ["D25:10"],
+      "retrieval_text": "Calvin inspired by people's struggles digs deeper into his music to capture those feelings"
+    },
+    {
+      "subject": "Dave",
+      "relation": "has_preference",
+      "object": "fascinated by machines since age ten",
+      "attributed_to": "Dave",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [25]},
+      "evidence_turn_ids": ["D25:15"],
+      "retrieval_text": "Dave has been fascinated with how machines work since age ten found an old car in neighbor's garage and fixed it"
+    }
+  ],
+  "segments": [
+    {
+      "session_number": 1,
+      "turns": ["D1:1","D1:2","D1:3","D1:4","D1:5","D1:6","D1:7","D1:8","D1:9","D1:10","D1:11","D1:12","D1:13","D1:14","D1:15","D1:16","D1:17","D1:18","D1:19"],
+      "topic": "Calvin's move to Japan and trip planning; Dave's car show and park",
+      "surface_events": [
+        "Dave attended a classic car show and spoke with owners",
+        "Calvin bought a mansion in Japan and plans to learn about Japanese culture",
+        "Calvin plans to explore the city, try cuisines, and collaborate with musicians",
+        "Calvin's agent found him a place to stay in Japan",
+        "Calvin plans to go to Boston after a few months in Japan",
+        "Dave recommends a park he visits regularly"
+      ],
+      "categories": ["life_update", "travel", "hobbies"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin shares his move to a Japanese mansion and plans to explore culture and music there before heading to Boston. Dave shares a car show experience and recommends a park.",
+      "retrieval_text": "Calvin bought a mansion in Japan to learn about Japanese culture plans to explore the city try cuisines collaborate with local musicians. His agent found the place. After a few months he will go to Boston. Dave attended a classic car show spoke with owners recommends a beautiful calm park.",
+      "bridging_terms": ["mansion", "Japan", "Japanese culture", "agent", "Boston", "classic cars", "car show", "park", "local cuisines", "collaborate musicians"],
+      "latent_concepts": ["relocation", "cultural immersion", "travel planning", "car enthusiasm", "exploration", "lifestyle change", "nature appreciation", "city exploration", "musician networking", "wanderlust"]
+    },
+    {
+      "session_number": 2,
+      "turns": ["D2:1","D2:2","D2:3","D2:4","D2:5","D2:6","D2:7","D2:8","D2:9","D2:10","D2:11","D2:12","D2:13","D2:14","D2:15","D2:16","D2:17","D2:18","D2:19","D2:20","D2:21"],
+      "topic": "Calvin's new luxury car; Dave's music festival and Aerosmith; Calvin's studio sessions",
+      "surface_events": [
+        "Calvin got a new luxury car, feels like a dream come true",
+        "Dave attended a music festival in Boston and saw Aerosmith perform",
+        "Dave's favorite band was Aerosmith, saw them live for the first time",
+        "Calvin had studio sessions last week writing new tunes",
+        "Calvin is excited to collaborate on music"
+      ],
+      "categories": ["purchases", "entertainment", "music"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Dave characterizes Calvin as deserving of his success (evidence: D2:6)"
+      ],
+      "literal_summary": "Calvin celebrates getting a new luxury car and shares his new studio sessions. Dave shares his music festival experience in Boston where he saw Aerosmith live for the first time.",
+      "retrieval_text": "Calvin got a new luxury car dream come true reward for hard work adrenaline rush. Dave went to a music festival in Boston saw Aerosmith live for the first time favorite band incredible performance. Calvin had studio sessions last week writing new tunes excited to collaborate on music.",
+      "bridging_terms": ["luxury car", "Aerosmith", "music festival", "Boston", "studio sessions", "new tunes", "collaborate", "live performance", "dream come true", "hard work"],
+      "latent_concepts": ["reward for effort", "live music experience", "creative momentum", "car culture", "fan fulfillment", "musical ambition", "celebration", "concert atmosphere", "dedication payoff", "artistic collaboration"]
+    },
+    {
+      "session_number": 3,
+      "turns": ["D3:1","D3:2","D3:3","D3:4","D3:5","D3:6","D3:7","D3:8","D3:9","D3:10","D3:11","D3:12","D3:13","D3:14","D3:15","D3:16","D3:17","D3:18"],
+      "topic": "Calvin's Tokyo music festival; producer advice; Boston plans; Dave's car show and restoration",
+      "surface_events": [
+        "Calvin attended a music event in Tokyo met talented artists and industry people",
+        "A producer advised Calvin to stay true to himself and sound unique",
+        "Calvin dreams of touring the world with a global audience",
+        "Calvin plans to visit Boston after the Frank Ocean tour",
+        "Dave offers to show Calvin around Boston mentioning Paradise Rock, House of Blues, and Fenway Park",
+        "Dave went to a car show and loves classic car restoration and auto engineering",
+        "Calvin shows off his car"
+      ],
+      "categories": ["music_career", "travel", "hobbies", "mentorship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin attended a Tokyo music festival, received producer advice to stay unique, and plans to visit Boston after the Frank Ocean tour. Dave went to a car show and offers to show Calvin around Boston's music venues.",
+      "retrieval_text": "Calvin went to music event in Tokyo met artists and industry people. Producer advised Calvin stay true to himself sound unique. Calvin dreams of touring the world performing globally. Plans to visit Boston after Frank Ocean tour. Dave mentions Paradise Rock House of Blues Fenway Park Boston music venues. Dave went to a car show loves classic car restoration and auto engineering.",
+      "bridging_terms": ["Tokyo", "music festival", "producer advice", "stay unique", "Frank Ocean tour", "Boston", "Paradise Rock", "House of Blues", "Fenway Park", "classic car restoration"],
+      "latent_concepts": ["artistic identity", "industry networking", "music venues", "career aspiration", "global ambition", "automotive passion", "cultural exchange", "mentorship", "travel plans", "friend showing around"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:1","D4:2","D4:3","D4:4","D4:5","D4:6","D4:7","D4:8","D4:9","D4:10","D4:11","D4:12","D4:13","D4:14","D4:15","D4:16","D4:17","D4:18","D4:19","D4:20","D4:21","D4:22","D4:23","D4:24","D4:25","D4:26","D4:27","D4:28"],
+      "topic": "Dave opens car maintenance shop; classic car passion; Calvin's diamond necklace gift",
+      "surface_events": [
+        "Dave opened his own car maintenance shop, a dream come true",
+        "Dave's dream is working on classic cars, loves their design and engineering",
+        "Dave restored a car last year, shows engine photo",
+        "Dave works on all kinds of cars from maintenance to full restorations",
+        "Calvin shows a diamond pendant necklace received as a gift from another artist",
+        "The necklace reminds Calvin why he keeps hustling as a musician"
+      ],
+      "categories": ["career_milestone", "hobbies", "gifts"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as having guts and ambition (evidence: D4:4)"
+      ],
+      "literal_summary": "Dave announces opening his car maintenance shop, shares his passion for classic car restoration, and shows a restored engine. Calvin shows a diamond pendant necklace gifted by another artist that motivates him.",
+      "retrieval_text": "Dave opened his own car maintenance shop dream come true works on all kinds of cars regular maintenance to full classic car restorations. Dave loves classic car design and engineering restored one last year labor of love. Calvin received a diamond pendant necklace as a gift from another artist reminds him why he keeps hustling as musician.",
+      "bridging_terms": ["car maintenance shop", "classic cars", "restoration", "dream come true", "diamond necklace", "artist gift", "hustling", "engineering", "dedication", "passion"],
+      "latent_concepts": ["entrepreneurship", "dream fulfillment", "craftsmanship", "symbolic objects", "motivation tokens", "vocational satisfaction", "legacy skills", "artistic community", "peer recognition", "labor of love"]
+    },
+    {
+      "session_number": 5,
+      "turns": ["D5:1","D5:2","D5:3","D5:4","D5:5","D5:6","D5:7","D5:8","D5:9","D5:10","D5:11","D5:12","D5:13","D5:14","D5:15"],
+      "topic": "Dave's garage partnership; Calvin's creative block; relaxation hobbies",
+      "surface_events": [
+        "Dave teamed up with a local garage working with mechanics",
+        "Dave dreams of building a custom car from scratch someday",
+        "Calvin uses long drives in his car to relax and clear his head",
+        "Dave takes walks to destress",
+        "Calvin has been enjoying Japanese culture but is stuck creatively",
+        "Dave advises immersing in something you love to break creative block"
+      ],
+      "categories": ["career", "creativity", "relaxation", "advice"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as inspiring for pushing himself to achieve his dream (evidence: D5:6)"
+      ],
+      "literal_summary": "Dave shares his new garage partnership and dream of building a custom car. Calvin discusses using drives to relax but confesses a creative block. Dave advises immersing in other passions to overcome it.",
+      "retrieval_text": "Dave teamed up with local garage working with mechanics dreams of building custom car from scratch. Calvin uses long drives to relax clear his head enjoys Japanese culture. Calvin stuck creatively creativity frozen. Dave advises immersing in concerts or favorite albums to jumpstart inspiration take a break from music.",
+      "bridging_terms": ["local garage", "custom car", "creative block", "long drives", "Japanese culture", "relax", "destress", "walks", "inspiration", "break from music"],
+      "latent_concepts": ["creative blocks", "relaxation rituals", "career growth", "mentorship", "stress management", "automotive ambition", "cultural immersion", "coping strategies", "artistic struggles", "friendship support"]
+    },
+    {
+      "session_number": 6,
+      "turns": ["D6:1","D6:2","D6:3","D6:4","D6:5","D6:6","D6:7","D6:8","D6:9","D6:10","D6:11","D6:12","D6:13","D6:14","D6:15","D6:16","D6:17","D6:18"],
+      "topic": "Calvin's flood and studio; Dave opens car shop; Calvin's Tokyo performance; Tokyo night skyline",
+      "surface_events": [
+        "Calvin's place got flooded last week but he saved his music gear and favorite microphone",
+        "Calvin is waiting on insurance for repairs",
+        "Calvin shows his studio creative haven",
+        "Dave opened his car shop last week and celebrated with friends",
+        "Calvin has an upcoming performance in Tokyo this month",
+        "Calvin took a photo of Tokyo's night skyline"
+      ],
+      "categories": ["adversity", "career_milestone", "music_career", "photography"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin reports his place flooded but saved his music gear and mic, waiting on insurance. Dave opened his car shop and celebrated. Calvin shares excitement about his upcoming Tokyo performance and a stunning night skyline photo.",
+      "retrieval_text": "Calvin's place got flooded saved music gear and favorite microphone waiting on insurance for repairs. Calvin shows his studio creative haven. Dave opened his car shop last week celebrated with friends. Calvin has upcoming performance in Tokyo this month. Calvin took photo of Tokyo night skyline stunning city lights.",
+      "bridging_terms": ["flood", "music gear", "microphone", "insurance", "car shop", "Tokyo", "performance", "night skyline", "studio", "city lights"],
+      "latent_concepts": ["disaster recovery", "resilience", "entrepreneurship celebration", "live performance", "urban beauty", "equipment attachment", "insurance hassle", "creative workspace", "international career", "optimism through adversity"]
+    },
+    {
+      "session_number": 7,
+      "turns": ["D7:1","D7:2","D7:3","D7:4","D7:5","D7:6","D7:7","D7:8","D7:9","D7:10","D7:11","D7:12","D7:13","D7:14","D7:15","D7:16","D7:17","D7:18","D7:19"],
+      "topic": "Calvin's Frank Ocean tour in Tokyo; fixing cars as therapy; Boston music scene",
+      "surface_events": [
+        "Calvin toured with Frank Ocean last week, Tokyo crowd was insane",
+        "Dave fixed a neighbor's car engine",
+        "Both find working on cars therapeutic and calming",
+        "Calvin loves performing live, describes it as an absolute high",
+        "Calvin is excited to perform in Boston on the Frank Ocean tour",
+        "Dave praises Boston's music scene with talented musicians and cool venues"
+      ],
+      "categories": ["music_career", "hobbies", "shared_interests", "travel"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin recounts touring with Frank Ocean in Tokyo, describing the crowd energy as insane. Dave fixed a neighbor's engine. Both bond over finding car work therapeutic. Calvin looks forward to performing in Boston.",
+      "retrieval_text": "Calvin toured with Frank Ocean last week Tokyo was unreal crowd was insane felt so alive performing. Dave fixed neighbor's car engine finds working on cars therapeutic not difficult for him. Both find car work calming like meditating. Calvin loves performing live absolute high indescribable rush. Calvin excited to perform in Boston. Dave praises Boston music scene talented musicians cool venues.",
+      "bridging_terms": ["Frank Ocean tour", "Tokyo", "crowd energy", "car repair", "therapeutic", "live performance", "Boston music scene", "neighbor's car", "adrenaline", "connection with crowd"],
+      "latent_concepts": ["tour life", "performance high", "mechanical therapy", "shared passion", "audience connection", "community service", "artistic fulfillment", "urban music culture", "friendship bonding", "parallel vocations"]
+    },
+    {
+      "session_number": 8,
+      "turns": ["D8:1","D8:2","D8:3","D8:4","D8:5","D8:6","D8:7","D8:8","D8:9","D8:10","D8:11","D8:12","D8:13","D8:14"],
+      "topic": "Calvin's album creative team meeting; Boston parks; mountain trip plans",
+      "surface_events": [
+        "Calvin met with the creative team for his album, long productive session",
+        "Calvin shows his studio where they work as a team",
+        "Dave has been exploring parks on weekends to relax",
+        "Dave recommends Boston parks especially in spring",
+        "Calvin has never been to Boston but plans to visit next month",
+        "Dave booked a trip to a mountainous region for next month",
+        "Calvin wants to go hiking to destress"
+      ],
+      "categories": ["music_career", "nature", "travel", "relaxation"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin met with his album creative team and shows the studio. Dave recommends Boston parks for relaxation. Calvin plans to visit Boston next month. Dave booked a mountain trip. Both discuss hiking and nature as stress relief.",
+      "retrieval_text": "Calvin met with creative team for his album long session magic in the studio. Dave explores parks on weekends to relax recommends Boston parks especially in spring serene walking. Calvin never been to Boston plans to visit next month. Dave booked trip to mountainous region for next month majestic peaks. Calvin wants to go hiking to escape and destress.",
+      "bridging_terms": ["album creative team", "studio", "Boston parks", "spring", "hiking", "mountains", "relax", "destress", "nature", "next month"],
+      "latent_concepts": ["album production", "teamwork", "nature therapy", "seasonal beauty", "adventure planning", "first-time visit", "stress relief", "mountain exploration", "creative collaboration", "anticipation"]
+    },
+    {
+      "session_number": 9,
+      "turns": ["D9:1","D9:2","D9:3","D9:4","D9:5","D9:6","D9:7","D9:8","D9:9","D9:10","D9:11","D9:12","D9:13","D9:14","D9:15","D9:16","D9:17","D9:18","D9:19","D9:20","D9:21"],
+      "topic": "Calvin's car accident and repair; Japanese mountain views; Dave joins a rock band",
+      "surface_events": [
+        "Calvin had a car accident last Friday, no one was hurt",
+        "Insurance process took a week with lots of paperwork but is sorted",
+        "Calvin shows mechanic working on his car at auto repair shop",
+        "Calvin shares stunning mountain view from a small town in Japan",
+        "Calvin wants to visit that mountain spot after the Frank Ocean tour",
+        "Dave recently joined a rock band and is practicing guitar"
+      ],
+      "categories": ["adversity", "car_repair", "travel", "music"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin had a car accident on Friday, nobody hurt, insurance took a week. He shows the mechanic fixing it. Calvin shares Japanese mountain views and plans to visit after his tour. Dave announces joining a rock band and practicing guitar.",
+      "retrieval_text": "Calvin had a car accident last Friday no one hurt insurance hassle lots of paperwork sorted in a week. Mechanic fixing Calvin's car at auto repair shop skilled knowledgeable. Calvin shows stunning mountain view from small town in Japan snowy peak. Calvin wants to visit after Frank Ocean tour ends. Dave recently joined a rock band practicing guitar shows photo of the band.",
+      "bridging_terms": ["car accident", "insurance", "mechanic", "auto repair", "Japan mountains", "snowy peak", "rock band", "guitar", "Frank Ocean tour", "small town"],
+      "latent_concepts": ["accident recovery", "insurance process", "trust in professionals", "scenic beauty", "bucket list", "new hobby", "band membership", "musical growth", "resilience", "future travel"]
+    },
+    {
+      "session_number": 10,
+      "turns": ["D10:1","D10:2","D10:3","D10:4","D10:5","D10:6","D10:7","D10:8","D10:9","D10:10","D10:11","D10:12","D10:13","D10:14","D10:15","D10:16","D10:17"],
+      "topic": "Calvin's car fixed; Dave's park walks; Calvin's Japanese mansion; music collaborations with Japanese artists",
+      "surface_events": [
+        "Calvin's car is fixed and running strong after the crash",
+        "Dave arranges regular park walks with friends",
+        "Dave shows a sunset over the river at his favorite spot",
+        "Calvin describes living in his Japanese mansion with epic city views",
+        "Calvin shows photos of his mansion front and backyard views",
+        "Dave has never been to Japan but wants to go",
+        "Calvin is working on music collaborations with Japanese artists"
+      ],
+      "categories": ["car_repair", "friendship", "lifestyle", "music_career"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin's car is fixed after the crash. Dave describes regular park walks with friends and a river sunset. Calvin shows his Japanese mansion with stunning city views and discusses music collaborations with Japanese artists.",
+      "retrieval_text": "Calvin's car fixed after crash cruising again. Dave arranged regular park walks with friends sunset over the river favorite spot. Calvin living in Japanese mansion epic cityscape city lights awe-inspiring luxury. Calvin shows mansion front and backyard photos. Dave never been to Japan keen to go. Calvin working on music collaborations with Japanese artists excited about results.",
+      "bridging_terms": ["car fixed", "park walks", "sunset", "river", "Japanese mansion", "city views", "city lights", "Japanese artists", "collaboration", "luxury"],
+      "latent_concepts": ["recovery completion", "routine friendship", "urban luxury", "expat lifestyle", "cross-cultural collaboration", "wanderlust", "scenic appreciation", "creative partnerships", "lifestyle aspiration", "community building"]
+    },
+    {
+      "session_number": 11,
+      "turns": ["D11:1","D11:2","D11:3","D11:4","D11:5","D11:6","D11:7","D11:8","D11:9","D11:10","D11:11","D11:12","D11:13","D11:14"],
+      "topic": "Dave's road trip; Calvin converting mansion into recording studio; genre experimentation",
+      "surface_events": [
+        "Dave went on a road trip with friends through stunning countryside",
+        "Calvin is converting his Japanese mansion into a recording studio",
+        "Calvin has been experimenting with different genres and electronic elements",
+        "Calvin finds balancing his sound with new styles challenging but exciting",
+        "Calvin stays motivated through collaborating with others and positive energy"
+      ],
+      "categories": ["travel", "music_career", "creativity", "lifestyle"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Dave recounts a road trip through countryside that recharged him. Calvin reveals he is converting his Japanese mansion into a recording studio and experimenting with electronic elements in different genres.",
+      "retrieval_text": "Dave went on road trip with friends stunning countryside winding roads recharged from work stress reconnected with passion. Calvin transforming Japanese mansion into recording studio his sanctuary for creating music with other artists. Calvin experimenting with different genres adding electronic elements fresh vibe self-discovery and growth. Balancing own sound with new styles challenging but exciting.",
+      "bridging_terms": ["road trip", "countryside", "recording studio", "mansion conversion", "electronic elements", "genre experimentation", "self-discovery", "sanctuary", "recharge", "positive energy"],
+      "latent_concepts": ["creative evolution", "workspace transformation", "artistic sanctuary", "escape from routine", "genre blending", "musical growth", "passion reconnection", "work-life balance", "collaborative spirit", "stylistic range"]
+    },
+    {
+      "session_number": 12,
+      "turns": ["D12:1","D12:2","D12:3","D12:4","D12:5","D12:6","D12:7","D12:8","D12:9","D12:10","D12:11","D12:12","D12:13","D12:14","D12:15","D12:16","D12:17"],
+      "topic": "Calvin's Ferrari service; Dave's childhood car memories with dad; Calvin's global brand ambition",
+      "surface_events": [
+        "Calvin took his Ferrari for service and felt stressed about it",
+        "Dave grew up working on cars with his dad, restoring an old car one summer",
+        "Dave finds refurbishing cars fulfilling, like therapy",
+        "Calvin visited a Ferrari dealership but says his car is the best",
+        "Calvin's biggest goal is expanding his brand worldwide and growing fanbase",
+        "Calvin performed with other artists last night"
+      ],
+      "categories": ["cars", "family_memories", "music_career", "goals"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin stresses over his Ferrari service. Dave recalls fond childhood memories restoring cars with his dad. Calvin states his goal to expand his brand worldwide and shows a photo from a performance with other artists.",
+      "retrieval_text": "Calvin took his Ferrari for service stressed attached to it. Dave grew up working on cars with his dad restored an old car one summer fond childhood memories. Dave finds refurbishing cars fulfilling like therapy. Calvin visited Ferrari dealership says his car is the best proud. Calvin's biggest goal expand brand worldwide grow fanbase collaborate with artists globally create special music.",
+      "bridging_terms": ["Ferrari", "service", "childhood", "dad", "car restoration", "therapy", "global brand", "fanbase", "worldwide", "perform with artists"],
+      "latent_concepts": ["material attachment", "father-son bonding", "nostalgia", "vocational roots", "brand ambition", "global reach", "pride in possessions", "childhood influences", "artistic collaboration", "career goals"]
+    },
+    {
+      "session_number": 13,
+      "turns": ["D13:1","D13:2","D13:3","D13:4","D13:5","D13:6","D13:7","D13:8","D13:9","D13:10","D13:11","D13:12","D13:13","D13:14","D13:15","D13:16","D13:17","D13:18","D13:19"],
+      "topic": "Dave's car mod workshop; engine swaps and body mods; music studio offer",
+      "surface_events": [
+        "Dave was selected for a car modification workshop",
+        "Dave's dream is learning auto engineering and building a custom car",
+        "Dave doing engine swaps, suspension mods, and body modifications",
+        "Dave is giving a classic muscle car a modern twist with silver finish",
+        "Dave offers Calvin use of his music studio with high-quality sound system"
+      ],
+      "categories": ["career", "hobbies", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as enthusiastic and hardworking in everything he does (evidence: D13:14)"
+      ],
+      "literal_summary": "Dave announces being selected for a car modification workshop where he does engine swaps, suspension mods, and body mods on a classic muscle car. Dave offers Calvin his music studio setup.",
+      "retrieval_text": "Dave selected for car modification workshop dream come true learning auto engineering building custom car. Dave doing engine swaps suspension modifications body modifications. Giving classic muscle car modern twist silver finish. Dave offers Calvin his music studio setup high-quality sound system. Calvin busy with music keeps offer in mind.",
+      "bridging_terms": ["car mod workshop", "engine swaps", "suspension mods", "body modifications", "muscle car", "silver finish", "modern twist", "music studio", "sound system", "auto engineering"],
+      "latent_concepts": ["skills development", "workshop learning", "automotive customization", "classic-modern fusion", "generosity", "friendship reciprocity", "technical mastery", "creative spaces", "dream pursuit", "craftsmanship pride"]
+    },
+    {
+      "session_number": 14,
+      "turns": ["D14:1","D14:2","D14:3","D14:4","D14:5","D14:6","D14:7","D14:8","D14:9","D14:10","D14:11","D14:12","D14:13","D14:14","D14:15","D14:16"],
+      "topic": "Dave's San Francisco car workshop; Calvin's tour and Tokyo show; Dave restoring another car",
+      "surface_events": [
+        "Dave went to a car workshop in San Francisco, found it inspiring",
+        "Calvin toured with a well-known artist ending with a show in Japan",
+        "Calvin's Tokyo show had the crowd singing along, magical moment",
+        "Dave is restoring another car, hopes to finish by end of next month",
+        "Calvin explored his new place in Japan"
+      ],
+      "categories": ["career", "music_career", "travel"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as having serious talent in car restoration (evidence: D14:14)"
+      ],
+      "literal_summary": "Dave attended a car workshop in San Francisco. Calvin describes his tour ending with a magical Tokyo show where the crowd sang along. Dave shows a car he is restoring, hoping to finish by end of next month.",
+      "retrieval_text": "Dave went to car workshop in San Francisco inspiring passionate people car restoration techniques. Calvin toured with well-known artist ended with show in Japan. Calvin's Tokyo show crowd singing along magical moment why he loves his job. Calvin explored his new place in Japan dream come true. Dave restoring a car hopes to finish by end of next month transformation from beat-up to beauty.",
+      "bridging_terms": ["San Francisco", "car workshop", "Tokyo show", "crowd singing", "car restoration", "magical moment", "new place Japan", "transformation", "inspiring", "next month"],
+      "latent_concepts": ["professional development", "performance magic", "audience participation", "restoration timeline", "career passion", "cross-cultural experience", "craftsmanship goals", "artistic connection", "travel experience", "dream realization"]
+    },
+    {
+      "session_number": 15,
+      "turns": ["D15:1","D15:2","D15:3","D15:4","D15:5","D15:6","D15:7","D15:8","D15:9","D15:10","D15:11","D15:12","D15:13","D15:14","D15:15"],
+      "topic": "Calvin's Frank Ocean collaboration deal; Tokyo festival; podcast recording",
+      "surface_events": [
+        "Dave had a card night with friends",
+        "Calvin scored a deal to continue collaborating with Frank Ocean",
+        "Calvin met Frank Ocean at a music festival in Tokyo and they clicked",
+        "They recorded a song in Calvin's mansion studio",
+        "Someone noticed Calvin's festival performance and they are now collaborating",
+        "Calvin's tour ends soon and he plans to come to Boston",
+        "Calvin recorded a podcast about the rapidly evolving rap industry"
+      ],
+      "categories": ["music_career", "collaboration", "social", "media"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin announces a deal to continue collaborating with Frank Ocean after meeting him at a Tokyo festival. They recorded at Calvin's mansion. Someone noticed Calvin's performance and wants to collaborate. Calvin also recorded a podcast about the rap industry.",
+      "retrieval_text": "Dave had card night with friends. Calvin scored deal to continue collaboration with Frank Ocean met him at Tokyo music festival they clicked. Recorded a song together in Calvin's mansion studio. Someone noticed Calvin's festival performance now working together. Calvin's tour ending soon heading to Boston. Calvin recorded a podcast with friends about rapidly evolving rap industry.",
+      "bridging_terms": ["Frank Ocean", "collaboration deal", "Tokyo festival", "mansion studio", "recorded song", "rap industry", "podcast", "Boston", "card night", "performance noticed"],
+      "latent_concepts": ["career breakthrough", "networking payoff", "artistic chemistry", "media presence", "industry discussion", "recognition", "friendship leisure", "career momentum", "musical partnership", "brand building"]
+    },
+    {
+      "session_number": 16,
+      "turns": ["D16:1","D16:2","D16:3","D16:4","D16:5","D16:6","D16:7","D16:8","D16:9","D16:10","D16:11","D16:12","D16:13","D16:14","D16:15","D16:16","D16:17","D16:18","D16:19","D16:20","D16:21","D16:22","D16:23","D16:24","D16:25"],
+      "topic": "Tour end; music video in Miami; custom octopus guitar",
+      "surface_events": [
+        "Calvin finished his tour, felt on top of the world performing on big stage",
+        "Calvin started shooting a music video for his new album in Miami on a beach",
+        "Calvin has a custom guitar with octopus design made by a Japanese artist friend",
+        "The guitar has a shiny purple finish matching Calvin's style",
+        "The guitar represents Calvin's love for art, the sea, and his friendships"
+      ],
+      "categories": ["music_career", "creative_projects", "personal_items"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Dave characterizes Calvin's unique style as standing out in his music and playing (evidence: D16:23)"
+      ],
+      "literal_summary": "Calvin describes performing on a big stage as surreal. He started shooting a music video on a Miami beach. Calvin shows his custom purple guitar with octopus design made by a Japanese artist friend, symbolizing art, the sea, and friendships.",
+      "retrieval_text": "Calvin finished tour performing on big stage dream come true surreal. Started shooting music video for new album on Miami beach epic visuals. Calvin has custom guitar octopus design made by Japanese artist friend shiny purple finish. Guitar represents love for art the sea and friendships matches Calvin's unique style. Dave appreciates Calvin staying true to himself.",
+      "bridging_terms": ["big stage", "music video", "Miami beach", "custom guitar", "octopus design", "Japanese artist", "purple finish", "unique style", "art and sea", "surreal"],
+      "latent_concepts": ["career peak moment", "visual media production", "symbolic possessions", "artistic identity", "custom craftsmanship", "cultural friendships", "self-expression", "beach aesthetic", "personal branding", "creative authenticity"]
+    },
+    {
+      "session_number": 17,
+      "turns": ["D17:1","D17:2","D17:3","D17:4","D17:5","D17:6","D17:7","D17:8","D17:9","D17:10"],
+      "topic": "Dave's San Francisco car insights; Calvin booked flight to Boston",
+      "surface_events": [
+        "Dave came back from San Francisco with car modification insights",
+        "Dave finds satisfaction in fixing cars and making a difference for people",
+        "Calvin booked a flight ticket to Boston, very excited",
+        "They plan to meet up in Boston"
+      ],
+      "categories": ["career", "travel", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as like a superhero for making a real difference in people's lives (evidence: D17:4)"
+      ],
+      "literal_summary": "Dave returns from San Francisco with car modification knowledge and takes pride in helping people with their cars. Calvin booked a flight to Boston and they plan to meet up.",
+      "retrieval_text": "Dave came back from San Francisco with car modification insights and knowledge. Dave feels great making a difference fixing people's cars proud when they feel relief. Calvin booked a flight to Boston last week excited about upcoming trip. They plan to meet up catch up in Boston when Calvin arrives.",
+      "bridging_terms": ["San Francisco", "car modification", "fixing cars", "making a difference", "flight to Boston", "meet up", "excited", "trip", "customer satisfaction", "proud"],
+      "latent_concepts": ["knowledge sharing", "vocational pride", "customer impact", "travel anticipation", "friendship reunion", "professional growth", "helping others", "city hopping", "skill application", "reunion planning"]
+    },
+    {
+      "session_number": 18,
+      "turns": ["D18:1","D18:2","D18:3","D18:4","D18:5","D18:6","D18:7","D18:8","D18:9","D18:10","D18:11","D18:12","D18:13","D18:14","D18:15","D18:16"],
+      "topic": "Calvin's album release; upcoming tour; Dave's garage",
+      "surface_events": [
+        "Calvin's album dropped on September 11 and received great reception",
+        "Calvin is motivated by people connecting with his music",
+        "Calvin has an upcoming tour and plans to explore and grow his brand",
+        "Dave invites Calvin to check out his garage when he visits Boston",
+        "Dave shows a photo of his garage"
+      ],
+      "categories": ["music_career", "milestone", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin's album released on September 11 to great reception. He is motivated by fan connection and has an upcoming tour. Dave invites Calvin to visit his garage in Boston.",
+      "retrieval_text": "Calvin's album finally dropped on September 11 wild feeling everyone loving it motivating to keep going. Calvin excited about connecting with people through music sharing his story journey just getting started. Upcoming tour hitting awesome spots then exploring and growing brand. Dave invites Calvin to check out his garage in Boston cool cars to show. Dave shows photo of his stunning garage.",
+      "bridging_terms": ["album release", "September 11", "reception", "fan connection", "upcoming tour", "brand growth", "garage", "Boston visit", "motivation", "journey"],
+      "latent_concepts": ["album launch", "public reception", "artistic validation", "career momentum", "brand expansion", "friendship invitation", "automotive showcase", "creative purpose", "fan engagement", "milestone celebration"]
+    },
+    {
+      "session_number": 19,
+      "turns": ["D19:1","D19:2","D19:3","D19:4","D19:5","D19:6","D19:7","D19:8","D19:9","D19:10","D19:11","D19:12"],
+      "topic": "Dave's band jam session; Ratatouille poster; vintage car restoration",
+      "surface_events": [
+        "Dave's band had a great jam session but forgot to record it",
+        "Dave attended a rock concert in Boston with amazing atmosphere",
+        "Calvin shares a Disney poster, Ratatouille is one of his favorites",
+        "Dave completed restoring a vintage car and shows the final result",
+        "Dave loves seeing people's reactions to his finished restorations"
+      ],
+      "categories": ["music", "entertainment", "hobbies"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as inspiring and talented at car restoration as an art (evidence: D19:10, D19:12)"
+      ],
+      "literal_summary": "Dave's band jammed but forgot to record. He also attended a Boston rock concert. Calvin shares a Ratatouille poster calling it a favorite. Dave shows a completed vintage car restoration and enjoys people's reactions.",
+      "retrieval_text": "Dave's band had great jam session music kept flowing forgot to record it. Dave attended rock concert in Boston electrifying atmosphere. Calvin shares Disney poster Ratatouille is one of his favorites about following dreams. Dave completed restoring a vintage beauty shows final result. Dave loves seeing people's reactions to finished restorations makes hard work worth it.",
+      "bridging_terms": ["jam session", "rock concert", "Boston", "Ratatouille", "Disney", "vintage car", "restoration complete", "following dreams", "people's reactions", "art of fixing"],
+      "latent_concepts": ["spontaneous creativity", "live music culture", "favorite films", "dream pursuit theme", "restoration satisfaction", "audience appreciation", "unrecorded moments", "cultural touchstones", "craftsmanship reveal", "artistic inspiration"]
+    },
+    {
+      "session_number": 20,
+      "turns": ["D20:1","D20:2","D20:3","D20:4","D20:5","D20:6","D20:7","D20:8","D20:9","D20:10","D20:11","D20:12","D20:13","D20:14","D20:15","D20:16","D20:17"],
+      "topic": "Dave's Mustang engine trouble; Calvin's nostalgic memories; California Love; jam plan",
+      "surface_events": [
+        "Dave had trouble with the vintage Mustang engine, heard weird noise after repair",
+        "Calvin shows his car in sunlight as symbol of hard work",
+        "Calvin recalls an unforgettable summer drive feeling of freedom",
+        "Calvin reflects on his Japan trip, longs to go back",
+        "Calvin's nostalgic childhood song is California Love by Tupac and Dr. Dre from road trips with his dad",
+        "They plan to jam music together"
+      ],
+      "categories": ["hobbies", "nostalgia", "music", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Dave hit a setback with a weird noise in the Mustang engine. Calvin reflects on his car as a symbol of hard work and recalls a childhood road trip song California Love by Tupac and Dr. Dre. They plan to jam together.",
+      "retrieval_text": "Dave worked on vintage Mustang engine thought he fixed it heard weird noise disappointing setback. Calvin shows car in sunlight symbol of hard work and dedication. Calvin recalls unforgettable summer drive wind in hair feeling of freedom reflects on life journey. Calvin's Japan trip was incredible longs to go back. Calvin's nostalgic childhood song California Love by Tupac and Dr Dre road trip with dad singing along. They plan to jam music together.",
+      "bridging_terms": ["Mustang engine", "weird noise", "summer drive", "freedom", "California Love", "Tupac", "Dr. Dre", "road trip with dad", "jam together", "Japan trip"],
+      "latent_concepts": ["mechanical setback", "perseverance", "nostalgic memories", "childhood music", "father-son bonding", "road trip nostalgia", "life reflection", "collaborative music plans", "material symbolism", "longing for return"]
+    },
+    {
+      "session_number": 21,
+      "turns": ["D21:1","D21:2","D21:3","D21:4","D21:5","D21:6","D21:7","D21:8","D21:9","D21:10","D21:11","D21:12","D21:13","D21:14","D21:15","D21:16","D21:17","D21:18"],
+      "topic": "Calvin meets Boston artists; Dave's Mustang restoration; mutual encouragement",
+      "surface_events": [
+        "Calvin met incredible artists in Boston, arranged through a mutual friend",
+        "Calvin shows a car project he works on to chill out",
+        "Dave has been working on a Ford Mustang found in a junkyard",
+        "Dave shows restored Mustang and his grease-stained hands",
+        "Both discuss how small successes bring pride and fulfillment"
+      ],
+      "categories": ["music_career", "hobbies", "friendship", "motivation"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin met artists in Boston via a mutual friend for collaboration. Dave shows his junkyard Mustang restoration with grease-stained hands. Both reflect on how small successes and hard work bring fulfillment.",
+      "retrieval_text": "Calvin met incredible artists in Boston mutual friend arranged meeting excited to collaborate on new music. Calvin also works on cars to chill out. Dave working on Ford Mustang found in junkyard bad shape but had potential now restored looks awesome. Dave shows grease-stained hands after a day in garage permanently stained. Both discuss small successes pride fulfillment growth hard work pays off.",
+      "bridging_terms": ["Boston artists", "mutual friend", "collaboration", "Ford Mustang", "junkyard", "restoration", "grease-stained hands", "small successes", "fulfillment", "hard work"],
+      "latent_concepts": ["networking through connections", "artistic collaboration", "salvage restoration", "blue-collar pride", "shared philosophy", "parallel journeys", "mutual encouragement", "creative hobbies", "transformation narrative", "dedication visible"]
+    },
+    {
+      "session_number": 22,
+      "turns": ["D22:1","D22:2","D22:3","D22:4","D22:5","D22:6","D22:7","D22:8","D22:9","D22:10","D22:11","D22:12","D22:13","D22:14"],
+      "topic": "Dave's car show; childhood garage memories; pursuing dreams as livelihood",
+      "surface_events": [
+        "Dave went to a car show, saw awesome cars and car mods",
+        "Dave restored and modified a car with custom exhaust and performance upgrades",
+        "Dave recalls spending hours in his dad's garage tinkering with engines as a kid",
+        "Dave describes his work as therapy and escape from everyday stress",
+        "Dave is doing what he loves as a job, his goal since childhood"
+      ],
+      "categories": ["hobbies", "career", "nostalgia", "motivation"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave's work as really inspiring for turning broken things into something awesome (evidence: D22:6)"
+      ],
+      "literal_summary": "Dave attended a car show and shares a car he restored with custom exhaust and performance upgrades. He recalls childhood hours in his dad's garage and describes car work as therapy. Doing this as a job is his lifelong goal.",
+      "retrieval_text": "Dave went to car show saw awesome cars and car mods. Dave restored and modified a car custom exhaust performance upgrades sweet sound really proud. Dave spent hours in dad's garage as a kid tinkering with engines his sanctuary. Car work is therapy escape from everyday stress. Dave now does what he loved as a kid for a living lifelong goal achieved.",
+      "bridging_terms": ["car show", "custom exhaust", "performance upgrades", "dad's garage", "childhood", "tinkering engines", "sanctuary", "therapy", "lifelong goal", "broken to awesome"],
+      "latent_concepts": ["childhood dream fulfilled", "vocational identity", "father's influence", "therapeutic hobby", "craftsmanship showcase", "car culture community", "stress escape", "pride in work", "passion as profession", "nostalgia and purpose"]
+    },
+    {
+      "session_number": 23,
+      "turns": ["D23:1","D23:2","D23:3","D23:4","D23:5","D23:6","D23:7","D23:8","D23:9","D23:10","D23:11","D23:12","D23:13","D23:14","D23:15","D23:16","D23:17","D23:18"],
+      "topic": "Dave's business setback; motivation strategies; music festival with The Fireworks; Calvin's new Ferrari",
+      "surface_events": [
+        "A competing shop snagged a deal Dave was pursuing for months",
+        "Dave feels bummed and questions if he is wasting his time",
+        "Calvin advises reminding yourself of passion and relying on supportive people",
+        "Dave attended a music festival headlined by The Fireworks, felt alive",
+        "Calvin mentions performing with Frank Ocean recently",
+        "Calvin got a new Ferrari, describes it as a masterpiece on wheels"
+      ],
+      "categories": ["adversity", "motivation", "entertainment", "purchases"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Dave characterizes Calvin's positivity as contagious (evidence: D23:17)"
+      ],
+      "literal_summary": "Dave feels bummed after a competing shop snagged a deal he worked on for months. Calvin advises relying on passion and support. Dave attended a festival headlined by The Fireworks. Calvin announces getting a new Ferrari.",
+      "retrieval_text": "Competing car shop snagged a deal Dave was pursuing for months felt bummed questioned if wasting time. Calvin advises remembering passion relying on supportive people taking breaks to recharge. Dave attended music festival headlined by The Fireworks felt alive amazing energy. Calvin performing with Frank Ocean recently. Calvin got a new Ferrari masterpiece on wheels excited for thrilling rides.",
+      "bridging_terms": ["competing shop", "lost deal", "motivation", "setback", "The Fireworks", "music festival", "Frank Ocean", "new Ferrari", "supportive people", "passion"],
+      "latent_concepts": ["business competition", "self-doubt", "resilience advice", "coping strategies", "live music therapy", "luxury acquisition", "peer encouragement", "emotional support", "career setbacks", "recharging through passions"]
+    },
+    {
+      "session_number": 24,
+      "turns": ["D24:1","D24:2","D24:3","D24:4","D24:5","D24:6","D24:7","D24:8","D24:9","D24:10","D24:11","D24:12","D24:13","D24:14","D24:15","D24:16","D24:17","D24:18","D24:19","D24:20","D24:21","D24:22","D24:23"],
+      "topic": "Frank Ocean tour updates; Tokyo concert photos; Shibuya and Shinjuku; ramen discussion",
+      "surface_events": [
+        "Calvin is touring with Frank Ocean, amazing energy from crowds",
+        "Calvin met Frank Ocean at a festival in August last year and they clicked",
+        "Calvin shows Tokyo concert photo with insane crowd energy",
+        "Dave dreams of visiting Tokyo, loves photos of the city",
+        "Calvin is going to Tokyo next month after the tour ends",
+        "Calvin excited about Shibuya Crossing and Shinjuku",
+        "Dave recommends trying ramen in Tokyo, tried some in Boston",
+        "Calvin has never tried ramen but plans to in Tokyo"
+      ],
+      "categories": ["music_career", "travel", "food", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin shares Frank Ocean tour updates and a Tokyo concert photo. He met Frank at a festival last August. Dave dreams of visiting Tokyo. Calvin plans to visit Shibuya and Shinjuku. Dave recommends ramen.",
+      "retrieval_text": "Calvin touring with Frank Ocean incredible energy jamming together dream come true. Met Frank Ocean at festival August last year clicked right away chemistry on stage. Calvin shows Tokyo concert photo whole city came out insane energy. Dave dreams of visiting Tokyo loves city photos culture food tech. Calvin going to Tokyo next month after tour. Calvin excited about Shibuya Crossing and Shinjuku. Dave recommends ramen tried it in Boston thinks Tokyo will be better. Calvin never tried ramen plans to in Tokyo.",
+      "bridging_terms": ["Frank Ocean", "tour", "Tokyo concert", "August festival", "Shibuya Crossing", "Shinjuku", "ramen", "city lights", "crowd energy", "chemistry on stage"],
+      "latent_concepts": ["tour life highlights", "origin story of collaboration", "urban exploration", "food tourism", "cross-cultural anticipation", "concert photography", "city as destination", "culinary discovery", "artistic chemistry", "audience connection"]
+    },
+    {
+      "session_number": 25,
+      "turns": ["D25:1","D25:2","D25:3","D25:4","D25:5","D25:6","D25:7","D25:8","D25:9","D25:10","D25:11","D25:12","D25:13","D25:14","D25:15","D25:16","D25:17","D25:18","D25:19","D25:20","D25:21","D25:22","D25:23","D25:24","D25:25","D25:26","D25:27","D25:28","D25:29","D25:30","D25:31"],
+      "topic": "Fame and balance; music as therapy; Dave's car origin story; attention to detail; concerts",
+      "surface_events": [
+        "Calvin discusses fame challenges and balancing tour with personal life",
+        "Calvin relies on friends and team for support",
+        "Calvin inspired by people's struggles for deeper music",
+        "Calvin describes music as his own form of therapy",
+        "Dave describes cars as his outlet and oasis of calm",
+        "Dave has been fascinated by machines since age 10, fixed a neighbor's old car",
+        "Dave restored and sold a car to a collector, now on new project",
+        "Both discuss importance of attention to detail in their crafts",
+        "Dave attended concerts last month and shares photos"
+      ],
+      "categories": ["fame", "coping", "career_origins", "philosophy", "entertainment"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin discusses fame challenges and uses music as therapy. Dave shares his car origin story starting at age 10. Both value attention to detail in their crafts. Dave sold a restored car to a collector and shares concert photos.",
+      "retrieval_text": "Calvin discusses fame challenges balancing tour with personal life takes it one day at a time can get overwhelming. Calvin relies on strong support system friends and team. Calvin inspired by people's struggles digs deeper into music as his own therapy. Dave describes cars as outlet oasis of calm connecting back with himself. Dave fascinated by machines since age 10 fixed old car in neighbor's garage that started his love for engineering. Dave restored car last year sold to collector now working on new challenging project. Both value attention to detail makes something extraordinary. Dave attended concerts last month shares photos amazing atmosphere.",
+      "bridging_terms": ["fame", "balance", "support system", "music as therapy", "cars as outlet", "age 10", "neighbor's garage", "attention to detail", "sold to collector", "concerts"],
+      "latent_concepts": ["fame management", "work-life balance", "emotional outlet", "vocational origin story", "craftsmanship philosophy", "parallel therapeutic hobbies", "detail orientation", "artistic depth", "commercial success", "concert appreciation"]
+    },
+    {
+      "session_number": 26,
+      "turns": ["D26:1","D26:2","D26:3","D26:4","D26:5","D26:6","D26:7","D26:8","D26:9","D26:10","D26:11","D26:12","D26:13","D26:14","D26:15"],
+      "topic": "Calvin's Boston sightseeing; Dave's Detroit conference; Dave's car origin; Calvin performs with admired artist",
+      "surface_events": [
+        "Calvin visited Boston sights with a high school friend, fun and eye-opening",
+        "Calvin followed Dave's advice and visited a peaceful spot in Boston",
+        "Dave attended a conference in Detroit and learned a lot",
+        "Dave shows his latest car project",
+        "Dave's dad took him to first car show at age 10, became automotive engineer",
+        "Calvin performed on stage with someone he admires, dream come true",
+        "Both reflect on finding fulfilling passions"
+      ],
+      "categories": ["travel", "career", "friendship", "performance"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave's car work as inspiring, makes Calvin want to keep pushing his music (evidence: D26:7)"
+      ],
+      "literal_summary": "Calvin visited Boston sights with a high school friend and followed Dave's park recommendation. Dave attended a Detroit conference. Dave recalls his dad taking him to his first car show at age 10. Calvin performed with an admired artist.",
+      "retrieval_text": "Calvin visited Boston sights with high school friend fun eye-opening great architecture cool history. Calvin followed Dave's advice visited peaceful spot in Boston. Dave attended conference in Detroit learned a lot. Dave shows latest car project. Dave's dad took him to first car show at age 10 became automotive engineer from small parts to powerful cars. Calvin performed on stage with someone he admires dream come true energy crowd passion and purpose. Both reflect on finding fulfilling passions.",
+      "bridging_terms": ["Boston sights", "high school friend", "Detroit conference", "car show age 10", "automotive engineer", "admired artist", "stage performance", "peaceful spot", "architecture", "passion purpose"],
+      "latent_concepts": ["tourism", "childhood inspiration", "professional conference", "mentorship lineage", "dream performance", "parallel fulfillment", "friend reunion", "career identity formation", "city exploration", "mutual inspiration"]
+    },
+    {
+      "session_number": 27,
+      "turns": ["D27:1","D27:2","D27:3","D27:4","D27:5","D27:6","D27:7","D27:8","D27:9","D27:10","D27:11","D27:12","D27:13"],
+      "topic": "Calvin's networking event; Dave's photography hobby; Boston sunset; car project update; album almost done",
+      "surface_events": [
+        "Calvin attended a networking event to meet more artists and build fanbase",
+        "Dave got into photography recently, taken great shots",
+        "Dave captured a magnificent Boston sunset and clock tower photo",
+        "Photography helps Dave appreciate beauty of nature as creative outlet",
+        "Dave finished restoring his car project, looks amazing",
+        "Calvin's album is almost finished with great collaborations"
+      ],
+      "categories": ["networking", "hobbies", "photography", "music_career"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Calvin characterizes Dave as talented at photography (evidence: D27:7)"
+      ],
+      "literal_summary": "Calvin attended a networking event to build his fanbase. Dave has taken up photography, capturing a Boston sunset and clock tower. Dave finished his car restoration. Calvin's album is nearly complete.",
+      "retrieval_text": "Calvin attended networking event to meet more artists build up fanbase excited about potential. Dave got into photography recently taken amazing shots. Dave captured magnificent Boston sunset sky on fire and clock tower photo at sunset stunning colors. Photography helps Dave capture and appreciate beauty of nature creative outlet. Dave finished restoring his car project looks amazing invites Calvin to check it out. Calvin's album almost finished great collaborations will send previews soon.",
+      "bridging_terms": ["networking event", "fanbase", "photography", "Boston sunset", "clock tower", "creative outlet", "car restoration complete", "album almost finished", "collaborations", "nature beauty"],
+      "latent_concepts": ["industry networking", "new creative hobby", "urban photography", "landscape appreciation", "project completion", "album production", "artistic diversification", "visual arts", "milestone approach", "creative cross-pollination"]
+    },
+    {
+      "session_number": 28,
+      "turns": ["D28:1","D28:2","D28:3","D28:4","D28:5","D28:6","D28:7","D28:8","D28:9","D28:10","D28:11","D28:12","D28:13","D28:14","D28:15","D28:16","D28:17","D28:18","D28:19","D28:20","D28:21","D28:22","D28:23","D28:24","D28:25","D28:26","D28:27","D28:28","D28:29","D28:30","D28:31","D28:32","D28:33","D28:34","D28:35","D28:36","D28:37","D28:38","D28:39","D28:40","D28:41","D28:42","D28:43"],
+      "topic": "Calvin's album release party at mansion; Dave's car mod blog; rock band logo; studio and relaxation setup; classic rock",
+      "surface_events": [
+        "Calvin threw an album release party at his Japanese mansion with family and friends",
+        "Dave started a blog on car modifications, inspiring DIY projects",
+        "Dave polished headlights on a restored car found in bad shape",
+        "Dave shows his rock band logo, fan for ages and joined them",
+        "Calvin shows his studio setup and separate relaxation room with TV",
+        "Calvin watches music videos, concerts, and artist documentaries for inspiration",
+        "Dave writes lyrics and notes in a notebook to boost motivation",
+        "Dave listens to classic rock while working on cars, uses a vinyl player",
+        "Dave has been getting into classic rock lately considers it timeless"
+      ],
+      "categories": ["celebration", "blogging", "music", "lifestyle", "hobbies"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Calvin threw an album party at his Japanese mansion. Dave started a car mod blog inspiring others. They discuss Dave's rock band logo, Calvin's studio and relaxation room, Dave's lyrics notebook, and shared love of music. Dave listens to classic rock while working.",
+      "retrieval_text": "Calvin threw album release party at Japanese mansion family and friends incredible energy love. Dave started blog on car modifications inspiring others to start DIY projects. Dave polished headlights on restored car found in bad shape. Dave shows rock band logo been a fan for ages joined the band. Calvin shows studio setup and separate cozy relaxation room with TV watches music videos concerts artist documentaries for inspiration. Dave writes lyrics and notes in notebook boost motivation. Dave listens to classic rock on vinyl player while working on cars considers it timeless.",
+      "bridging_terms": ["album party", "Japanese mansion", "car mod blog", "headlights", "rock band logo", "studio setup", "relaxation room", "music videos", "documentaries", "classic rock", "vinyl player", "lyrics notebook"],
+      "latent_concepts": ["celebration milestone", "content creation", "DIY community", "band identity", "creative workspace", "media consumption", "writing practice", "musical taste", "analog appreciation", "work accompaniment", "lifestyle design"]
+    },
+    {
+      "session_number": 29,
+      "turns": ["D29:1","D29:2","D29:3","D29:4","D29:5","D29:6","D29:7","D29:8","D29:9","D29:10","D29:11","D29:12","D29:13","D29:14","D29:15","D29:16","D29:17","D29:18"],
+      "topic": "Calvin's Boston performance with high school friend; mentoring young musicians; experimenting with new sounds",
+      "surface_events": [
+        "Calvin invited his high school friend to see him perform in Boston",
+        "Calvin gets nostalgic about freestyling as teenagers dreaming of fame",
+        "Calvin's high school friend has been supportive throughout his journey",
+        "Calvin is mentoring young musicians from a music program",
+        "Calvin plans to support them long-term, like passing a torch",
+        "Calvin is making beats for a young artist with great potential",
+        "Calvin experimenting with new sounds pushing boundaries"
+      ],
+      "categories": ["performance", "nostalgia", "mentorship", "creativity"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Dave characterizes Calvin as really making a difference by supporting next generation of musicians (evidence: D29:10)"
+      ],
+      "literal_summary": "Calvin invited his high school friend to his Boston performance, getting nostalgic about freestyling as teens. Calvin is mentoring young musicians from a music program, making beats for them, and experimenting with new sounds.",
+      "retrieval_text": "Calvin invited high school buddy to see him perform in Boston nostalgic about how far he's come. Freestyling as teenagers dreaming of fame crazy how life changed. High school friend always there supportive and encouraging. Calvin mentoring young musicians from music program supporting their passion torch being passed. Calvin making beats for young artist with great potential plans long-term support. Calvin experimenting with new sounds pushing boundaries staying ahead.",
+      "bridging_terms": ["high school friend", "Boston performance", "freestyling", "teenagers", "mentoring", "young musicians", "music program", "making beats", "pushing boundaries", "passing torch"],
+      "latent_concepts": ["nostalgia", "career reflection", "youth mentorship", "giving back", "legacy building", "artistic evolution", "lifelong friendship", "early influences", "next generation", "creative experimentation"]
+    },
+    {
+      "session_number": 30,
+      "turns": ["D30:1","D30:2","D30:3","D30:4","D30:5","D30:6","D30:7","D30:8","D30:9","D30:10","D30:11","D30:12","D30:13","D30:14","D30:15","D30:16","D30:17","D30:18","D30:19","D30:20","D30:21","D30:22","D30:23","D30:24"],
+      "topic": "Dave's photography and vintage camera; Calvin's Boston gala; nature appreciation; upcoming Boston show",
+      "surface_events": [
+        "Dave has taken up photography and takes pics of scenery",
+        "Calvin attended a fancy gala in Boston and bonded with an artist over music and art",
+        "Dave bought a new vintage camera this month that takes great photos",
+        "Dave loves capturing nature: sunsets, beaches, waves, waterfalls",
+        "Dave found serene spots in a nearby park including a bench under cherry blossoms",
+        "Calvin shot a photo in a Japanese garden",
+        "Calvin accepted an invitation to perform at an upcoming show in Boston"
+      ],
+      "categories": ["photography", "social_events", "nature", "music_career"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Dave shares his new photography hobby and vintage camera capturing nature scenes. Calvin attended a Boston gala where he bonded with an artist. Calvin shares a Japanese garden photo. Calvin accepted an invitation to perform at an upcoming Boston show.",
+      "retrieval_text": "Dave taken up photography takes pics of scenery bought new vintage camera this month great photos. Dave loves capturing nature sunsets beaches waves found serene park spots waterfall rocks bench under cherry blossoms. Calvin attended fancy gala in Boston met interesting people bonded with cool artist over music and art creative high. Calvin shot photo in Japanese garden. Calvin accepted invitation to perform at upcoming show in Boston unforgettable musical experience. They plan to catch up when Calvin is in Boston.",
+      "bridging_terms": ["photography", "vintage camera", "sunsets", "nature", "Boston gala", "artist bonding", "Japanese garden", "upcoming show", "cherry blossoms", "waterfall"],
+      "latent_concepts": ["visual arts hobby", "nature photography", "networking at events", "artistic community", "creative inspiration", "cultural appreciation", "performance booking", "reunion planning", "scenic beauty", "analog equipment"]
+    }
+  ]
+}

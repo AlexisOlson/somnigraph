@@ -94,7 +94,15 @@ def setup_isolated_db(conv_dir: Path):
 
     memory.constants.DATA_DIR = conv_dir
     memory.db.DB_PATH = conv_dir / "memory.db"
+    memory.db._schema_initialized = False  # Force schema init for new DB
     memory.reranker._cache = {"model": None, "feature_names": None, "memory_meta": None, "meta_mem_count": -1, "loaded": False, "failed": False}
+
+    # Reset eval_retrieval conv cache so reranker reloads for new conversation
+    try:
+        from locomo_bench.eval_retrieval import _conv_cache
+        _conv_cache.clear()
+    except ImportError:
+        pass
     # Point MODEL_PATH at the real model location (not the benchmark dir).
     # Must patch both constants and reranker since reranker imports at module load.
     real_model = Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.pkl"
@@ -123,6 +131,8 @@ def run_conversation(
     results_path: Path | None = None,
     done_keys: set | None = None,
     corrections: dict | None = None,
+    build_graph: bool = False,
+    categories: list[int] | None = None,
 ) -> list[dict]:
     """Run the full pipeline for one conversation."""
     conv_dir = run_dir / f"conv_{conv_idx}"
@@ -133,6 +143,8 @@ def run_conversation(
 
     if config.skip_adversarial:
         conv_questions = [q for q in conv_questions if q["category"] != 5]
+    if categories:
+        conv_questions = [q for q in conv_questions if q["category"] in categories]
 
     if question_limit:
         conv_questions = conv_questions[:question_limit]
@@ -153,13 +165,52 @@ def run_conversation(
     finally:
         db.close()
 
+    dia_map_path = conv_dir / "dia_map.json"
     if count > 0 and config.resume:
         logger.info("  Reusing existing DB (%d memories)", count)
-        # Rebuild dia_map from DB
-        dia_map = _rebuild_dia_map(conv_dir)
+        if dia_map_path.exists():
+            # Load saved dia_map
+            with open(dia_map_path) as f:
+                raw = json.load(f)
+            dia_map = {}
+            for k, v in raw.items():
+                parts = k.split(":", 1)
+                dia_map[(int(parts[0]), parts[1])] = v
+        else:
+            # Rebuild dia_map by matching turn content to DB memories
+            dia_map = _rebuild_dia_map_from_turns(conv_dir, conv_turns)
+            with open(dia_map_path, "w") as f:
+                json.dump({f"{k[0]}:{k[1]}": v for k, v in dia_map.items()}, f)
+            logger.info("  Rebuilt dia_map: %d mappings", len(dia_map))
     else:
         dia_map = ingest_conversation(conv_turns)
         logger.info("  Ingestion complete: %d memories", len(dia_map))
+        # Save dia_map.json for graph builder and other tools
+        with open(dia_map_path, "w") as f:
+            json.dump({f"{k[0]}:{k[1]}": v for k, v in dia_map.items()}, f)
+
+    # Build graph nodes if requested
+    if build_graph:
+        from memory.db import get_db as _get_db_graph
+        _db_g = _get_db_graph()
+        _syn_count = _db_g.execute(
+            "SELECT COUNT(*) FROM memories WHERE source = 'extraction'"
+        ).fetchone()[0]
+        _db_g.close()
+        if _syn_count == 0:
+            from locomo_bench.build_graph import build_graph as _build, load_dia_map as _load_graph_dia_map
+            logger.info("  Building graph nodes for conv %d...", conv_idx)
+            graph_dia_map = _load_graph_dia_map(conv_dir)
+            _build(conv_idx, graph_dia_map,
+                   embed_cache_path=config.embed_cache)
+            _db_g = _get_db_graph()
+            _syn_count = _db_g.execute(
+                "SELECT COUNT(*) FROM memories WHERE source = 'extraction'"
+            ).fetchone()[0]
+            _db_g.close()
+            logger.info("  Graph built: %d synthetic nodes", _syn_count)
+        else:
+            logger.info("  Graph already built: %d synthetic nodes", _syn_count)
 
     # Phase 2: Evaluate each question
     results = []
@@ -340,6 +391,35 @@ def _rebuild_dia_map(conv_dir: Path) -> dict:
     return dia_map
 
 
+def _rebuild_dia_map_from_turns(conv_dir: Path, conv_turns: list[dict]) -> dict:
+    """Rebuild dia_map by matching turn content to DB memories."""
+    import sqlite3
+    db_path = conv_dir / "memory.db"
+    if not db_path.exists():
+        return {}
+
+    db = sqlite3.connect(str(db_path))
+    db.row_factory = sqlite3.Row
+
+    # Build content -> memory_id lookup from DB
+    content_to_id = {}
+    for row in db.execute(
+        "SELECT id, content FROM memories WHERE status = 'active' AND source != 'extraction'"
+    ):
+        content_to_id[row["content"]] = row["id"]
+    db.close()
+
+    # Match turns to DB entries
+    dia_map = {}
+    for turn in conv_turns:
+        content = f"[{turn['speaker']}] {turn['text']}"
+        mem_id = content_to_id.get(content)
+        if mem_id:
+            dia_map[(turn["conv_id"], turn["dia_id"])] = mem_id
+
+    return dia_map
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -375,10 +455,16 @@ def main():
     # Category options
     parser.add_argument("--skip-adversarial", action="store_true",
                         help="Skip category 5 (match CORE methodology)")
+    parser.add_argument("--categories", type=int, nargs="+",
+                        help="Only run specific categories (e.g. --categories 3 for multi-hop only)")
 
     # Reranker options
     parser.add_argument("--locomo-reranker", action="store_true",
                         help="Use LoCoMo-specific reranker instead of production")
+    parser.add_argument("--expand-all", action="store_true",
+                        help="Enable two-phase expansion (all methods)")
+    parser.add_argument("--build-graph", action="store_true",
+                        help="Build synthetic graph nodes in each conversation DB")
 
     # Ablation options
     parser.add_argument("--feedback-loop", action="store_true",
@@ -413,6 +499,15 @@ def main():
     if args.locomo_reranker:
         from locomo_bench.eval_retrieval import _install_locomo_reranker
         _install_locomo_reranker()
+
+    # Enable expansion (two-phase retrieval inside the monkey-patched reranker)
+    if args.expand_all:
+        from locomo_bench.eval_retrieval import enable_expansion
+        enable_expansion(
+            entity_focus=True, multi_query=True, keyword=True,
+            session=True, entity_bridge=True, rocchio=True,
+        )
+        logger.info("Two-phase expansion enabled (all methods)")
 
     # Create or reuse run directory
     if args.run_dir:
@@ -497,6 +592,8 @@ def main():
             results_path=results_path,
             done_keys=done_keys,
             corrections=corrections,
+            build_graph=args.build_graph,
+            categories=args.categories,
         )
 
         all_results.extend(results)

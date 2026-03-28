@@ -61,7 +61,7 @@ BENCHMARK_DIR = DATA_DIR / "benchmark"
 
 def _extract_entities(text: str, speakers: set[str]) -> set[str]:
     """Extract named entities using allowlist from expansion module."""
-    from expansion import LOCOMO_ENTITIES
+    from locomo_bench.expansion import LOCOMO_ENTITIES
     entities = set()
     for w in text.split():
         clean = re.sub(r'[.,!?"\';:()]+$', '', w).lower()
@@ -141,6 +141,11 @@ FEATURE_NAMES = [
     "expansion_method_count",# 29: How many expansion methods found this candidate (0 in phase 1)
     "phase1_rrf_score",     # 30: Raw RRF score from phase 1 pool (0 if new in phase 2)
     "is_seed",              # 31: Binary: was this a top-K seed for expansion? (0 in phase 1)
+    # Group I: Graph features (from extraction-based synthetic nodes + edges)
+    "graph_edge_count",     # 32: Total edges this turn has (EXTRACTED_FROM + claim_coref)
+    "graph_synthetic_score",# 33: Max RRF score of any synthetic node pointing to this turn
+    "graph_coref_hits",     # 34: Other candidates sharing a claim_coref edge with this turn
+    "is_graph_resolved",    # 35: Binary: was this turn added via graph resolution?
 ]
 
 NUM_FEATURES = len(FEATURE_NAMES)  # 32
@@ -154,6 +159,7 @@ FEATURE_GROUPS = {
     "F": list(range(17, 22)),
     "G": list(range(22, 25)),
     "H": list(range(25, 32)),
+    "I": list(range(32, 36)),
 }
 
 _ALL_INDICES = list(range(NUM_FEATURES))
@@ -320,7 +326,38 @@ def load_conversation_data(conv_idx: int) -> dict | None:
             "entity_density": len(entities) / max(token_count, 1),
         }
 
+    # Load graph data: edges and synthetic node relationships
+    graph_edges = defaultdict(int)  # memory_id -> total edge count
+    graph_synthetic_targets = defaultdict(set)  # turn_id -> set of synthetic_ids pointing to it
+    graph_coref_neighbors = defaultdict(set)  # turn_id -> set of turn_ids sharing claim_coref edges
+    synthetic_ids = set()
+
+    edge_rows = db.execute("""
+        SELECT source_id, target_id, linking_context, flags
+        FROM memory_edges
+    """).fetchall()
+
+    for er in edge_rows:
+        src, tgt, ctx, flags_str = er["source_id"], er["target_id"], er["linking_context"] or "", er["flags"] or "[]"
+        graph_edges[src] += 1
+        graph_edges[tgt] += 1
+
+        if ctx.startswith("extracted_from:"):
+            # source is synthetic, target is turn
+            graph_synthetic_targets[tgt].add(src)
+            synthetic_ids.add(src)
+        elif ctx.startswith("claim_coref:"):
+            graph_coref_neighbors[src].add(tgt)
+            graph_coref_neighbors[tgt].add(src)
+
     db.close()
+
+    # Tag memories with graph metadata
+    for mid in memories:
+        memories[mid]["graph_edge_count"] = graph_edges.get(mid, 0)
+        memories[mid]["graph_synthetic_ids"] = graph_synthetic_targets.get(mid, set())
+        memories[mid]["graph_coref_neighbors"] = graph_coref_neighbors.get(mid, set())
+        memories[mid]["is_synthetic"] = mid in synthetic_ids
 
     # Build dia_id ordinal mapping for neighbor_density
     # Sort memories by created_at to get temporal ordering
@@ -359,6 +396,11 @@ def run_searches(conv_data: dict) -> dict:
     db = get_db()
     questions = conv_data["questions"]
 
+    # Pre-build rowid -> memory_id lookup (one query, not per-row)
+    rowid_map = {}
+    for r in db.execute("SELECT rowid, memory_id FROM memory_rowid_map").fetchall():
+        rowid_map[r["rowid"]] = r["memory_id"]
+
     fts_results = {}   # query -> [memory_ids ordered by rank]
     fts_scores = {}    # query -> {memory_id: bm25_score}
     vec_results = {}   # query -> [memory_ids ordered by rank]
@@ -376,18 +418,15 @@ def run_searches(conv_data: dict) -> dict:
                 f"""
                 SELECT rowid, bm25(memory_fts, {BM25_SUMMARY_WT}, {BM25_THEMES_WT}) as rank
                 FROM memory_fts WHERE memory_fts MATCH ?
-                ORDER BY rank LIMIT 200
+                ORDER BY rank LIMIT 4000
                 """,
                 (fts_query,),
             ).fetchall()
             for row in fts_rows:
-                mapped = db.execute(
-                    "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
-                    (row["rowid"],),
-                ).fetchone()
-                if mapped:
-                    fts_ids.append(mapped["memory_id"])
-                    fts_sc[mapped["memory_id"]] = row["rank"]
+                mid = rowid_map.get(row["rowid"])
+                if mid:
+                    fts_ids.append(mid)
+                    fts_sc[mid] = row["rank"]
         except sqlite3.OperationalError:
             pass
 
@@ -402,19 +441,16 @@ def run_searches(conv_data: dict) -> dict:
             WHERE embedding MATCH ? AND k = ?
             ORDER BY distance
             """,
-            (serialize_f32(query_embedding), 200),
+            (serialize_f32(query_embedding), 4000),
         ).fetchall()
 
         vec_ids = []
         vec_sc = {}
         for row in vec_rows:
-            mapped = db.execute(
-                "SELECT memory_id FROM memory_rowid_map WHERE rowid = ?",
-                (row["rowid"],),
-            ).fetchone()
-            if mapped:
-                vec_ids.append(mapped["memory_id"])
-                vec_sc[mapped["memory_id"]] = row["distance"]
+            mid = rowid_map.get(row["rowid"])
+            if mid:
+                vec_ids.append(mid)
+                vec_sc[mid] = row["distance"]
 
         vec_results[qtext] = vec_ids
         vec_scores[qtext] = vec_sc
@@ -438,7 +474,8 @@ def run_searches(conv_data: dict) -> dict:
 
 
 def extract_features(conv_data: dict, search_data: dict,
-                     two_phase: bool = False, n_seeds: int = 10) -> dict:
+                     two_phase: bool = False, n_seeds: int = 10,
+                     synthetic_coverage: dict | None = None) -> dict:
     """Extract features for all (query, candidate) pairs in a conversation.
 
     If two_phase=True, generates two rows per (query, candidate): phase 0
@@ -447,6 +484,10 @@ def extract_features(conv_data: dict, search_data: dict,
 
     n_seeds: number of phase 1 top-ranked candidates used as seeds for
     phase 2 expansion (default 10, aligns with R@10 saturation point).
+
+    synthetic_coverage: if provided, dict mapping question keys
+    (conv_idx:qi) to {synth_id: [covered_turn_ids]}. Synthetics that
+    cover evidence get label=1.0 and are included in training.
 
     Returns dict with features, labels, query_ids, memory_ids arrays.
     """
@@ -472,6 +513,15 @@ def extract_features(conv_data: dict, search_data: dict,
 
         if not evidence_mids:
             continue
+
+        # Synthetics that cover evidence for this question (L5b labeling)
+        positive_synth_ids = set()
+        if synthetic_coverage is not None:
+            qkey = f"{conv_data['conv_idx']}:{qi}"
+            cov = synthetic_coverage.get(qkey, {})
+            for synth_id, covered_turns in cov.items():
+                if covered_turns:  # non-empty = covers at least one evidence turn
+                    positive_synth_ids.add(synth_id)
 
         # Build candidate pool from search results
         fts_ids = search_data["fts_results"].get(qtext, [])
@@ -629,8 +679,22 @@ def extract_features(conv_data: dict, search_data: dict,
             features[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score
             features[i, 31] = 0     # is_seed (no seeds in phase 1)
 
-            # Label: binary
-            labels[i] = 1.0 if mid in evidence_mids else 0.0
+            # Group I: Graph features
+            features[i, 32] = mem.get("graph_edge_count", 0)       # graph_edge_count
+            # graph_synthetic_score: max RRF score of any synthetic node → this turn
+            syn_ids = mem.get("graph_synthetic_ids", set())
+            if syn_ids:
+                max_syn_score = max(rrf_scores.get(sid, 0.0) for sid in syn_ids)
+                features[i, 33] = max_syn_score                    # graph_synthetic_score
+            # graph_coref_hits: other candidates sharing claim_coref edges
+            coref_neighbors = mem.get("graph_coref_neighbors", set())
+            if coref_neighbors:
+                features[i, 34] = len(coref_neighbors & candidate_ids)  # graph_coref_hits
+            # is_graph_resolved: 0 for training (all candidates are directly retrieved)
+            features[i, 35] = 0                                    # is_graph_resolved
+
+            # Label: binary (turns from evidence, or synthetics covering evidence)
+            labels[i] = 1.0 if (mid in evidence_mids or mid in positive_synth_ids) else 0.0
 
         # Group F: Second-pass features (inter-passage, based on top-10 RRF)
         top10_rrf = sorted(candidate_list,
@@ -733,12 +797,24 @@ def extract_features(conv_data: dict, search_data: dict,
                 cos_sim = float(np.dot(emb, centroid) / (emb_norm + 1e-9))
                 features[i, 24] = 1.0 - cos_sim                          # centroid_distance
 
+        # Filter synthetic nodes unless coverage table is provided (L5b)
+        if synthetic_coverage is None:
+            turn_mask = np.array([
+                not memories.get(mid, {}).get("is_synthetic", False)
+                for mid in candidate_list
+            ])
+            turn_indices = np.where(turn_mask)[0]
+            phase1_candidate_list = [candidate_list[i] for i in turn_indices]
+        else:
+            turn_indices = np.arange(len(candidate_list))
+            phase1_candidate_list = candidate_list
+
         # Phase 1 rows: query_id = 2*qi (even) to keep CV folds correct
         phase1_qid = 2 * qi if two_phase else qi
-        all_features.append(features)
-        all_labels.append(labels)
-        all_query_ids.extend([phase1_qid] * n)
-        all_mids.extend([(qtext, mid) for mid in candidate_list])
+        all_features.append(features[turn_indices])
+        all_labels.append(labels[turn_indices])
+        all_query_ids.extend([phase1_qid] * len(turn_indices))
+        all_mids.extend([(qtext, mid) for mid in phase1_candidate_list])
 
         # --- Phase 2: expanded pool with real Group H features ---
         if two_phase:
@@ -994,7 +1070,7 @@ def extract_features(conv_data: dict, search_data: dict,
                 features2[i, 30] = rrf_scores.get(mid, 0.0)  # phase1_rrf_score (0 if new)
                 features2[i, 31] = 1.0 if mid in top_seeds_set else 0.0
 
-                labels2[i] = 1.0 if mid in evidence_mids else 0.0
+                labels2[i] = 1.0 if (mid in evidence_mids or mid in positive_synth_ids) else 0.0
 
             # Group F second-pass (inter-passage based on expanded top-10)
             exp_top10_rrf = sorted(exp_candidate_list,
@@ -1208,6 +1284,7 @@ def train_cv(
     all_search_data: list[dict],
     feature_indices: list[int],
     n_estimators: int = 500,
+    random_state: int = 42,
 ) -> tuple[list[dict], np.ndarray]:
     """Leave-one-conversation-out CV. Returns (per-question metrics, importances)."""
     n_convs = len(all_conv_features)
@@ -1236,14 +1313,14 @@ def train_cv(
         # Hold out 10% of training for early stopping
         n_train = len(y_train)
         n_val = max(1, n_train // 10)
-        rng = np.random.RandomState(42 + test_idx)
+        rng = np.random.RandomState(random_state + test_idx)
         val_mask = np.zeros(n_train, dtype=bool)
         val_mask[rng.choice(n_train, size=n_val, replace=False)] = True
 
         model = lgb.LGBMRegressor(
             num_leaves=31, learning_rate=0.1, n_estimators=n_estimators,
             min_child_samples=20, subsample=0.8, colsample_bytree=0.8,
-            verbose=-1, random_state=42,
+            verbose=-1, random_state=random_state,
         )
         model.fit(
             X_train[~val_mask], y_train[~val_mask],
@@ -1401,12 +1478,14 @@ _DEAD_FEATURES = {6, 13, 14}  # proximity, age_days, theme_count
 
 
 def _cv_score(all_conv_features, all_conv_data, all_search_data,
-              feature_indices, n_estimators=500, metric="ndcg@10"):
+              feature_indices, n_estimators=500, metric="ndcg@10",
+              random_state=42):
     """Quick CV score for a feature set."""
     if not feature_indices:
         return 0.0
     metrics, _ = train_cv(all_conv_features, all_conv_data, all_search_data,
-                          sorted(feature_indices), n_estimators)
+                          sorted(feature_indices), n_estimators,
+                          random_state=random_state)
     if not metrics:
         return 0.0
     return np.mean([m[metric] for m in metrics])
@@ -1471,7 +1550,8 @@ def select_correlation_filter(all_conv_features, threshold=0.85):
 
 def select_forward_stepwise(all_conv_features, all_conv_data, all_search_data,
                             candidates=None, n_estimators=500, seed=None,
-                            metric="ndcg@10", union_metrics=None):
+                            metric="ndcg@10", union_metrics=None,
+                            random_state=42, log_path=None):
     """Greedy forward selection: add the feature that most improves a CV metric.
 
     If seed is provided (list of feature indices), start with those features
@@ -1481,6 +1561,8 @@ def select_forward_stepwise(all_conv_features, all_conv_data, all_search_data,
     runs a two-pass forward selection:
       Pass 1: greedy on the first metric until exhausted
       Pass 2: continue from that set, accepting features that improve the second metric
+
+    If log_path is provided, appends JSONL records per step for live monitoring.
     """
     if candidates is None:
         candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
@@ -1494,44 +1576,61 @@ def select_forward_stepwise(all_conv_features, all_conv_data, all_search_data,
     else:
         passes = [(metric, metric)]
 
-    print(f"\n{'=' * 60}")
-    print("Forward Stepwise Selection")
-    print(f"{'=' * 60}")
+    log_file = open(log_path, "a") if log_path else None
+
+    def _log(msg, record=None):
+        print(msg, flush=True)
+        if log_file and record:
+            import json as _json
+            log_file.write(_json.dumps(record) + "\n")
+            log_file.flush()
+
+    _log(f"\n{'=' * 60}")
+    _log(f"Forward Stepwise Selection (random_state={random_state})")
+    _log(f"{'=' * 60}")
     if union_metrics:
-        print(f"Two-pass: {union_metrics[0]} primary, then {union_metrics[1]} additions")
+        _log(f"Two-pass: {union_metrics[0]} primary, then {union_metrics[1]} additions")
     else:
-        print(f"Metric: {metric}")
+        _log(f"Metric: {metric}")
     if selected:
-        print(f"Seed: {[FEATURE_NAMES[i] for i in selected]}")
+        _log(f"Seed: {[FEATURE_NAMES[i] for i in selected]}")
         for _, m in passes:
             s = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                          selected, n_estimators, metric=m)
-            print(f"  Seed {m}: {s:.4f}")
-    print(f"Candidate pool: {len(remaining)} features")
+                          selected, n_estimators, metric=m,
+                          random_state=random_state)
+            _log(f"  Seed {m}: {s:.4f}")
+    _log(f"Candidate pool: {len(remaining)} features")
 
     step = 0
     for pass_idx, (pass_metric, _) in enumerate(passes):
         best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                               selected, n_estimators, metric=pass_metric) if selected else 0.0
+                               selected, n_estimators, metric=pass_metric,
+                               random_state=random_state) if selected else 0.0
         if union_metrics:
             pass_label = "Primary" if pass_idx == 0 else "Secondary"
-            print(f"\n  --- {pass_label} pass: {pass_metric} ---")
+            _log(f"\n  --- {pass_label} pass: {pass_metric} ---")
 
         while remaining:
             step += 1
             best_feat = None
             best_new_score = best_score
 
+            # Evaluate all candidates, log each trial
+            trial_scores = []
             for feat in remaining:
                 trial = selected + [feat]
                 score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                                  trial, n_estimators, metric=pass_metric)
+                                  trial, n_estimators, metric=pass_metric,
+                                  random_state=random_state)
+                trial_scores.append((feat, score))
                 if score > best_new_score:
                     best_new_score = score
                     best_feat = feat
 
             if best_feat is None:
-                print(f"  Step {step}: no improvement on {pass_metric}, stopping")
+                _log(f"  Step {step}: no improvement on {pass_metric}, stopping",
+                     {"step": step, "action": "stop", "metric": pass_metric,
+                      "random_state": random_state})
                 break
 
             delta = best_new_score - best_score
@@ -1539,34 +1638,63 @@ def select_forward_stepwise(all_conv_features, all_conv_data, all_search_data,
             remaining.remove(best_feat)
             best_score = best_new_score
             history.append((best_feat, best_score, delta, pass_metric))
-            print(f"  Step {step}: +{FEATURE_NAMES[best_feat]:25s} {pass_metric}={best_score:.4f} (+{delta:.4f})")
+
+            # Sort trials by score descending for the log
+            trial_scores.sort(key=lambda x: -x[1])
+            top3 = [(FEATURE_NAMES[f], round(s, 6)) for f, s in trial_scores[:3]]
+
+            _log(f"  Step {step}: +{FEATURE_NAMES[best_feat]:25s} {pass_metric}={best_score:.4f} (+{delta:.4f})",
+                 {"step": step, "action": "add", "feature": FEATURE_NAMES[best_feat],
+                  "feature_idx": best_feat, "score": round(best_score, 6),
+                  "delta": round(delta, 6), "metric": pass_metric,
+                  "random_state": random_state, "selected_count": len(selected),
+                  "top3_candidates": top3})
 
     # Print final scores for all tracked metrics
     final_metrics = list(dict.fromkeys(m for _, m in passes))
-    print(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
+    _log(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
     for m in final_metrics:
         s = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                      selected, n_estimators, metric=m)
-        print(f"  {m}: {s:.4f}")
+                      selected, n_estimators, metric=m,
+                      random_state=random_state)
+        _log(f"  {m}: {s:.4f}",
+             {"action": "final", "metric": m, "score": round(s, 6),
+              "random_state": random_state,
+              "features": [FEATURE_NAMES[i] for i in selected]})
+
+    if log_file:
+        log_file.close()
+
     return selected, history
 
 
 def select_backward_elimination(all_conv_features, all_conv_data, all_search_data,
-                                candidates=None, n_estimators=500, metric="ndcg@10"):
+                                candidates=None, n_estimators=500, metric="ndcg@10",
+                                random_state=42, log_path=None):
     """Greedy backward elimination: remove the feature whose removal hurts least."""
     if candidates is None:
         candidates = [i for i in range(NUM_FEATURES) if i not in _DEAD_FEATURES]
 
     selected = list(candidates)
     best_score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                           selected, n_estimators, metric=metric)
+                           selected, n_estimators, metric=metric,
+                           random_state=random_state)
     history = []
 
-    print(f"\n{'=' * 60}")
-    print("Backward Elimination")
-    print(f"{'=' * 60}")
-    print(f"Metric: {metric}")
-    print(f"Starting with {len(selected)} features, {metric}={best_score:.4f}")
+    log_file = open(log_path, "a") if log_path else None
+
+    def _log(msg, record=None):
+        print(msg, flush=True)
+        if log_file and record:
+            import json as _json
+            log_file.write(_json.dumps(record) + "\n")
+            log_file.flush()
+
+    _log(f"\n{'=' * 60}")
+    _log(f"Backward Elimination (random_state={random_state})")
+    _log(f"{'=' * 60}")
+    _log(f"Metric: {metric}")
+    _log(f"Starting with {len(selected)} features, {metric}={best_score:.4f}")
 
     step = 0
     while len(selected) > 1:
@@ -1577,23 +1705,37 @@ def select_backward_elimination(all_conv_features, all_conv_data, all_search_dat
         for feat in selected:
             trial = [f for f in selected if f != feat]
             score = _cv_score(all_conv_features, all_conv_data, all_search_data,
-                              trial, n_estimators, metric=metric)
+                              trial, n_estimators, metric=metric,
+                              random_state=random_state)
             if score > best_new_score:
                 best_new_score = score
                 best_drop = feat
 
         if best_new_score < best_score:
-            print(f"  Step {step}: any removal hurts, stopping")
+            _log(f"  Step {step}: any removal hurts, stopping",
+                 {"step": step, "action": "stop", "metric": metric,
+                  "random_state": random_state})
             break
 
         delta = best_new_score - best_score
         selected.remove(best_drop)
         best_score = best_new_score
         history.append((best_drop, best_score, delta))
-        print(f"  Step {step}: -{FEATURE_NAMES[best_drop]:25s} {metric}={best_score:.4f} ({delta:+.4f})")
+        _log(f"  Step {step}: -{FEATURE_NAMES[best_drop]:25s} {metric}={best_score:.4f} ({delta:+.4f})",
+             {"step": step, "action": "remove", "feature": FEATURE_NAMES[best_drop],
+              "feature_idx": best_drop, "score": round(best_score, 6),
+              "delta": round(delta, 6), "metric": metric,
+              "random_state": random_state, "remaining_count": len(selected)})
 
-    print(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}")
-    print(f"Final {metric}: {best_score:.4f}")
+    _log(f"\nFinal set ({len(selected)}): {[FEATURE_NAMES[i] for i in selected]}",
+         {"action": "final", "metric": metric, "score": round(best_score, 6),
+          "random_state": random_state,
+          "features": [FEATURE_NAMES[i] for i in selected]})
+    _log(f"Final {metric}: {best_score:.4f}")
+
+    if log_file:
+        log_file.close()
+
     return selected, history
 
 
@@ -1831,10 +1973,29 @@ def main():
                         help="Number of phase 1 seeds for phase 2 expansion (default: 10)")
     parser.add_argument("--shap-by-phase", action="store_true",
                         help="Decompose SHAP contributions by phase (requires --two-phase extraction)")
+    parser.add_argument("--random-seeds", type=int, nargs="+",
+                        help="Run CV with multiple random seeds to check variance (e.g. --random-seeds 42 123 456 789 0)")
+    parser.add_argument("--synthetic-coverage", type=str, default=None,
+                        help="Path to synthetic_coverage.json for L5b training (include synthetics with coverage-based labels)")
 
     args = parser.parse_args()
 
     t_start = time.time()
+
+    # Load synthetic coverage table if provided
+    _synth_coverage = None
+    if args.synthetic_coverage:
+        cov_path = Path(args.synthetic_coverage)
+        if not cov_path.exists():
+            print(f"ERROR: Synthetic coverage file not found: {cov_path}")
+            sys.exit(1)
+        _synth_coverage = json.loads(cov_path.read_text())
+        n_with_coverage = sum(
+            1 for qcov in _synth_coverage.values()
+            for turns in qcov.values() if turns
+        )
+        print(f"Loaded synthetic coverage: {len(_synth_coverage)} questions, "
+              f"{n_with_coverage} synthetics with evidence coverage")
 
     # Determine feature indices
     if args.feature_names:
@@ -1920,7 +2081,8 @@ def main():
 
             feature_data = extract_features(conv_data, search_data,
                                             two_phase=args.two_phase,
-                                            n_seeds=args.n_seeds)
+                                            n_seeds=args.n_seeds,
+                                            synthetic_coverage=_synth_coverage)
             n_pos = np.sum(feature_data["labels"] > 0)
             print(f"  Features: {feature_data['features'].shape[0]} pairs, "
                   f"{n_pos} positive ({100*n_pos/max(len(feature_data['labels']),1):.1f}%)")
@@ -1986,16 +2148,41 @@ def main():
                             return
                         seed_indices.append(FEATURE_NAMES.index(name))
                 union = ["r@10", "ndcg@10"] if args.select_union else None
-                select_forward_stepwise(all_conv_features, all_conv_data,
-                                        all_search_data, n_estimators=args.n_estimators,
-                                        seed=seed_indices, metric=args.select_metric,
-                                        union_metrics=union)
+                random_seeds = args.random_seeds or [42]
+                log_base = BENCHMARK_DIR / "forward_select"
+                for rs in random_seeds:
+                    log_path = f"{log_base}_rs{rs}.jsonl"
+                    selected, _ = select_forward_stepwise(
+                        all_conv_features, all_conv_data,
+                        all_search_data, n_estimators=args.n_estimators,
+                        seed=seed_indices, metric=args.select_metric,
+                        union_metrics=union, random_state=rs,
+                        log_path=log_path)
+                    print(f"\n  Log saved to {log_path}")
+
+                    # Auto-chain backward prune on the forward result
+                    # Use primary forward metric (first in union, or --select-metric)
+                    bw_metric = union[0] if union else args.select_metric
+                    if len(selected) > 1:
+                        print(f"\n  Chaining backward elimination on {len(selected)} features (rs={rs}), metric={bw_metric}...")
+                        bw_log_path = f"{log_base}_backward_rs{rs}.jsonl"
+                        select_backward_elimination(
+                            all_conv_features, all_conv_data,
+                            all_search_data, candidates=selected,
+                            n_estimators=args.n_estimators,
+                            metric=bw_metric,
+                            random_state=rs, log_path=bw_log_path)
+                        print(f"  Backward log saved to {bw_log_path}")
             elif method == "backward":
                 backward_candidates = feature_indices if args.feature_names else None
-                select_backward_elimination(all_conv_features, all_conv_data,
-                                            all_search_data, candidates=backward_candidates,
-                                            n_estimators=args.n_estimators,
-                                            metric=args.select_metric)
+                random_seeds_bw = args.random_seeds or [42]
+                for rs in random_seeds_bw:
+                    bw_log = f"{BENCHMARK_DIR / 'backward_select'}_rs{rs}.jsonl"
+                    select_backward_elimination(all_conv_features, all_conv_data,
+                                                all_search_data, candidates=backward_candidates,
+                                                n_estimators=args.n_estimators,
+                                                metric=args.select_metric,
+                                                random_state=rs, log_path=bw_log)
             elif method == "permutation":
                 select_permutation_importance(all_conv_features, all_conv_data,
                                               all_search_data, n_estimators=args.n_estimators)
@@ -2042,6 +2229,21 @@ def main():
             all_indices, args.n_estimators,
         )
         print_importance_table(full_importances, all_indices)
+
+    elif args.random_seeds:
+        # Multi-seed variance check
+        print(f"\nTraining with features: {[FEATURE_NAMES[i] for i in feature_indices]}")
+        print(f"Random seeds: {args.random_seeds}")
+        for seed in args.random_seeds:
+            print(f"\n--- Seed {seed} ---")
+            metrics, importances = train_cv(
+                all_conv_features, all_conv_data, all_search_data,
+                feature_indices, args.n_estimators, random_state=seed,
+            )
+            summary = summarize_metrics(metrics, f"seed_{seed}")
+            all_results.append(summary)
+        # Print importance from last seed
+        print_importance_table(importances, feature_indices)
 
     else:
         # Single training run with specified features

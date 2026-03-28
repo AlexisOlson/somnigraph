@@ -1,0 +1,2019 @@
+{
+  "entities": [
+    {
+      "name": "Deborah",
+      "aliases": ["Deb", "Debs"],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Jolene",
+      "aliases": [],
+      "type": "person",
+      "grounding": null
+    },
+    {
+      "name": "Anna",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Deborah's neighbor, met at yoga in the park"
+    },
+    {
+      "name": "Karlie",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Deborah's friend who passed away"
+    },
+    {
+      "name": "Susie",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Jolene's first pet snake, adopted two years ago"
+    },
+    {
+      "name": "Seraphim",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Jolene's second pet snake, bought in Paris"
+    },
+    {
+      "name": "Luna",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Deborah's cat, adopted from a shelter, 5 years old"
+    },
+    {
+      "name": "Max",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Deborah's cat, inherited from her deceased mother, 8 years old"
+    },
+    {
+      "name": "Bali",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Island in Indonesia"
+    },
+    {
+      "name": "Bogota",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Capital city of Colombia"
+    },
+    {
+      "name": "Rio de Janeiro",
+      "aliases": [],
+      "type": "place",
+      "grounding": "City in Brazil"
+    },
+    {
+      "name": "Phuket",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Island province in Thailand"
+    },
+    {
+      "name": "Mount Talkeetna",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Mountain location where Jolene did yoga"
+    },
+    {
+      "name": "Paris",
+      "aliases": [],
+      "type": "place",
+      "grounding": "Capital city of France"
+    },
+    {
+      "name": "Sapiens",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Nonfiction book about human history by Yuval Noah Harari"
+    },
+    {
+      "name": "Avalanche",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Book by Neal Stephenson that Jolene read in one sitting"
+    },
+    {
+      "name": "Neal Stephenson",
+      "aliases": [],
+      "type": "person",
+      "grounding": "American author, wrote Avalanche"
+    },
+    {
+      "name": "Detroit",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Console video game played by Jolene and her partner"
+    },
+    {
+      "name": "Walking Dead",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Video game Jolene and partner planned to play"
+    },
+    {
+      "name": "It Takes Two",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Co-op team-strategy video game, Jolene and partner's favorite"
+    },
+    {
+      "name": "Zelda BOTW",
+      "aliases": ["Zelda Breath of the Wild"],
+      "type": "thing",
+      "grounding": "Open-world video game for Nintendo Switch"
+    },
+    {
+      "name": "Animal Crossing: New Horizons",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Calming simulation video game for Nintendo Switch"
+    },
+    {
+      "name": "Overcooked 2",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Co-op cooking video game"
+    },
+    {
+      "name": "Monster Hunter: World",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Open-world action video game"
+    },
+    {
+      "name": "Battlefield 1",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Console video game given to Jolene and partner"
+    },
+    {
+      "name": "Nils Frahm",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Musician; calming instrumental music for yoga"
+    },
+    {
+      "name": "Olafur Arnalds",
+      "aliases": [],
+      "type": "person",
+      "grounding": "Musician; calming instrumental music for yoga"
+    },
+    {
+      "name": "Savana",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Instrumental music track Deborah uses during yoga"
+    },
+    {
+      "name": "Sleep",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Music album Deborah recommends for meditation and deep relaxation"
+    },
+    {
+      "name": "Eisenhower Matrix",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Time management method that sorts tasks by urgency and importance"
+    },
+    {
+      "name": "Pomodoro Technique",
+      "aliases": [],
+      "type": "thing",
+      "grounding": "Time management method using 25-minute work intervals with 5-minute breaks"
+    }
+  ],
+  "claims": [
+    {
+      "subject": "Deborah",
+      "relation": "has_skill",
+      "object": "teaches yoga classes to community and neighbors",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 2, 3, 4, 7, 8, 9, 13, 14, 15, 18]},
+      "evidence_turn_ids": ["D1:13", "D2:9", "D3:6", "D4:12", "D7:18", "D9:3", "D9:5", "D13:22", "D15:11", "D18:8"],
+      "retrieval_text": "Deborah teaches yoga. Deborah is a yoga instructor who teaches classes in the park and neighborhood. She is passionate about sharing yoga with the community."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "mother passed away a few years ago",
+      "attributed_to": "Deborah",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [1]},
+      "evidence_turn_ids": ["D1:5", "D1:7", "D2:13"],
+      "retrieval_text": "Deborah's mother passed away. Deborah visits her mother's old house and sits on a special bench by the window to feel connected to her."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "father passed away on January 25, 2023",
+      "attributed_to": "Deborah",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [2]},
+      "evidence_turn_ids": ["D2:1"],
+      "retrieval_text": "Deborah's father died suddenly two days before January 27, 2023. His sudden death left the family shell-shocked."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_trait",
+      "object": "finds peace and comfort in nature and memories",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "strong_inference",
+      "time_scope": {"type": "stable", "sessions": [1, 2, 4, 6, 7, 15, 19, 20, 29, 30]},
+      "evidence_turn_ids": ["D1:7", "D2:15", "D4:32", "D4:34", "D6:10", "D7:16", "D15:29", "D19:17", "D20:12", "D30:13"],
+      "retrieval_text": "Deborah finds peace in nature and memories. She visits her mother's house, sits on the bench, goes to parks, beaches, and gardens to find comfort and reflect."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_trait",
+      "object": "married, values love and openness in relationship",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2, 19, 23, 28]},
+      "evidence_turn_ids": ["D2:5", "D2:7", "D19:11", "D23:4", "D28:11"],
+      "retrieval_text": "Deborah is married. Her husband appears in photos. They value love and openness. She got married on a beach. They play detective games together."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "parents married in 1993",
+      "attributed_to": "Deborah",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [2]},
+      "evidence_turn_ids": ["D2:3"],
+      "retrieval_text": "Deborah's parents' wedding was in 1993. She looked at the family album after her father's death."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_trait",
+      "object": "has a pendant/amulet from her mother",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 4]},
+      "evidence_turn_ids": ["D1:9", "D4:36"],
+      "retrieval_text": "Deborah has a pendant or amulet from her mother. She brings it when visiting reflective spots. It provides comfort and connection to her late mother."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "friend Karlie passed away, last hiked together",
+      "attributed_to": "Deborah",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [6]},
+      "evidence_turn_ids": ["D6:4", "D6:8"],
+      "retrieval_text": "Deborah lost her friend Karlie. Their last photo was from a hike the previous summer. Deborah spent time in a garden with roses and dahlias for comfort."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "traveled to Bali for yoga last year",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [6]},
+      "evidence_turn_ids": ["D6:10"],
+      "retrieval_text": "Deborah visited Bali last year and did yoga on the beach. She described it as gorgeous and peaceful."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "visited Rio de Janeiro three years ago",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [23]},
+      "evidence_turn_ids": ["D23:18"],
+      "retrieval_text": "Deborah visited Rio de Janeiro three years ago and took photos on excursions."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_preference",
+      "object": "likes cats, does not like dogs",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [15, 22]},
+      "evidence_turn_ids": ["D15:25", "D22:19", "D22:27"],
+      "retrieval_text": "Deborah likes cats and does not like dogs. She has two cats: Luna (5 years old, from shelter) and Max (8 years old, inherited from her mother)."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_trait",
+      "object": "daily routine includes meditation, yoga, teaching, jogging, evening family time",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [7]},
+      "evidence_turn_ids": ["D7:18", "D7:20"],
+      "retrieval_text": "Deborah's daily routine: morning meditation, yoga, teaching classes, started jogging in the park. Evenings spent with loved ones. Exercise connects her to her body."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "started running group with Anna",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [15]},
+      "evidence_turn_ids": ["D15:1", "D15:3"],
+      "retrieval_text": "Deborah started a running group with her neighbor Anna. They support and motivate each other during runs."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "organized community cleanup fundraiser",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [16]},
+      "evidence_turn_ids": ["D16:1"],
+      "retrieval_text": "Deborah started a community cleanup project and raised funds for it."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "ran free gardening class for community with neighbor",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [29]},
+      "evidence_turn_ids": ["D29:1"],
+      "retrieval_text": "Deborah and her neighbor ran a free gardening class for the community. People of all ages participated."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "got married on a beach, discovered surfing there",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [28]},
+      "evidence_turn_ids": ["D28:11"],
+      "retrieval_text": "Deborah got married on a beach. That same beach is where she discovered her love for surfing."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_skill",
+      "object": "surfs and does yoga on the beach",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [28, 29]},
+      "evidence_turn_ids": ["D28:11", "D28:15", "D29:25"],
+      "retrieval_text": "Deborah surfs and does yoga on the beach. She loves the ocean, sand, and fresh air."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_preference",
+      "object": "plays detective games with husband",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [19]},
+      "evidence_turn_ids": ["D19:13"],
+      "retrieval_text": "Deborah and her husband prefer to play detective games together."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "mother loved reading, travel, cooking, art, and flowers",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [2, 12, 20, 29]},
+      "evidence_turn_ids": ["D2:17", "D2:19", "D12:3", "D20:6", "D29:7"],
+      "retrieval_text": "Deborah's mother loved reading by the window at night, traveling, cooking (especially pineapple birthday cakes), art, and flowers. She appreciated simple things."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "mother's old house has special bench by window",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 2, 4, 19, 23, 29]},
+      "evidence_turn_ids": ["D1:7", "D2:13", "D2:17", "D4:34", "D19:17", "D19:19", "D23:4", "D29:5"],
+      "retrieval_text": "Deborah's mother's old house has a special bench by the window. Deborah visits regularly to sit there, do yoga, and feel connected to her mother. There is also a bench/spot by the water nearby."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "attended music festival with friends",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:1"],
+      "retrieval_text": "Deborah attended a music festival with friends. The music reminded her of her mother's soothing lullabies."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_preference",
+      "object": "vegan; Anna brought her vegan stir-fry",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "weak_inference",
+      "time_scope": {"type": "session", "sessions": [8]},
+      "evidence_turn_ids": ["D8:1"],
+      "retrieval_text": "Anna got Deborah a vegan stir-fry with tofu, vegetables, ginger, and soy sauce. Deborah called it tasty."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "created meditation guide for yoga retreat",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [17]},
+      "evidence_turn_ids": ["D17:1"],
+      "retrieval_text": "Deborah made a meditation guide for her yoga retreat."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "led meditation yoga session for elderly at care home",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [18]},
+      "evidence_turn_ids": ["D18:8"],
+      "retrieval_text": "Deborah led a meditation yoga session for the elderly at a local care home during sunset."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "yoga retreat near mom's place, life-changing",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [21]},
+      "evidence_turn_ids": ["D21:1"],
+      "retrieval_text": "Deborah went to a yoga retreat near her mother's place. She described it as life-changing, connecting with nature and herself."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "storm cancelled yoga getaway",
+      "attributed_to": "Deborah",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [26]},
+      "evidence_turn_ids": ["D26:1"],
+      "retrieval_text": "A storm forced Deborah to cancel her yoga getaway. She was bummed but found comfort in work and home."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "reconnected with mother's old friends, heard new stories",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [28]},
+      "evidence_turn_ids": ["D28:1", "D28:3", "D28:5"],
+      "retrieval_text": "Deborah reconnected with her mother's old friends. They shared stories and looked through photos. It was emotional but comforting."
+    },
+    {
+      "subject": "Anna",
+      "relation": "has_trait",
+      "object": "wears pendant in memory of her mother",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:40"],
+      "retrieval_text": "Anna has a pendant she wears in memory of her mother, which brought her and Deborah closer."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_skill",
+      "object": "electrical engineering student",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1, 3, 4, 5, 9, 11, 13, 17, 22]},
+      "evidence_turn_ids": ["D1:2", "D3:1", "D4:3", "D4:5", "D5:5", "D9:14", "D13:5", "D17:10", "D22:6"],
+      "retrieval_text": "Jolene is an electrical engineering student. She works on robotics projects, built a sustainable water purifier, and designs aerial surveillance prototypes."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "mother passed away last year (before Jan 2023)",
+      "attributed_to": "Jolene",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [1]},
+      "evidence_turn_ids": ["D1:6"],
+      "retrieval_text": "Jolene's mother also passed away last year. She has memories of her mother's house and room."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_trait",
+      "object": "has pendant from mother, given in Paris in 2010, symbolizes freedom",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [1]},
+      "evidence_turn_ids": ["D1:8", "D1:10"],
+      "retrieval_text": "Jolene has a pendant from her mother given in 2010 in Paris. It has a symbol representing freedom. It reminds her to pursue her goals."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_trait",
+      "object": "owns two pet snakes: Susie and Seraphim",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2, 8, 14, 15, 16, 22, 28]},
+      "evidence_turn_ids": ["D2:20", "D2:22", "D8:8", "D14:4", "D15:18", "D16:4", "D16:6", "D22:17", "D28:26"],
+      "retrieval_text": "Jolene has two pet snakes: Susie (adopted two years ago when feeling lonely) and Seraphim (bought in Paris a year ago). They bring her comfort and calm."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "loves playing video games, learned as a child",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2, 3, 12, 15, 19, 24]},
+      "evidence_turn_ids": ["D2:26", "D2:28", "D3:11", "D12:6", "D15:6", "D19:6", "D24:6"],
+      "retrieval_text": "Jolene loves video games. She learned to play on her own as a child. Her parents got her first console at age 10. She plays with her partner regularly."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_trait",
+      "object": "has boyfriend/partner, together 3 years, met in engineering class",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [2, 7]},
+      "evidence_turn_ids": ["D2:26", "D7:7", "D7:9"],
+      "retrieval_text": "Jolene has a boyfriend/partner. They have been together for three years and met in an engineering class in college. They are not married."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "built sustainable water purifier for rural community",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:5", "D4:7"],
+      "retrieval_text": "Jolene designed and built a sustainable water purifier for a rural community in need. Seeing it provide clean water was incredibly satisfying."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_goal",
+      "object": "use engineering to make positive impact on communities in need",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [4, 5, 22]},
+      "evidence_turn_ids": ["D4:9", "D5:7", "D22:6", "D22:8", "D22:10", "D22:12"],
+      "retrieval_text": "Jolene wants to use engineering to make a positive impact. She is interested in green tech, renewable energy (solar), clean water access, and sustainable solutions for disadvantaged areas."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_goal",
+      "object": "volunteer program teaching STEM to underprivileged kids",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [5]},
+      "evidence_turn_ids": ["D5:7", "D5:9"],
+      "retrieval_text": "Jolene proposed a volunteer program where engineers teach STEM to underprivileged kids. She planned to partner with local schools and invite guest speakers."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "did mini retreat to assess life progress",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [5]},
+      "evidence_turn_ids": ["D5:1", "D5:3"],
+      "retrieval_text": "Jolene did a mini retreat last Wednesday to assess where she is in life. It gave her a new outlook and confidence boost."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "favorite food is lasagna",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [8]},
+      "evidence_turn_ids": ["D8:2"],
+      "retrieval_text": "Jolene's favorite comfort food is lasagna."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "uses Pomodoro Technique for time management",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [10]},
+      "evidence_turn_ids": ["D10:4"],
+      "retrieval_text": "Jolene uses the Pomodoro Technique (25 minutes work, 5-minute break) to avoid burnout while studying."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "interning at well-known engineering firm",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:5", "D13:7"],
+      "retrieval_text": "Jolene started interning at a well-known engineering firm. She applies what she learned in school to real projects."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "practiced yoga sporadically for about 3 years",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [13, 20]},
+      "evidence_turn_ids": ["D13:17", "D20:21"],
+      "retrieval_text": "Jolene has been doing yoga sporadically for about 3 years. It helps her escape studying and work stress."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "favorite yoga pose is savasana (corpse pose)",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [20]},
+      "evidence_turn_ids": ["D20:19"],
+      "retrieval_text": "Jolene's favorite yoga pose is savasana (corpse pose). She finds it calming and it helps her let go."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "lost work files, major setback on project",
+      "attributed_to": "Jolene",
+      "polarity": "negative",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [16, 17]},
+      "evidence_turn_ids": ["D16:2", "D17:2"],
+      "retrieval_text": "Jolene had a huge setback when her project crashed and she lost all her work files. It was frustrating and depressing. Meditation helped her cope."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "designed notebooks inspired by space and engines",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [17]},
+      "evidence_turn_ids": ["D17:6"],
+      "retrieval_text": "Jolene designed creative notebooks with elements like galaxies and circuitry, inspired by her love for space and engines."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "working on aerial surveillance prototype",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [17]},
+      "evidence_turn_ids": ["D17:10", "D17:12"],
+      "retrieval_text": "Jolene is working on a prototype to revolutionize aerial surveillance. It aims to be more productive and affordable for emergency response and environmental monitoring."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "started using bullet journal for time management",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [18]},
+      "evidence_turn_ids": ["D18:3", "D18:5"],
+      "retrieval_text": "Jolene started using a bullet journal for tracking tasks and staying organized. She finds crossing off tasks satisfying."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "bought console for partner as gift on August 17",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:2"],
+      "retrieval_text": "Jolene bought a console for her partner as a gift on August 17th."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "recommends Zelda BOTW, Animal Crossing, Overcooked 2",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:8", "D19:10"],
+      "retrieval_text": "Jolene recommends Zelda BOTW for Switch, Animal Crossing: New Horizons, and Overcooked 2 as a co-op game. She once won three large pizzas playing Overcooked 2 with her partner."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "parents got her first gaming console at age 10",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [24]},
+      "evidence_turn_ids": ["D24:6"],
+      "retrieval_text": "Jolene's parents got her a gaming console when she was 10, starting her passion for video games."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "favorite game with mom was Monster Hunter: World",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [24]},
+      "evidence_turn_ids": ["D24:10"],
+      "retrieval_text": "Jolene's favorite game to play with her mom was Monster Hunter: World. She loved the immersive story and open-world gaming."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "presented at virtual conference, received positive feedback",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [21]},
+      "evidence_turn_ids": ["D21:6", "D21:8"],
+      "retrieval_text": "Jolene presented at a virtual conference and received positive feedback. It confirmed she is on the right track with her engineering career."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "partner's mother also deceased, values perseverance",
+      "attributed_to": "Jolene",
+      "polarity": "neutral",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [22]},
+      "evidence_turn_ids": ["D22:4"],
+      "retrieval_text": "Jolene's partner's dad taught determination. Jolene's mom taught her to never give up. Their loved ones' values guide them in pursuing goals."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "traveled to Rio de Janeiro with partner for yoga classes",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [23]},
+      "evidence_turn_ids": ["D23:1", "D23:3", "D23:15", "D23:17"],
+      "retrieval_text": "Jolene and her partner traveled to Rio de Janeiro and took yoga classes. They visited cafes, old temples, and went on excursions."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "signed up for meditation course at retreat near lake",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [25]},
+      "evidence_turn_ids": ["D25:1"],
+      "retrieval_text": "Jolene signed up for a meditation course at a retreat near a lake with her partner."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "meditation retreat in Phuket for a few weeks with partner",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [27]},
+      "evidence_turn_ids": ["D27:1", "D27:3", "D27:5"],
+      "retrieval_text": "Jolene and her partner traveled to a meditation retreat in Phuket for a few weeks. Key insight: releasing expectations and savoring the present."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "tried scuba diving with partner, found cool dive spot",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [29]},
+      "evidence_turn_ids": ["D29:4"],
+      "retrieval_text": "Jolene and her partner tried a scuba diving lesson last Friday and found a cool dive spot to explore together."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "uses lavender and rosemary scents for yoga ambience",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [11, 28]},
+      "evidence_turn_ids": ["D11:5", "D28:18"],
+      "retrieval_text": "Jolene creates serene yoga spaces with soothing scents like lavender and rosemary. She uses essential oils and soft music."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "listens to Nils Frahm and Olafur Arnalds during yoga",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [11]},
+      "evidence_turn_ids": ["D11:9"],
+      "retrieval_text": "Jolene listens to Nils Frahm and Olafur Arnalds during yoga practice. She finds their music calming."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "reads Sapiens and Avalanche by Neal Stephenson",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:21", "D4:23"],
+      "retrieval_text": "Jolene is reading Sapiens about human history and technology. She read Avalanche by Neal Stephenson in one sitting two weeks prior."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "vacationed in Bogota last summer",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [4]},
+      "evidence_turn_ids": ["D4:33"],
+      "retrieval_text": "Jolene took a vacation to Bogota last summer and photographed a beautiful sunset over the water."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_goal",
+      "object": "wants to learn surfing",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [10, 29]},
+      "evidence_turn_ids": ["D10:18", "D10:20", "D29:30"],
+      "retrieval_text": "Jolene wants to learn surfing. She has been gathering information, watching videos, and got a beginner's guide. She plans to try it with Deborah."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "planning camping trip with partner for yoga in nature",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [26]},
+      "evidence_turn_ids": ["D26:4"],
+      "retrieval_text": "Jolene and her partner plan a camping trip to connect with nature and practice yoga."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_preference",
+      "object": "favorite cookie is chocolate chip butter cookies",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [29]},
+      "evidence_turn_ids": ["D29:14"],
+      "retrieval_text": "Jolene's favorite cookie to bake is warm gooey chocolate with soft buttery cookie."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_trait",
+      "object": "struggles with stress and time management during studies",
+      "attributed_to": "Jolene",
+      "polarity": "negative",
+      "status": "strong_inference",
+      "time_scope": {"type": "recurring", "sessions": [8, 9, 10, 13, 14, 18, 24, 25]},
+      "evidence_turn_ids": ["D8:14", "D8:16", "D9:14", "D10:2", "D10:4", "D13:13", "D14:10", "D18:1", "D24:14", "D25:7"],
+      "retrieval_text": "Jolene repeatedly struggles with stress and time management during engineering studies. She feels overwhelmed by exams, deadlines, and balancing work with self-care."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "yoga on top of Mount Talkeetna",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [13]},
+      "evidence_turn_ids": ["D13:15"],
+      "retrieval_text": "Jolene did yoga on top of Mount Talkeetna one morning during her internship."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "tried meditation with flowers in Thailand",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [28]},
+      "evidence_turn_ids": ["D28:16"],
+      "retrieval_text": "Jolene tried a new style of meditation with flowers in Thailand."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "attended music festival with partner last year",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:2"],
+      "retrieval_text": "Jolene and her partner attended a music festival last year."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "yoga retreat with partner, sunrise yoga with amazing views",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [30]},
+      "evidence_turn_ids": ["D30:4", "D30:6"],
+      "retrieval_text": "Jolene and partner went on a yoga retreat. They did sunrise yoga with amazing sky colors and views of nature."
+    },
+    {
+      "subject": "Jolene",
+      "relation": "has_experience",
+      "object": "got a new plant as reminder to nurture herself",
+      "attributed_to": "Jolene",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [23]},
+      "evidence_turn_ids": ["D23:27", "D23:29"],
+      "retrieval_text": "Jolene got a new plant as a reminder to nurture herself and embrace fresh starts."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "biked with neighbor and attended art show",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [12]},
+      "evidence_turn_ids": ["D12:1", "D12:3"],
+      "retrieval_text": "Deborah went biking nearby with her neighbor and attended an art show that reminded her of her mother, who was interested in art."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_preference",
+      "object": "favorite park has forest trail and beach nearby",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [4, 19]},
+      "evidence_turn_ids": ["D4:32", "D19:17"],
+      "retrieval_text": "Deborah's favorite nature spot is a park with a forest trail and a nearby beach. She also loves a spot by the water near her mom's old house."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_preference",
+      "object": "likes instrumental music track Savana and album Sleep for yoga",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "stable", "sessions": [11]},
+      "evidence_turn_ids": ["D11:8", "D11:10"],
+      "retrieval_text": "Deborah listens to Savana (instrumental track with mellow melodies) and an album called Sleep for meditation and deep relaxation during yoga."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "told Anna her life story, meaningful connection",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:1"],
+      "retrieval_text": "Deborah told Anna the story of her life last Friday. Anna was kind about it, creating a meaningful connection."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "organized yoga event with local businesses, food stalls, live music",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [19]},
+      "evidence_turn_ids": ["D19:3", "D19:5"],
+      "retrieval_text": "Deborah organized a yoga event last month with local businesses, food stalls, and live music."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "played card game about cats (unnamed)",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [27]},
+      "evidence_turn_ids": ["D27:12"],
+      "retrieval_text": "Deborah recently played a card game about cats where you draw cards and attack opponents. She wants to play it with Jolene."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "tried Dancer Pose (Natarajasana) and Tree Pose",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [14]},
+      "evidence_turn_ids": ["D14:3", "D14:15"],
+      "retrieval_text": "Deborah tried new yoga poses at her retreat: Dancer Pose (Natarajasana) and Tree Pose."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "mother sang lullabies",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [30]},
+      "evidence_turn_ids": ["D30:1"],
+      "retrieval_text": "Deborah's mother had a soothing voice and sang lullabies to her. Music at a festival reminded her of those memories."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "mother baked pineapple birthday cakes for her as a kid",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [29]},
+      "evidence_turn_ids": ["D29:9"],
+      "retrieval_text": "Deborah's mother baked pineapple birthday cakes for her when she was a kid. It always made her feel special."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "received bouquet from friend during struggling time",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [4]},
+      "evidence_turn_ids": ["D4:28"],
+      "retrieval_text": "Deborah's friend gave her a bouquet when she was struggling. It gives her hope and courage."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "received thank-you letter from yoga group members",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [2]},
+      "evidence_turn_ids": ["D2:9"],
+      "retrieval_text": "Deborah's yoga group members sent her a letter thanking her for her positive influence on them."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "community event to support each other, inspiring",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "session", "sessions": [24]},
+      "evidence_turn_ids": ["D24:1", "D24:3"],
+      "retrieval_text": "Deborah attended a community event to support each other and a community meetup where people shared stories."
+    },
+    {
+      "subject": "Deborah",
+      "relation": "has_experience",
+      "object": "yoga was how she found peace during rough time",
+      "attributed_to": "Deborah",
+      "polarity": "positive",
+      "status": "explicit",
+      "time_scope": {"type": "historical", "sessions": [1]},
+      "evidence_turn_ids": ["D1:15"],
+      "retrieval_text": "Yoga helped Deborah find peace during a rough time, inspiring her to share it with others."
+    }
+  ],
+  "segments": [
+    {
+      "session_number": 1,
+      "turns": ["D1:1", "D1:2", "D1:3", "D1:4", "D1:5", "D1:6", "D1:7", "D1:8", "D1:9", "D1:10", "D1:11"],
+      "topic": "First meeting: introductions, mothers' deaths, pendants, memories",
+      "surface_events": [
+        "Jolene finished an electrical engineering project",
+        "Deborah visited her deceased mother's old house",
+        "Both lost their mothers; Deborah a few years ago, Jolene last year",
+        "Deborah describes special bench by window where mother sat every morning",
+        "Jolene received pendant from mother in 2010 in Paris, symbolizing freedom"
+      ],
+      "categories": ["grief_and_loss", "family", "personal_items", "engineering"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah and Jolene meet for the first time, bond over losing their mothers, share pendant keepsakes, and discuss memories of their mothers' homes.",
+      "retrieval_text": "Deborah and Jolene first meet and discover they both lost their mothers. Deborah visited her mother's old house with a special bench by the window. Jolene finished an electrical engineering project. Jolene's pendant from mother given in Paris 2010 symbolizes freedom. Deborah also has a pendant from her mother.",
+      "bridging_terms": ["mother's house", "pendant", "grief", "loss", "bench", "window", "engineering project", "memories", "Paris"],
+      "latent_concepts": ["bonding through shared grief", "memorial objects", "first impressions", "emotional connection", "physical spaces as memory anchors"]
+    },
+    {
+      "session_number": 1,
+      "turns": ["D1:12", "D1:13", "D1:14", "D1:15", "D1:16", "D1:17", "D1:18"],
+      "topic": "Goals and yoga teaching",
+      "surface_events": [
+        "Deborah's goal is to keep teaching yoga and supporting community",
+        "Yoga helped Deborah find peace during a rough time"
+      ],
+      "categories": ["yoga", "goals", "wellness"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Jolene characterizes Deborah's yoga journey as 'truly inspiring' (evidence: D1:16)"
+      ],
+      "literal_summary": "Deborah shares her goal of teaching yoga and how it helped her through a rough time. Jolene finds it inspiring.",
+      "retrieval_text": "Deborah's goal is to keep teaching yoga and supporting her community. Yoga helped Deborah find peace during a rough time, inspiring her to share it with others. Jolene calls it truly inspiring.",
+      "bridging_terms": ["yoga", "teaching", "community", "peace", "goals", "passion"],
+      "latent_concepts": ["finding purpose through healing", "giving back", "personal transformation"]
+    },
+    {
+      "session_number": 2,
+      "turns": ["D2:1", "D2:2", "D2:3", "D2:4", "D2:5", "D2:6", "D2:7", "D2:8", "D2:9"],
+      "topic": "Deborah's father's death, family album, yoga group letter",
+      "surface_events": [
+        "Deborah's dad passed away two days ago (around Jan 25, 2023)",
+        "Family looked at photo album, parents' wedding was in 1993",
+        "Deborah values love and openness in marriage",
+        "Yoga group sent thank-you letter for Deborah's positive influence"
+      ],
+      "categories": ["grief_and_loss", "family", "marriage", "yoga"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah shares that her father died suddenly. She finds comfort in family photos from her parents' 1993 wedding and receives a touching thank-you letter from yoga group members.",
+      "retrieval_text": "Deborah's father passed away suddenly around January 25, 2023. Family looked at album with parents' 1993 wedding photo. Deborah values love and openness in her marriage. Yoga group members sent thank-you letter appreciating Deborah's positive influence.",
+      "bridging_terms": ["father's death", "family album", "wedding", "1993", "marriage", "yoga group", "thank-you letter", "grief"],
+      "latent_concepts": ["coping through memories", "community appreciation", "continuing legacy", "relationship values"]
+    },
+    {
+      "session_number": 2,
+      "turns": ["D2:10", "D2:11", "D2:12", "D2:13", "D2:14", "D2:15", "D2:16", "D2:17", "D2:18", "D2:19"],
+      "topic": "Deborah's yoga at mother's house, mother's hobbies",
+      "surface_events": [
+        "Deborah does yoga at her mother's old house",
+        "Mother sat by the window every night reading books",
+        "Mother loved travel",
+        "The window spot gives Deborah peace and connection"
+      ],
+      "categories": ["yoga", "family_memories", "hobbies"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah reveals she does yoga at her mother's old house. Her mother loved reading by the window nightly and traveling. The window spot brings peace and a sense of her mother's presence.",
+      "retrieval_text": "Deborah does yoga at her deceased mother's old house. Her mother sat by the window every night reading books with a smile. Mother's hobbies were reading and travel. Deborah feels her mother's presence at the window spot.",
+      "bridging_terms": ["mother's house", "window", "reading", "travel", "hobbies", "yoga location", "peace", "presence"],
+      "latent_concepts": ["sacred spaces", "continuing rituals", "inherited love of place", "memory through habit"]
+    },
+    {
+      "session_number": 2,
+      "turns": ["D2:20", "D2:21", "D2:22", "D2:23", "D2:24", "D2:25", "D2:26", "D2:27", "D2:28", "D2:29", "D2:30", "D2:31", "D2:32"],
+      "topic": "Jolene's pet snakes, video gaming with partner",
+      "surface_events": [
+        "Jolene introduces snake Susie",
+        "Seraphim escaped cage and coiled up during video games",
+        "Seraphim bought a year ago in Paris",
+        "Jolene and partner played Detroit on console",
+        "Both crazy about gaming; Jolene learned as a child",
+        "Planning to play Walking Dead next Saturday"
+      ],
+      "categories": ["pets", "video_games", "relationship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene introduces her snakes Susie and Seraphim. Seraphim was bought in Paris and once escaped during gaming. Jolene and her partner play console games like Detroit and plan to play Walking Dead.",
+      "retrieval_text": "Jolene has two pet snakes: Susie and Seraphim. Seraphim was bought a year ago in Paris and once escaped her cage during video games. Jolene and partner played Detroit on console. They plan to play Walking Dead next Saturday. Jolene learned gaming as a child on her own.",
+      "bridging_terms": ["snakes", "Susie", "Seraphim", "Paris", "video games", "Detroit", "Walking Dead", "console", "partner", "gaming"],
+      "latent_concepts": ["unusual pets as companions", "shared hobbies in relationships", "childhood origins of passions"]
+    },
+    {
+      "session_number": 3,
+      "turns": ["D3:1", "D3:2", "D3:3", "D3:4", "D3:5", "D3:6", "D3:7", "D3:8", "D3:9", "D3:10", "D3:11", "D3:12", "D3:13", "D3:14", "D3:15"],
+      "topic": "Robotics project, meeting neighbor Anna at yoga",
+      "surface_events": [
+        "Jolene's engineering professor assigned huge robotics project",
+        "Jolene enjoys the creative problem-solving",
+        "Deborah met new neighbor Anna at yoga in the park",
+        "They bonded over how yoga improved their lives",
+        "Jolene declines yoga suggestion, plans to game with partner"
+      ],
+      "categories": ["engineering", "yoga", "friendship", "video_games"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene's robotics work as putting 'creative and problem-solving skills to the test' (evidence: D3:2)"
+      ],
+      "literal_summary": "Jolene is working on a challenging robotics project for her engineering class. Deborah met new neighbor Anna at yoga in the park, bonding over yoga's benefits. Jolene prefers gaming with partner over yoga.",
+      "retrieval_text": "Jolene's engineering professor gave a huge robotics project that she finds exciting and challenging. Deborah met neighbor Anna at yoga in the park. They discussed how yoga improved their lives and built community. Jolene declined yoga to game with partner instead.",
+      "bridging_terms": ["robotics", "engineering project", "Anna", "neighbor", "yoga in park", "community", "problem-solving", "gaming"],
+      "latent_concepts": ["academic challenge as growth", "forming new friendships through shared activities", "different priorities in recreation"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:1", "D4:2", "D4:3", "D4:4", "D4:5", "D4:6", "D4:7", "D4:8", "D4:9", "D4:10", "D4:11"],
+      "topic": "Water purifier milestone, career aspirations",
+      "surface_events": [
+        "Jolene had major engineering milestone: designed and built sustainable water purifier for rural community",
+        "Seeing clean water provided was surreal and satisfying",
+        "Jolene wants to keep creating sustainable solutions for communities in need"
+      ],
+      "categories": ["engineering", "social_impact", "goals", "achievement"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene's engineering achievement as 'amazing' and says she 'really made a difference' (evidence: D4:6)"
+      ],
+      "literal_summary": "Jolene designed and built a sustainable water purifier for a rural community. She found it incredibly satisfying and wants to continue making positive impact through engineering.",
+      "retrieval_text": "Jolene designed and built a sustainable water purifier for a rural community in need. Seeing it provide clean water was surreal and satisfying. Jolene aspires to keep creating sustainable solutions for communities. Deborah praises the achievement as making a real difference.",
+      "bridging_terms": ["water purifier", "sustainable", "rural community", "clean water", "engineering milestone", "career goals", "positive impact"],
+      "latent_concepts": ["engineering for social good", "tangible impact of academic work", "purpose-driven career", "milestone achievement"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:12", "D4:13", "D4:14", "D4:15", "D4:16", "D4:17", "D4:18", "D4:19"],
+      "topic": "Yoga with Anna, Warrior II and modified poses",
+      "surface_events": [
+        "Deborah bonded with Anna during yesterday's yoga class",
+        "They tried dance poses including Warrior II",
+        "Deborah explains a modified seated twist pose"
+      ],
+      "categories": ["yoga", "friendship", "wellness"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah bonded with Anna during a yoga class, trying Warrior II and other dance poses. She explains a modified seated twist that relaxes tense muscles.",
+      "retrieval_text": "Deborah and Anna bonded during yoga class trying Warrior II and dance poses. Deborah explains a modified seated twist pose on a chair for relaxing tense muscles. The experience brought Deborah and Anna closer.",
+      "bridging_terms": ["Warrior II", "yoga class", "Anna", "dance poses", "seated twist", "bonding"],
+      "latent_concepts": ["deepening friendship through shared practice", "teaching and sharing knowledge", "physical wellness as social connector"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:19", "D4:20", "D4:21", "D4:22", "D4:23", "D4:24", "D4:25", "D4:26", "D4:27", "D4:28", "D4:29", "D4:30"],
+      "topic": "Books, inspirational stories, bouquet from friend",
+      "surface_events": [
+        "Jolene shows bookshelf; currently reading Sapiens",
+        "Jolene read Avalanche by Neal Stephenson in one sitting two weeks ago",
+        "Jolene read inspirational story about overcoming challenges",
+        "Deborah received bouquet from friend during struggling time; gives hope and courage"
+      ],
+      "categories": ["books", "inspiration", "friendship", "personal_items"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene shares her bookshelf, reading Sapiens and having read Avalanche by Neal Stephenson in one sitting. Deborah shows a bouquet from a friend that gives her hope during hard times.",
+      "retrieval_text": "Jolene is reading Sapiens about human history and technology. She read Avalanche by Neal Stephenson in one sitting two weeks ago. Deborah received a bouquet from a friend when she was struggling. The bouquet gives her hope and courage.",
+      "bridging_terms": ["Sapiens", "Avalanche", "Neal Stephenson", "bookshelf", "reading", "bouquet", "hope", "courage", "inspiration"],
+      "latent_concepts": ["books as intellectual fuel", "small gestures with big impact", "resilience through support"]
+    },
+    {
+      "session_number": 4,
+      "turns": ["D4:31", "D4:32", "D4:33", "D4:34", "D4:35", "D4:36", "D4:37", "D4:38", "D4:39", "D4:40", "D4:41", "D4:42", "D4:43", "D4:44"],
+      "topic": "Nature spots, Bogota vacation, amulet, Anna's pendant",
+      "surface_events": [
+        "Deborah's favorite spots: park with forest trail, nearby beach",
+        "Jolene vacationed in Bogota last summer, photographed sunset",
+        "Deborah reflects by the water near mom's old house with amulet",
+        "Anna also has pendant in memory of her mother, bonding with Deborah"
+      ],
+      "categories": ["nature", "travel", "grief_and_loss", "personal_items", "friendship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah and Jolene share favorite nature spots. Jolene visited Bogota last summer. Deborah brings her mother's amulet to reflect by the water. Anna also has a pendant for her late mother.",
+      "retrieval_text": "Deborah's favorite spots are a park with forest trail and a nearby beach. Jolene vacationed in Bogota last summer and photographed a sunset. Deborah brings her mother's amulet to a spot by the water near mom's old house for reflection. Anna also wears a pendant in memory of her mother, which bonds her and Deborah.",
+      "bridging_terms": ["nature spots", "Bogota", "vacation", "amulet", "pendant", "Anna", "mother's memory", "forest trail", "beach", "water"],
+      "latent_concepts": ["nature as healing space", "parallel memorial practices", "cross-generational grief", "travel for perspective"]
+    },
+    {
+      "session_number": 5,
+      "turns": ["D5:1", "D5:2", "D5:3", "D5:4", "D5:5", "D5:6", "D5:7", "D5:8", "D5:9", "D5:10", "D5:11", "D5:12", "D5:13", "D5:14", "D5:15", "D5:16", "D5:17"],
+      "topic": "Mini retreat, green tech, STEM volunteer program idea",
+      "surface_events": [
+        "Jolene did a mini retreat last Wednesday to assess her life",
+        "She achieved more than imagined; confidence boost",
+        "Jolene interested in green tech for disadvantaged areas",
+        "Proposed volunteer program: engineers teach STEM to underprivileged kids",
+        "Plans to partner with local schools and invite guest speakers"
+      ],
+      "categories": ["self_reflection", "engineering", "social_impact", "goals", "volunteering"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene as deserving credit for 'stepping outside your comfort zone and believing in yourself' (evidence: D5:4)"
+      ],
+      "literal_summary": "Jolene did a mini retreat that boosted her confidence. She is interested in green tech for disadvantaged communities and proposes a STEM volunteer program partnering with local schools.",
+      "retrieval_text": "Jolene did a mini life-assessment retreat last Wednesday and gained confidence. She wants to explore green tech for disadvantaged areas. She proposed a volunteer program where engineers teach STEM to underprivileged kids, partnering with local schools and inviting guest speakers.",
+      "bridging_terms": ["mini retreat", "life assessment", "green tech", "STEM", "volunteer program", "underprivileged kids", "local schools", "guest speakers", "confidence"],
+      "latent_concepts": ["self-evaluation catalyzing ambition", "engineering as social service", "mentorship pipeline", "confidence from reflection"]
+    },
+    {
+      "session_number": 6,
+      "turns": ["D6:1", "D6:2", "D6:3", "D6:4", "D6:5", "D6:6", "D6:7", "D6:8", "D6:9", "D6:10", "D6:11", "D6:12", "D6:13", "D6:14", "D6:15", "D6:16"],
+      "topic": "Friend Karlie's death, garden comfort, Bali trip",
+      "surface_events": [
+        "Jolene had fun night out with friends",
+        "Deborah lost friend Karlie last week; finding comfort in garden with roses and dahlias",
+        "Last photo with Karlie was from a hike last summer",
+        "Deborah traveled to Bali last year for yoga on the beach",
+        "Jolene interested in trying beach yoga"
+      ],
+      "categories": ["grief_and_loss", "friendship", "travel", "yoga", "nature"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah lost her friend Karlie and finds comfort in a garden with roses and dahlias. Their last photo was from a hike. Deborah traveled to Bali last year for beach yoga. Jolene wants to try beach yoga.",
+      "retrieval_text": "Deborah lost friend Karlie last week. She finds comfort in a garden with roses and dahlias. Last photo with Karlie was from hiking last summer. Deborah visited Bali last year for yoga on the beach. Jolene had fun night out with friends and is interested in trying beach yoga.",
+      "bridging_terms": ["Karlie", "friend's death", "garden", "roses", "dahlias", "Bali", "beach yoga", "hiking", "comfort"],
+      "latent_concepts": ["grief management through nature", "travel as spiritual practice", "friendship across loss"]
+    },
+    {
+      "session_number": 7,
+      "turns": ["D7:1", "D7:2", "D7:3", "D7:4", "D7:5", "D7:6", "D7:7", "D7:8", "D7:9", "D7:10", "D7:11"],
+      "topic": "Jolene's yoga practice, relationship with partner",
+      "surface_events": [
+        "Jolene balancing engineering school with partner's gaming",
+        "Yoga and meditation help Jolene stay calm",
+        "Partner sometimes joins yoga, bonding activity",
+        "Not married, together for three years",
+        "Met in engineering class in college, friendship became romantic",
+        "They enjoy working on engineering projects together"
+      ],
+      "categories": ["yoga", "relationship", "engineering", "work_life_balance"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene balances engineering and gaming with partner. Her partner started joining yoga, strengthening their bond. They have been together three years, met in engineering class, and collaborate on projects.",
+      "retrieval_text": "Jolene balances engineering school with partner's video gaming. Partner joined her yoga sessions sometimes, which brought them closer. They are not married but together for three years. They met in an engineering class in college and enjoy collaborating on projects.",
+      "bridging_terms": ["partner", "three years", "engineering class", "college", "yoga together", "bonding", "balance", "not married"],
+      "latent_concepts": ["shared intellectual foundations in relationships", "wellness as couple activity", "managing competing interests"]
+    },
+    {
+      "session_number": 7,
+      "turns": ["D7:12", "D7:13", "D7:14", "D7:15", "D7:16", "D7:17", "D7:18", "D7:19", "D7:20", "D7:21", "D7:22", "D7:23"],
+      "topic": "Deborah's daily routine, morning jogging",
+      "surface_events": [
+        "Yoga and meditation help Jolene handle challenges",
+        "Deborah's routine: morning meditation, yoga, teaching, evening family time",
+        "Deborah went jogging in nearby park for first time, plans to incorporate it daily",
+        "Exercise makes Deborah feel connected to her body"
+      ],
+      "categories": ["daily_routine", "wellness", "exercise", "self_care"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene's progress as noteworthy: 'great to see your progress since we last chatted' (evidence: D7:14)"
+      ],
+      "literal_summary": "Deborah describes her daily routine: morning meditation, yoga, teaching classes, new jogging habit, and evening family time. Exercise connects her to her body. She encourages Jolene to prioritize self-care.",
+      "retrieval_text": "Deborah's daily routine: morning meditation, yoga, teaching classes, started jogging for the first time in a nearby park. Evenings with loved ones. Exercise makes her feel connected to her body. Jolene uses breathing and meditation to stay calm during challenges.",
+      "bridging_terms": ["daily routine", "jogging", "meditation", "yoga", "teaching", "self-care", "exercise", "body connection"],
+      "latent_concepts": ["structured wellness practice", "new habit formation", "embodiment through movement", "mentoring by example"]
+    },
+    {
+      "session_number": 8,
+      "turns": ["D8:1", "D8:2", "D8:3", "D8:4", "D8:5", "D8:6", "D8:7", "D8:8", "D8:9", "D8:10", "D8:11", "D8:12"],
+      "topic": "Food, outdoor time with Seraphim, mindfulness",
+      "surface_events": [
+        "Anna got Deborah a vegan stir-fry with tofu, ginger, soy sauce",
+        "Jolene's favorite dish is lasagna",
+        "Jolene did yoga and meditation last Friday",
+        "Jolene took Seraphim to the park last Sunday",
+        "People surprised to see a tamed snake in the park"
+      ],
+      "categories": ["food", "pets", "yoga", "nature", "self_care"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Anna brought Deborah a vegan stir-fry. Jolene loves lasagna. Jolene took snake Seraphim to the park where people were surprised. Both practice yoga and meditation for balance.",
+      "retrieval_text": "Anna got Deborah a vegan stir-fry with tofu, vegetables, ginger, and soy sauce. Jolene's favorite comfort food is lasagna. Jolene took snake Seraphim to the park last Sunday where people were surprised by a tamed snake. Both practice yoga and meditation for self-care.",
+      "bridging_terms": ["vegan stir-fry", "lasagna", "comfort food", "Seraphim", "park", "tamed snake", "yoga", "meditation"],
+      "latent_concepts": ["food as comfort and connection", "unusual pets in public spaces", "parallel wellness practices"]
+    },
+    {
+      "session_number": 8,
+      "turns": ["D8:13", "D8:14", "D8:15", "D8:16", "D8:17", "D8:18", "D8:19", "D8:20", "D8:21", "D8:22", "D8:23"],
+      "topic": "Academic stress, study tips, time management",
+      "surface_events": [
+        "Jolene overwhelmed by exams and deadlines",
+        "Jolene needs to prioritize mental health and self-care",
+        "Deborah suggests breaking tasks into smaller pieces, using planners",
+        "Deborah offers to help with study plan and gives motivational mug"
+      ],
+      "categories": ["academic_stress", "time_management", "mentoring", "self_care"],
+      "implied_traits": ["Jolene: tendency toward academic overwhelm"],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene is overwhelmed by exams and deadlines, struggling to prioritize self-care. Deborah advises breaking tasks into smaller pieces and using planners. She offers to help make a study plan.",
+      "retrieval_text": "Jolene is overwhelmed by exams and deadlines, forgetting to prioritize self-care and mental health. Deborah suggests breaking tasks into smaller pieces and using planners/schedulers. Deborah offers a motivational mug and help with a study plan.",
+      "bridging_terms": ["exams", "deadlines", "overwhelmed", "time management", "planner", "study tips", "self-care", "mental health"],
+      "latent_concepts": ["academic burnout risk", "mentoring relationship", "practical coping strategies", "emotional support through gifts"]
+    },
+    {
+      "session_number": 9,
+      "turns": ["D9:1", "D9:2", "D9:3", "D9:4", "D9:5", "D9:6", "D9:7", "D9:8", "D9:9", "D9:10", "D9:11", "D9:12", "D9:13", "D9:14", "D9:15", "D9:16", "D9:17", "D9:18", "D9:19", "D9:20"],
+      "topic": "Neighborhood yoga class, engineering struggles, time management",
+      "surface_events": [
+        "Deborah started a yoga class in the neighborhood on Friday",
+        "Teaching yoga builds community connections",
+        "Jolene struggling with engineering assignments",
+        "They plan to discuss time management strategies"
+      ],
+      "categories": ["yoga", "community", "academic_stress", "time_management"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah started a neighborhood yoga class on Friday. She finds teaching builds community. Jolene is struggling with engineering assignments and asks to continue discussing time management.",
+      "retrieval_text": "Deborah started a neighborhood yoga class on Friday. Teaching yoga gives her happiness and builds community connections. Jolene is struggling with engineering assignments and overwhelmed. They plan to discuss time management strategies together.",
+      "bridging_terms": ["neighborhood yoga class", "community", "teaching", "engineering assignments", "time management", "struggling"],
+      "latent_concepts": ["community building through wellness", "ongoing academic stress pattern", "seeking mentorship"]
+    },
+    {
+      "session_number": 10,
+      "turns": ["D10:1", "D10:2", "D10:3", "D10:4", "D10:5", "D10:6", "D10:7", "D10:8", "D10:9", "D10:10", "D10:11", "D10:12", "D10:13", "D10:14", "D10:15", "D10:16"],
+      "topic": "Pomodoro Technique, Eisenhower Matrix",
+      "surface_events": [
+        "Jolene uses Pomodoro Technique (25 min work, 5 min break)",
+        "Still struggling to prioritize tasks",
+        "Deborah shares Eisenhower Matrix (urgency vs importance)",
+        "Deborah uses daily schedule and to-do lists"
+      ],
+      "categories": ["time_management", "productivity", "mentoring"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene uses the Pomodoro Technique but still struggles with prioritization. Deborah introduces the Eisenhower Matrix for sorting tasks by urgency and importance.",
+      "retrieval_text": "Jolene uses Pomodoro Technique (25-minute work intervals with 5-minute breaks) but struggles to prioritize. Deborah introduces the Eisenhower Matrix which sorts tasks into four boxes by urgency and importance. Deborah uses daily schedules and to-do lists.",
+      "bridging_terms": ["Pomodoro Technique", "Eisenhower Matrix", "prioritization", "to-do list", "time management", "urgency", "importance"],
+      "latent_concepts": ["structured productivity methods", "practical mentoring", "overcoming overwhelm through frameworks"]
+    },
+    {
+      "session_number": 10,
+      "turns": ["D10:17", "D10:18", "D10:19", "D10:20", "D10:21", "D10:22", "D10:23", "D10:24"],
+      "topic": "Anna seaside reflection, Jolene wants to learn surfing",
+      "surface_events": [
+        "Deborah and Anna sat by the sea watching sunset, realized they inspire each other",
+        "Jolene wants to learn surfing",
+        "Jolene gathering info, watching videos, got beginner's guide"
+      ],
+      "categories": ["friendship", "surfing", "goals", "nature"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah and Anna watched a sunset by the sea and realized they inspire each other. Jolene wants to learn surfing and has been gathering information and watching instructional videos.",
+      "retrieval_text": "Deborah and Anna sat by the sea watching sunset and realized they inspire each other. Jolene wants to learn surfing, has been gathering information, watching videos, and got a beginner's guide to surfing.",
+      "bridging_terms": ["Anna", "sea", "sunset", "surfing", "beginner", "inspiration", "learning"],
+      "latent_concepts": ["mutual inspiration in friendship", "aspiration toward new physical activities", "self-directed learning"]
+    },
+    {
+      "session_number": 11,
+      "turns": ["D11:1", "D11:2", "D11:3", "D11:4", "D11:5", "D11:6", "D11:7", "D11:8", "D11:9", "D11:10", "D11:11", "D11:12", "D11:13", "D11:14"],
+      "topic": "Engineering breakthrough, yoga ambience (scents, candles, music)",
+      "surface_events": [
+        "Jolene had breakthrough on engineering project on Friday",
+        "Deborah bought new props and candle for yoga",
+        "Jolene uses lavender and rosemary scents for yoga",
+        "Deborah likes candles and essential oils for yoga",
+        "Jolene listens to Nils Frahm and Olafur Arnalds during practice",
+        "Deborah recommends track Savana and album Sleep"
+      ],
+      "categories": ["engineering", "yoga", "music", "wellness"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene as having proven her skills (evidence: D11:2)"
+      ],
+      "literal_summary": "Jolene had an engineering breakthrough. They discuss yoga ambience: Jolene uses lavender and rosemary, Deborah uses candles and oils. They share music: Nils Frahm, Olafur Arnalds, track Savana, album Sleep.",
+      "retrieval_text": "Jolene had breakthrough on engineering project Friday. Deborah bought new yoga props and candle. Jolene creates serene yoga spaces with lavender and rosemary scents. Deborah uses candles and essential oils. Jolene listens to Nils Frahm and Olafur Arnalds during yoga. Deborah recommends instrumental track Savana and album Sleep for meditation.",
+      "bridging_terms": ["engineering breakthrough", "yoga props", "candles", "lavender", "rosemary", "essential oils", "Nils Frahm", "Olafur Arnalds", "Savana", "Sleep album", "music"],
+      "latent_concepts": ["sensory enhancement of practice", "shared aesthetic in wellness", "parallel creative achievements"]
+    },
+    {
+      "session_number": 12,
+      "turns": ["D12:1", "D12:2", "D12:3", "D12:4", "D12:5", "D12:6", "D12:7", "D12:8", "D12:9", "D12:10", "D12:11", "D12:12", "D12:13", "D12:14", "D12:15", "D12:16"],
+      "topic": "Biking, art show and mother's art love, comfort activities",
+      "surface_events": [
+        "Deborah went biking with neighbor and attended art show",
+        "Art show reminded Deborah of her mother who was interested in art",
+        "Jolene finds comfort in snakes and gaming with partner",
+        "Jolene working on a big project"
+      ],
+      "categories": ["art", "family_memories", "pets", "video_games", "engineering"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah biked with neighbor and attended art show that reminded her of her art-loving mother. Jolene finds comfort in her snakes and gaming with partner. Jolene is working on a big project.",
+      "retrieval_text": "Deborah went biking with neighbor and attended art show that reminded her of her mother who was interested in art. Mother believed art gives strong emotions and connects people uniquely. Jolene finds comfort in pet snakes and video gaming with partner during tough times. Jolene working on a big project.",
+      "bridging_terms": ["biking", "art show", "mother's art interest", "comfort activities", "snakes", "gaming", "project"],
+      "latent_concepts": ["art as posthumous connection", "parallel coping mechanisms", "mother's cultural influence"]
+    },
+    {
+      "session_number": 13,
+      "turns": ["D13:1", "D13:2", "D13:3", "D13:4", "D13:5", "D13:6", "D13:7", "D13:8", "D13:9", "D13:10", "D13:11"],
+      "topic": "Project completion, engineering internship",
+      "surface_events": [
+        "Jolene finished tough engineering project last month",
+        "Jolene interning at well-known engineering firm",
+        "Applying school knowledge to real projects is fulfilling",
+        "Internship stoked her love of engineering"
+      ],
+      "categories": ["engineering", "career", "achievement", "internship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene's project completion as showing she 'really put in the work and it paid off' (evidence: D13:2)"
+      ],
+      "literal_summary": "Jolene finished a tough engineering project and started interning at a well-known engineering firm. Applying school knowledge to real projects is fulfilling and stoked her love of engineering.",
+      "retrieval_text": "Jolene finished tough engineering project last month. She started interning at a well-known engineering firm. Applying school knowledge to real projects is fulfilling. The internship stoked her love of engineering and inspired her to pursue her dreams.",
+      "bridging_terms": ["engineering project", "internship", "engineering firm", "career", "real-world experience", "achievement"],
+      "latent_concepts": ["academic-to-professional transition", "validation through real-world application", "career momentum"]
+    },
+    {
+      "session_number": 13,
+      "turns": ["D13:12", "D13:13", "D13:14", "D13:15", "D13:16", "D13:17", "D13:18", "D13:19", "D13:20", "D13:21", "D13:22", "D13:23", "D13:24", "D13:25", "D13:26", "D13:27"],
+      "topic": "Work-life balance, yoga on Mount Talkeetna, mindful breathing",
+      "surface_events": [
+        "Jolene struggling with work-life balance during internship",
+        "Jolene did yoga on top of Mount Talkeetna yesterday morning",
+        "Jolene has done yoga sporadically for about 3 years",
+        "Deborah recommends mindful breathing practice",
+        "Deborah shows her favorite yoga studio"
+      ],
+      "categories": ["work_life_balance", "yoga", "wellness", "mentoring"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene struggles with work-life balance during internship but did yoga on Mount Talkeetna. She has practiced yoga sporadically for 3 years. Deborah recommends daily mindful breathing exercises.",
+      "retrieval_text": "Jolene struggles with work-life balance during internship. She did yoga on top of Mount Talkeetna yesterday morning. Jolene has practiced yoga sporadically for about 3 years and it helps with stress. Deborah recommends daily mindful breathing: sit, close eyes, deep breaths, focus on air entering and leaving body.",
+      "bridging_terms": ["work-life balance", "Mount Talkeetna", "3 years yoga", "mindful breathing", "internship", "studio", "stress management"],
+      "latent_concepts": ["wellness as counterbalance to career pressure", "yoga in dramatic settings", "practical meditation guidance"]
+    },
+    {
+      "session_number": 14,
+      "turns": ["D14:1", "D14:2", "D14:3", "D14:4", "D14:5", "D14:6", "D14:7", "D14:8", "D14:9", "D14:10", "D14:11", "D14:12", "D14:13"],
+      "topic": "Yoga retreat preparation, Seraphim's new aquarium, project breakthrough",
+      "surface_events": [
+        "Deborah preparing for yoga retreat with buddies",
+        "Deborah tried Dancer Pose (Natarajasana)",
+        "Jolene bought new aquarium for Seraphim day before yesterday",
+        "Jolene got Seraphim last year; the snake cheers her up",
+        "Jolene had another engineering breakthrough"
+      ],
+      "categories": ["yoga", "pets", "engineering", "achievement"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Jolene characterizes Deborah's Dancer Pose as 'amazing as always' (evidence: D14:4)"
+      ],
+      "literal_summary": "Deborah prepares for yoga retreat and tried Dancer Pose. Jolene bought Seraphim a new aquarium. She got the snake last year. Jolene had another engineering project breakthrough.",
+      "retrieval_text": "Deborah preparing for yoga retreat with friends, tried Dancer Pose (Natarajasana). Jolene bought new aquarium for snake Seraphim two days ago. She got Seraphim last year and the snake brings peace and comfort. Jolene had another engineering project breakthrough.",
+      "bridging_terms": ["yoga retreat", "Dancer Pose", "Natarajasana", "Seraphim", "aquarium", "engineering breakthrough"],
+      "latent_concepts": ["preparation for spiritual retreat", "pet care investment", "ongoing academic success"]
+    },
+    {
+      "session_number": 14,
+      "turns": ["D14:14", "D14:15", "D14:16", "D14:17", "D14:18", "D14:19", "D14:20", "D14:21", "D14:22", "D14:23"],
+      "topic": "Yoga retreat: tree pose, peace statue",
+      "surface_events": [
+        "Deborah shows photo of tree pose at retreat",
+        "Statue in photo symbolizes peace and enlightenment",
+        "Jolene wants to visit a retreat like that"
+      ],
+      "categories": ["yoga", "spirituality", "retreat"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah shares photos from yoga retreat showing tree pose and a statue symbolizing peace and enlightenment. Jolene finds the retreat ideal for finding peace and refreshment.",
+      "retrieval_text": "Deborah shows photos from yoga retreat: tree pose and a statue symbolizing peace and enlightenment. The retreat is perfect for reflecting and getting centered. Jolene wants to visit a retreat like that for chill time.",
+      "bridging_terms": ["tree pose", "retreat", "statue", "peace", "enlightenment", "reflection"],
+      "latent_concepts": ["spiritual symbolism in practice", "aspiration toward retreat experience"]
+    },
+    {
+      "session_number": 15,
+      "turns": ["D15:1", "D15:2", "D15:3", "D15:4", "D15:5", "D15:6", "D15:7", "D15:8", "D15:9", "D15:10", "D15:11", "D15:12", "D15:13"],
+      "topic": "Running group with Anna, gaming with partner, It Takes Two",
+      "surface_events": [
+        "Deborah started running group with Anna",
+        "They push each other during runs",
+        "Jolene and partner game together as stress relief",
+        "Favorite co-op game: It Takes Two",
+        "Deborah organizes workshops for mindfulness and self-care"
+      ],
+      "categories": ["exercise", "friendship", "video_games", "wellness", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah started a running group with Anna for mutual motivation. Jolene and partner play It Takes Two together for bonding. Deborah organizes mindfulness workshops and self-care events.",
+      "retrieval_text": "Deborah started a running group with neighbor Anna. They support and push each other during runs. Jolene and partner play It Takes Two as favorite co-op game for bonding. Deborah organizes workshops and events for mindfulness, meditation, self-reflection, and self-care.",
+      "bridging_terms": ["running group", "Anna", "It Takes Two", "gaming", "bonding", "workshops", "mindfulness", "self-care events"],
+      "latent_concepts": ["fitness through social accountability", "gaming as relationship maintenance", "community wellness programming"]
+    },
+    {
+      "session_number": 15,
+      "turns": ["D15:14", "D15:15", "D15:16", "D15:17", "D15:18", "D15:19", "D15:20", "D15:21", "D15:22", "D15:23", "D15:24", "D15:25", "D15:26", "D15:27", "D15:28", "D15:29", "D15:30", "D15:31", "D15:32", "D15:33", "D15:34", "D15:35", "D15:36", "D15:37", "D15:38", "D15:39"],
+      "topic": "Pets, snake adventure, Deborah's cats, nature spots",
+      "surface_events": [
+        "Jolene fascinated by reptiles; snake is calming connection to nature",
+        "Seraphim once escaped, found snuggling under bed",
+        "Deborah has cats, not dogs (doesn't like dogs)",
+        "Deborah takes cats to park morning and evening",
+        "Jolene's snakes can't run; wishes they could join outdoor activities",
+        "Jolene shares photo of peaceful lake surrounded by trees"
+      ],
+      "categories": ["pets", "nature", "daily_routine"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene's snake Seraphim once escaped and was found under the bed. Deborah reveals she has cats (dislikes dogs) and takes them to the park daily. Jolene shares a hidden gem lake spot.",
+      "retrieval_text": "Jolene is fascinated by reptiles. Snake Seraphim once escaped and was found snuggling under the bed, showing how much Jolene loves her. Deborah has cats, not dogs (she doesn't like dogs). She takes cats to the park every morning and evening. Jolene wishes her snakes could join outdoor activities. Jolene has a hidden gem peaceful lake surrounded by trees.",
+      "bridging_terms": ["snake escape", "Seraphim", "cats", "dogs dislike", "park", "morning", "evening", "lake", "hidden gem", "reptiles"],
+      "latent_concepts": ["pet personality stories", "animal preferences as identity", "nature as shared value"]
+    },
+    {
+      "session_number": 16,
+      "turns": ["D16:1", "D16:2", "D16:3", "D16:4", "D16:5", "D16:6", "D16:7", "D16:8", "D16:9", "D16:10", "D16:11", "D16:12", "D16:13", "D16:14", "D16:15", "D16:16", "D16:17", "D16:18", "D16:19", "D16:20"],
+      "topic": "Community cleanup, project crash, Susie comfort, yoga routine",
+      "surface_events": [
+        "Deborah started community cleanup project with fundraising",
+        "Jolene's project crashed and she lost everything, very frustrating",
+        "Susie and video games comfort Jolene during setback",
+        "Jolene adopted Susie two years ago when feeling lonely",
+        "Deborah offers gentle yoga flow routine focusing on breathing"
+      ],
+      "categories": ["community", "setback", "pets", "yoga", "coping"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah started a community cleanup fundraiser. Jolene's project crashed and she lost all her work. Susie (adopted two years ago when lonely) and video games provide comfort. Deborah shares a gentle yoga flow routine.",
+      "retrieval_text": "Deborah started community cleanup project with fundraising. Jolene had huge setback: project crashed and she lost everything. Susie the snake comforts her; Jolene adopted Susie two years ago when feeling lonely. Video games are also a distraction. Deborah offers a gentle yoga flow routine focusing on breathing and grounding.",
+      "bridging_terms": ["community cleanup", "project crash", "data loss", "Susie", "adopted two years ago", "lonely", "comfort", "gentle flow", "breathing"],
+      "latent_concepts": ["resilience after failure", "pets as emotional anchors", "community engagement as purpose", "recovery through routine"]
+    },
+    {
+      "session_number": 17,
+      "turns": ["D17:1", "D17:2", "D17:3", "D17:4", "D17:5", "D17:6", "D17:7", "D17:8", "D17:9", "D17:10", "D17:11", "D17:12", "D17:13", "D17:14", "D17:15"],
+      "topic": "Meditation guide, notebook designs, aerial surveillance prototype",
+      "surface_events": [
+        "Deborah made meditation guide for yoga retreat",
+        "Jolene still stressed from losing files but meditation helped",
+        "Jolene designed notebooks inspired by space and engines (galaxies, circuitry)",
+        "Jolene working on aerial surveillance prototype",
+        "Aim: more productive and affordable system for emergencies and environmental monitoring"
+      ],
+      "categories": ["meditation", "creativity", "engineering", "design"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene as having 'a knack for turning these into art' and 'amazing creativity' (evidence: D17:7)"
+      ],
+      "literal_summary": "Deborah made a meditation guide for her retreat. Jolene coped with file loss through meditation. She designed creative notebooks with space/circuitry themes and is working on an aerial surveillance prototype.",
+      "retrieval_text": "Deborah created meditation guide for yoga retreat. Jolene still stressed from losing work files but meditation restored clarity. Jolene designed notebooks inspired by space and engines with galaxies and circuitry elements. Working on aerial surveillance prototype to revolutionize emergency response and environmental monitoring.",
+      "bridging_terms": ["meditation guide", "file loss", "notebooks", "space", "circuitry", "galaxies", "aerial surveillance", "prototype", "creativity"],
+      "latent_concepts": ["creative expression of technical interests", "meditation as recovery tool", "ambitious engineering projects"]
+    },
+    {
+      "session_number": 18,
+      "turns": ["D18:1", "D18:2", "D18:3", "D18:4", "D18:5", "D18:6", "D18:7", "D18:8", "D18:9", "D18:10", "D18:11", "D18:12", "D18:13", "D18:14", "D18:15"],
+      "topic": "Bullet journal, yoga for elderly, mindfulness introduction",
+      "surface_events": [
+        "Jolene juggling engineering, relationship, personal growth",
+        "Jolene started using bullet journal for organization",
+        "Bullet journal has motivational quote",
+        "Deborah led meditation yoga session for elderly at care home during sunset",
+        "Jolene interested in mindfulness but hasn't tried it",
+        "Deborah started mindfulness through workshops and books"
+      ],
+      "categories": ["productivity", "yoga", "elderly_care", "mindfulness", "work_life_balance"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene started using a bullet journal with motivational quotes. Deborah led a meditation yoga session for the elderly at a care home at sunset. Jolene is interested in trying mindfulness.",
+      "retrieval_text": "Jolene juggling engineering, relationship, and personal growth. She started bullet journal with favorite quotes for task tracking. Deborah led meditation yoga session for elderly at local care home during sunset. Jolene interested in mindfulness but hasn't tried it. Deborah started mindfulness through workshops and books.",
+      "bridging_terms": ["bullet journal", "quotes", "elderly care home", "meditation yoga", "sunset", "mindfulness", "workshops", "balance"],
+      "latent_concepts": ["organizational tools for overwhelm", "yoga as service to vulnerable populations", "introduction to contemplative practices"]
+    },
+    {
+      "session_number": 19,
+      "turns": ["D19:1", "D19:2", "D19:3", "D19:4", "D19:5", "D19:6", "D19:7", "D19:8", "D19:9", "D19:10", "D19:11"],
+      "topic": "Console gift, yoga event, game recommendations",
+      "surface_events": [
+        "Deborah told Anna her life story last Friday",
+        "Jolene bought console for partner as gift on August 17",
+        "Deborah organized yoga event with local businesses, food stalls, live music",
+        "Jolene recommends Zelda BOTW, Animal Crossing, Overcooked 2",
+        "Jolene won three large pizzas playing Overcooked 2 with partner"
+      ],
+      "categories": ["friendship", "gifts", "video_games", "yoga_event", "community"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah shared her life story with Anna. Jolene bought her partner a console as a gift. Deborah organized a yoga event with businesses and live music. Jolene recommends games including Overcooked 2.",
+      "retrieval_text": "Deborah told Anna her life story, creating meaningful connection. Jolene bought console for partner on August 17 as gift. Deborah organized yoga event with local businesses, food stalls, and live music. Jolene recommends Zelda BOTW for Switch, Animal Crossing: New Horizons, Overcooked 2. She won three large pizzas betting on Overcooked 2.",
+      "bridging_terms": ["life story", "Anna", "console gift", "August 17", "yoga event", "food stalls", "live music", "Zelda", "Animal Crossing", "Overcooked 2", "pizza bet"],
+      "latent_concepts": ["deepening friendships through vulnerability", "gift-giving in relationships", "community event organization", "competitive gaming for fun"]
+    },
+    {
+      "session_number": 19,
+      "turns": ["D19:11", "D19:12", "D19:13", "D19:14", "D19:15", "D19:16", "D19:17", "D19:18", "D19:19", "D19:20", "D19:21", "D19:22", "D19:23", "D19:24"],
+      "topic": "Detective games, park with special bench, mother memories",
+      "surface_events": [
+        "Deborah and husband used to play games together, prefer detective games",
+        "They also enjoyed outdoor exploration",
+        "Deborah loves park near house with forest trail and beach",
+        "Special bench holds memories of Deborah and her mom discussing dreams",
+        "Deborah cherishes watching sunset with mom in silence at that spot"
+      ],
+      "categories": ["video_games", "marriage", "nature", "family_memories"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah and her husband play detective games and explore outdoors. She loves a park with a forest trail, beach, and special bench where she and her mom discussed dreams and watched sunsets.",
+      "retrieval_text": "Deborah and husband prefer detective games together and enjoy outdoors. Deborah loves park near house with forest trail and beach. A special bench holds memories of discussing dreams and life with her mom. She cherishes a silent sunset they watched together, feeling peace and gratitude.",
+      "bridging_terms": ["detective games", "husband", "forest trail", "beach", "special bench", "mom", "dreams", "sunset", "silence"],
+      "latent_concepts": ["gaming as couple bonding", "place-based memory", "mother-daughter intimacy", "silence as connection"]
+    },
+    {
+      "session_number": 20,
+      "turns": ["D20:1", "D20:2", "D20:3", "D20:4", "D20:5", "D20:6", "D20:7", "D20:8", "D20:9", "D20:10", "D20:11", "D20:12", "D20:13", "D20:14", "D20:15", "D20:16", "D20:17", "D20:18", "D20:19", "D20:20", "D20:21", "D20:22", "D20:23", "D20:24", "D20:25", "D20:26"],
+      "topic": "Battlefield 1, visiting mom's bench, savasana, 3 years yoga",
+      "surface_events": [
+        "Jolene and partner got Battlefield 1 last week",
+        "Deborah visited bench where she and mom used to chat, brought flowers",
+        "Mom loved flowers and appreciated simple things",
+        "Jolene doing more yoga and meditation to relax",
+        "Jolene's favorite yoga pose is savasana (corpse pose)",
+        "Jolene has been doing yoga for 3 years"
+      ],
+      "categories": ["video_games", "family_memories", "yoga", "nature"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene got Battlefield 1 with partner. Deborah visited her mom's bench and brought flowers, reflecting on how her mom loved flowers and simple things. Jolene's favorite yoga pose is savasana; she has practiced 3 years.",
+      "retrieval_text": "Jolene and partner received Battlefield 1 last week. Deborah visited the bench where she and mom chatted, brought flowers. Mom loved flowers and appreciated simple things. Jolene practices yoga and meditation to relax. Her favorite pose is savasana (corpse pose). She has done yoga for 3 years to escape study and work stress.",
+      "bridging_terms": ["Battlefield 1", "bench", "flowers", "simple things", "savasana", "corpse pose", "3 years yoga", "meditation"],
+      "latent_concepts": ["honoring the dead through their preferences", "simplicity as wisdom", "yoga as long-term practice"]
+    },
+    {
+      "session_number": 21,
+      "turns": ["D21:1", "D21:2", "D21:3", "D21:4", "D21:5", "D21:6", "D21:7", "D21:8", "D21:9", "D21:10", "D21:11", "D21:12", "D21:13", "D21:14", "D21:15", "D21:16", "D21:17"],
+      "topic": "Yoga retreat near mom's place, virtual conference presentation",
+      "surface_events": [
+        "Deborah attended life-changing yoga retreat near mom's place last week",
+        "Nature and self-reflection helped Deborah see beauty in every moment",
+        "Jolene making strides toward goals despite hectic life",
+        "Jolene presented at virtual conference with positive feedback",
+        "Jolene considering more internships to enhance skills"
+      ],
+      "categories": ["yoga_retreat", "career", "achievement", "self_reflection"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene as putting 'heart and soul' into her work (evidence: D21:7)"
+      ],
+      "literal_summary": "Deborah attended a life-changing yoga retreat near her mother's place. Jolene presented at a virtual conference with positive feedback and is considering more internships.",
+      "retrieval_text": "Deborah attended life-changing yoga retreat near mother's place last week, connecting with nature and herself. Jolene presented at a virtual conference and received positive feedback. She is considering more internships to enhance engineering skills. Deborah sees beauty in every moment through self-reflection.",
+      "bridging_terms": ["yoga retreat", "mother's place", "virtual conference", "positive feedback", "internships", "self-reflection", "life-changing"],
+      "latent_concepts": ["spiritual transformation through retreat", "professional validation", "career planning"]
+    },
+    {
+      "session_number": 22,
+      "turns": ["D22:1", "D22:2", "D22:3", "D22:4", "D22:5", "D22:6", "D22:7", "D22:8", "D22:9", "D22:10", "D22:11", "D22:12", "D22:13"],
+      "topic": "Values from loved ones, sustainable engineering goals",
+      "surface_events": [
+        "Deborah thinking about mom's influence",
+        "Jolene and partner discussed loved ones' values and influence",
+        "Jolene's mom taught perseverance; partner's dad taught determination",
+        "Jolene wants to use engineering for good: renewable energy, clean water",
+        "Interested in solar energy and water access for communities"
+      ],
+      "categories": ["values", "family_influence", "engineering", "sustainability", "goals"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene's plans as 'really inspiring' (evidence: D22:11)"
+      ],
+      "literal_summary": "Deborah reflects on her mom's influence. Jolene and partner discussed how deceased parents' values guide them. Jolene aims for renewable energy and clean water access through engineering.",
+      "retrieval_text": "Deborah reflecting on mother's ongoing influence. Jolene and partner discussed how their deceased parents' values guide them: Jolene's mom taught perseverance, partner's dad taught determination. Jolene wants to work on renewable energy (solar) and clean water access for communities in need. She wants to join organizations focused on social causes.",
+      "bridging_terms": ["values", "perseverance", "determination", "renewable energy", "solar", "clean water", "sustainability", "social causes", "mother's influence"],
+      "latent_concepts": ["intergenerational value transmission", "engineering as social justice", "loss shaping purpose"]
+    },
+    {
+      "session_number": 22,
+      "turns": ["D22:14", "D22:15", "D22:16", "D22:17", "D22:18", "D22:19", "D22:20", "D22:21", "D22:22", "D22:23", "D22:24", "D22:25", "D22:26", "D22:27", "D22:28", "D22:29", "D22:30"],
+      "topic": "Yoga and meditation retreat with partner, cats Luna and Max",
+      "surface_events": [
+        "Jolene shared love of yoga with partner; planning meditation retreat together",
+        "Jolene's snakes watch her during yoga",
+        "Deborah has two cats: Luna (5, from shelter) and Max (8, mother's cat)",
+        "Deborah took Max when mother passed away",
+        "Deborah took Luna from a shelter"
+      ],
+      "categories": ["yoga", "pets", "relationship"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Jolene characterizes Deborah as 'great for taming' Max and 'wonderful' for becoming loving owner (evidence: D22:24, D22:26)"
+      ],
+      "literal_summary": "Jolene plans a meditation retreat with her partner. Deborah introduces cats Luna (5, from shelter) and Max (8, inherited from deceased mother). Max is old. Deborah really loves cats.",
+      "retrieval_text": "Jolene shared yoga with partner and they plan a meditation retreat together. Jolene's snakes watch her do yoga calmly. Deborah has two cats: Luna (5 years old, adopted from shelter) and Max (8 years old, her mother's cat she took when mother passed). Deborah loves cats and they need a home and care.",
+      "bridging_terms": ["meditation retreat", "partner", "Luna", "Max", "cats", "shelter", "mother's cat", "5 years", "8 years"],
+      "latent_concepts": ["couple wellness planning", "pet inheritance from deceased parent", "animal rescue"]
+    },
+    {
+      "session_number": 23,
+      "turns": ["D23:1", "D23:2", "D23:3", "D23:4", "D23:5", "D23:6", "D23:7", "D23:8", "D23:9", "D23:10", "D23:11", "D23:12"],
+      "topic": "Rio de Janeiro trip, mother's house visit with husband",
+      "surface_events": [
+        "Jolene and partner traveled to Rio de Janeiro for yoga classes",
+        "They visited delicious cafes",
+        "Deborah visited mom's house last month with husband",
+        "House symbolizes mother's strength and love",
+        "Jolene meditates at a nearby tranquil spot"
+      ],
+      "categories": ["travel", "yoga", "family_memories", "meditation"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene and partner traveled to Rio de Janeiro for yoga classes and cafes. Deborah visited her mother's house last month with her husband. Jolene meditates at a tranquil nearby spot.",
+      "retrieval_text": "Jolene and partner traveled to Rio de Janeiro for yoga classes and visited delicious cafes. The country showed different kinds of yoga and their backgrounds. Deborah visited mom's house last month with husband; it symbolizes mother's strength and love. Jolene meditates by a tranquil spot nearby for stress relief.",
+      "bridging_terms": ["Rio de Janeiro", "yoga classes", "cafes", "mother's house", "husband", "strength", "tranquil spot", "meditation"],
+      "latent_concepts": ["travel as cultural yoga education", "pilgrimage to family spaces", "parallel contemplative practices"]
+    },
+    {
+      "session_number": 23,
+      "turns": ["D23:13", "D23:14", "D23:15", "D23:16", "D23:17", "D23:18", "D23:19", "D23:20", "D23:21", "D23:22", "D23:23", "D23:24", "D23:25", "D23:26", "D23:27", "D23:28", "D23:29", "D23:30", "D23:31", "D23:32"],
+      "topic": "Temple in Rio, Deborah's Rio trip, quotes, new plant",
+      "surface_events": [
+        "Jolene and partner visited old temple with amazing stairs in Rio",
+        "Deborah was also in Rio de Janeiro three years ago",
+        "Deborah shows photo with quote from deceased friend: 'Let go of what no longer serves you'",
+        "Jolene also has inspirational quotes in notebook",
+        "Jolene got a new plant as reminder to nurture herself"
+      ],
+      "categories": ["travel", "quotes", "grief_and_loss", "self_care"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene visited an old temple in Rio. Deborah also visited Rio three years ago. Deborah shares a quote from a deceased friend about letting go. Jolene bought a plant symbolizing self-nurture.",
+      "retrieval_text": "Jolene and partner visited old temple with amazing stairs in Rio de Janeiro. Deborah visited Rio three years ago. Deborah shows photo with quote from deceased friend: 'Let go of what no longer serves you.' Jolene has inspirational quotes in notebook. Jolene got a new plant as reminder to nurture herself and embrace fresh starts.",
+      "bridging_terms": ["temple", "Rio de Janeiro", "three years ago", "quote", "let go", "deceased friend", "notebook", "plant", "self-nurture"],
+      "latent_concepts": ["shared travel destinations across time", "wisdom from loss", "motivational artifacts", "growth symbolism"]
+    },
+    {
+      "session_number": 24,
+      "turns": ["D24:1", "D24:2", "D24:3", "D24:4", "D24:5", "D24:6", "D24:7", "D24:8", "D24:9", "D24:10", "D24:11", "D24:12", "D24:13", "D24:14", "D24:15"],
+      "topic": "Community meetup, childhood gaming origins, Monster Hunter, finals stress",
+      "surface_events": [
+        "Deborah attended community event and meetup last Friday",
+        "Deborah's yoga pals are her second family; mom attended early classes",
+        "Jolene got first console at age 10 from parents",
+        "She taught herself but mom played games with her",
+        "Favorite game with mom: Monster Hunter: World",
+        "Jolene has finals this month, studying hard, wants trip afterward"
+      ],
+      "categories": ["community", "family_memories", "video_games", "academic_stress"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah attended a community meetup. Her yoga friends are like a second family and her mom used to attend classes. Jolene got her first console at 10, played Monster Hunter: World with her mom. Finals coming up.",
+      "retrieval_text": "Deborah attended community meetup where people shared stories. Her yoga pals are second family; her mother was her biggest fan and attended yoga classes with her. Jolene got first console at age 10 from parents. She taught herself gaming but mom played with her. Favorite game with mom: Monster Hunter: World. Jolene has finals this month.",
+      "bridging_terms": ["community meetup", "yoga pals", "second family", "mom attended classes", "console at 10", "Monster Hunter: World", "gaming with mom", "finals"],
+      "latent_concepts": ["community as chosen family", "parental support of interests", "gaming as mother-child bonding", "academic cycle stress"]
+    },
+    {
+      "session_number": 25,
+      "turns": ["D25:1", "D25:2", "D25:3", "D25:4", "D25:5", "D25:6", "D25:7", "D25:8", "D25:9", "D25:10", "D25:11", "D25:12", "D25:13", "D25:14", "D25:15", "D25:16", "D25:17", "D25:18", "D25:19", "D25:20"],
+      "topic": "Meditation course at lake retreat, sunrise photo, beach memories",
+      "surface_events": [
+        "Jolene signed up for meditation course at retreat near a lake",
+        "Plans to share experience with partner",
+        "Meditation part of both their routines now",
+        "Jolene's project is tough but ongoing",
+        "Deborah shows sunrise photo",
+        "Jolene reminisces about beach getaway"
+      ],
+      "categories": ["meditation", "retreat", "nature", "academic_stress"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene as 'so strong for handling all the challenges' (evidence: D25:8)"
+      ],
+      "literal_summary": "Jolene signed up for a meditation course at a retreat near a lake with her partner. Meditation is part of both Deborah's and Jolene's routines. Deborah shares sunrise photo that reminds Jolene of a beach getaway.",
+      "retrieval_text": "Jolene signed up for meditation course at retreat near a lake to share with partner and learn new techniques. Meditation is now part of both their routines. Jolene's engineering project is tough but ongoing. Deborah shows sunrise photo. Jolene reminisces about a past beach getaway.",
+      "bridging_terms": ["meditation course", "lake retreat", "partner", "routine", "sunrise", "beach getaway", "project"],
+      "latent_concepts": ["deepening contemplative practice", "shared wellness journey", "nature photography as trigger for memory"]
+    },
+    {
+      "session_number": 26,
+      "turns": ["D26:1", "D26:2", "D26:3", "D26:4", "D26:5", "D26:6", "D26:7", "D26:8", "D26:9", "D26:10", "D26:11", "D26:12", "D26:13", "D26:14", "D26:15", "D26:16", "D26:17", "D26:18", "D26:19", "D26:20", "D26:21"],
+      "topic": "Storm cancels yoga, camping trip plan, coffee date planning",
+      "surface_events": [
+        "Storm forced cancellation of Deborah's yoga getaway",
+        "Jolene and partner planning camping trip for nature yoga",
+        "Jolene has schedule routine for classes, studying, personal time",
+        "They try to plan a coffee date: first Wednesday at 4, then Friday at 5",
+        "Deborah mentions hidden coffee shop nearby"
+      ],
+      "categories": ["setback", "planning", "friendship", "yoga", "camping"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "A storm cancelled Deborah's yoga getaway. Jolene plans a camping trip with partner for nature yoga. They attempt to schedule a coffee date, settling on Friday at 5.",
+      "retrieval_text": "Storm forced cancellation of Deborah's yoga getaway. Jolene and partner planning camping trip for nature and yoga. Jolene uses a routine schedule for classes, studying, and personal time including yoga and meditation. They plan a coffee date at a cafe, settling on Friday at 5 after rescheduling. Deborah mentions a hidden coffee shop nearby.",
+      "bridging_terms": ["storm", "cancelled", "yoga getaway", "camping trip", "schedule", "coffee date", "Friday at 5", "cafe"],
+      "latent_concepts": ["weather disrupting plans", "in-person friendship development", "scheduling complexity in busy lives"]
+    },
+    {
+      "session_number": 27,
+      "turns": ["D27:1", "D27:2", "D27:3", "D27:4", "D27:5", "D27:6", "D27:7", "D27:8", "D27:9", "D27:10", "D27:11", "D27:12", "D27:13"],
+      "topic": "Phuket meditation retreat, mindfulness, cat card game",
+      "surface_events": [
+        "Jolene and partner went to meditation retreat in Phuket for a few weeks",
+        "Key lesson: releasing expectations and savoring the present",
+        "Jolene experiencing new level of joy from mindfulness and gratitude",
+        "Deborah recently played a card game about cats (attack/defense)",
+        "Plans to play it together"
+      ],
+      "categories": ["meditation_retreat", "travel", "mindfulness", "card_games"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene and partner attended a meditation retreat in Phuket for weeks. Key insight: release expectations and savor the present. Deborah played an unnamed cat card game and wants to play it with Jolene.",
+      "retrieval_text": "Jolene and partner traveled to meditation retreat in Phuket for a few weeks. Key lesson: releasing expectations, judgments, and savoring the present moment. Nature there was inspiring. Jolene experiencing new joy from mindfulness and gratitude. Deborah played a cat card game (draw cards, attack opponent) and wants to play it with Jolene.",
+      "bridging_terms": ["Phuket", "meditation retreat", "releasing expectations", "present moment", "gratitude", "mindfulness", "cat card game"],
+      "latent_concepts": ["transformative travel", "letting go philosophy", "playful friendship activities", "joy through presence"]
+    },
+    {
+      "session_number": 28,
+      "turns": ["D28:1", "D28:2", "D28:3", "D28:4", "D28:5", "D28:6", "D28:7", "D28:8", "D28:9", "D28:10", "D28:11"],
+      "topic": "Reconnecting with mom's friends, beach wedding and surfing",
+      "surface_events": [
+        "Deborah reconnected with mother's old friends, heard new stories",
+        "They looked through old photos together",
+        "The beach is where Deborah got married and discovered surfing",
+        "Beach yoga is peaceful with ocean and sand"
+      ],
+      "categories": ["family_memories", "friendship", "marriage", "surfing", "yoga"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah reconnected with her mother's old friends and heard new stories while looking at photos. The beach is where she got married and discovered surfing. Beach yoga is her peaceful practice.",
+      "retrieval_text": "Deborah reconnected with mother's old friends, shared stories and looked through photos. She learned new things about her mother through their eyes. The beach is where Deborah got married and discovered her love for surfing. Beach yoga with ocean, sand, and fresh air is deeply relaxing.",
+      "bridging_terms": ["mother's friends", "old photos", "stories", "beach", "wedding", "surfing", "beach yoga", "ocean"],
+      "latent_concepts": ["posthumous discovery of parent's life", "place layered with multiple meanings", "beach as site of transformation"]
+    },
+    {
+      "session_number": 28,
+      "turns": ["D28:12", "D28:13", "D28:14", "D28:15", "D28:16", "D28:17", "D28:18", "D28:19", "D28:20", "D28:21", "D28:22", "D28:23", "D28:24", "D28:25", "D28:26", "D28:27", "D28:28", "D28:29", "D28:30"],
+      "topic": "Yoga environments, meditation with flowers in Thailand, Susie companionship",
+      "surface_events": [
+        "Jolene creates yoga space with candles, oils, soft music",
+        "Jolene tried meditation with flowers in Thailand",
+        "Environment enhances yoga practice",
+        "Jolene's room is her relaxation haven",
+        "Susie has been with Jolene for two years",
+        "Deborah asks whether photo shows Susie or Seraphim"
+      ],
+      "categories": ["yoga", "meditation", "travel", "pets", "home"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Jolene creates serene yoga spaces with candles, oils, and music. She tried flower meditation in Thailand. Her room is her relaxation haven. Susie has been her companion for two years.",
+      "retrieval_text": "Jolene creates yoga space with candles, essential oils, and soft soothing music. She tried new meditation style with flowers in Thailand. Environment enhances practice. Jolene's room is her relaxation haven. Susie the snake has been with her for two years as a great companion. Deborah also uses candles and oils for yoga ambience.",
+      "bridging_terms": ["candles", "essential oils", "music", "Thailand", "flower meditation", "room", "haven", "Susie", "two years"],
+      "latent_concepts": ["curated wellness environments", "cross-cultural meditation practices", "home as sanctuary"]
+    },
+    {
+      "session_number": 29,
+      "turns": ["D29:1", "D29:2", "D29:3", "D29:4", "D29:5", "D29:6", "D29:7", "D29:8", "D29:9", "D29:10", "D29:11", "D29:12", "D29:13", "D29:14", "D29:15"],
+      "topic": "Community gardening class, scuba diving, cooking memories",
+      "surface_events": [
+        "Deborah and neighbor ran free gardening class for community",
+        "Jolene and partner tried scuba diving lesson last Friday",
+        "Deborah visited mom's house, sat on bench last Sunday",
+        "Mom had passion for cooking; famous for special dish",
+        "Mom baked pineapple birthday cakes for Deborah as a kid",
+        "Jolene used to bake chocolate chip cookies with someone close",
+        "Jolene's favorite cookie: warm gooey chocolate with buttery cookie"
+      ],
+      "categories": ["community", "scuba_diving", "family_memories", "cooking", "baking"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Deborah ran a free gardening class. Jolene tried scuba diving with partner. Deborah recalls mom's cooking passion and pineapple birthday cakes. Jolene baked chocolate cookies with someone close.",
+      "retrieval_text": "Deborah and neighbor ran free gardening class for community, all ages joined. Jolene and partner tried scuba diving lesson last Friday. Deborah visited mom's house and sat on bench Sunday; mom had passion for cooking, especially pineapple birthday cakes for Deborah as a kid. Jolene baked warm gooey chocolate cookies with someone close.",
+      "bridging_terms": ["gardening class", "scuba diving", "bench", "cooking", "pineapple birthday cake", "chocolate cookies", "baking", "community"],
+      "latent_concepts": ["community service through teaching", "trying new activities as couple", "food as family memory", "baking traditions"]
+    },
+    {
+      "session_number": 29,
+      "turns": ["D29:16", "D29:17", "D29:18", "D29:19", "D29:20", "D29:21", "D29:22", "D29:23", "D29:24", "D29:25", "D29:26", "D29:27", "D29:28", "D29:29", "D29:30", "D29:31", "D29:32", "D29:33", "D29:34"],
+      "topic": "Books, bookshelves, surfing plans together",
+      "surface_events": [
+        "Jolene has a book that transports her to another world",
+        "Deborah has a big bookshelf for escaping and relaxing",
+        "Jolene read a self-discovery book in her aesthetic bathroom",
+        "Deborah surfs and confirms with photo",
+        "Jolene started learning about surfing but hasn't tried yet",
+        "They plan to go surfing together next month"
+      ],
+      "categories": ["books", "surfing", "friendship_plans", "self_discovery"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [],
+      "literal_summary": "Both share their love of books and reading nooks. Deborah confirms she surfs. Jolene is learning about surfing. They plan to try surfing together next month.",
+      "retrieval_text": "Jolene has books that transport her and read a self-discovery book in her aesthetic bathroom. Deborah has a big bookshelf for escaping reality. Deborah surfs and shows photo as proof. Jolene started learning about surfing but hasn't gone yet. They plan to go surfing together next month.",
+      "bridging_terms": ["books", "bookshelf", "reading", "self-discovery", "surfing", "plan", "next month", "together"],
+      "latent_concepts": ["reading as escape", "planned shared activity", "progression from aspiration to action"]
+    },
+    {
+      "session_number": 30,
+      "turns": ["D30:1", "D30:2", "D30:3", "D30:4", "D30:5", "D30:6", "D30:7", "D30:8", "D30:9", "D30:10", "D30:11", "D30:12", "D30:13", "D30:14", "D30:15", "D30:16", "D30:17", "D30:18"],
+      "topic": "Music festival, yoga retreat sunrise, nature resilience",
+      "surface_events": [
+        "Deborah attended music festival with friends, reminded of mom's lullabies",
+        "Jolene and partner attended a festival last year",
+        "Jolene and partner went on yoga retreat with amazing sunrise view",
+        "Jolene and partner hiked to a waterfall oasis",
+        "Deborah recalls blossom tree near home blooming each spring",
+        "Both find resilience and inspiration in nature's small moments"
+      ],
+      "categories": ["music", "yoga_retreat", "nature", "family_memories", "resilience"],
+      "implied_traits": [],
+      "cross_speaker_evaluations": [
+        "Deborah characterizes Jolene as someone who finds 'inspiration in the small things' (evidence: D30:15)"
+      ],
+      "literal_summary": "Deborah attended a music festival reminding her of mom's lullabies. Jolene and partner went on a yoga retreat with sunrise and hiked to a waterfall. Both find resilience in nature's beauty.",
+      "retrieval_text": "Deborah attended music festival, music reminded her of mother's soothing lullabies. Jolene and partner attended a festival last year and went on yoga retreat with amazing sunrise colors. They hiked to a waterfall oasis. Deborah recalls a blossom tree near home blooming each spring as nature's artwork. Both find resilience and growth inspiration in nature.",
+      "bridging_terms": ["music festival", "lullabies", "yoga retreat", "sunrise", "waterfall", "hike", "blossom tree", "spring", "resilience", "nature"],
+      "latent_concepts": ["music as memory trigger", "shared retreat experiences", "nature as metaphor for resilience", "seasonal renewal"]
+    }
+  ]
+}
