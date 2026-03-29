@@ -24,7 +24,7 @@ from memory.events import _row_get, _log_event
 from memory.decay import effective_priority
 from memory.embeddings import count_tokens, embed_text, embed_batch, build_enriched_text
 from memory.formatting import format_memory_compact, format_memory_full, format_memory_pending
-from memory.fts import sanitize_fts_query, _themes_for_fts
+from memory.fts import sanitize_fts_query, _themes_for_fts, update_fts
 from memory.themes import normalize_themes
 from memory.vectors import serialize_f32
 from memory.privacy import _strip_sensitive
@@ -1143,6 +1143,153 @@ def impl_link(
         tgt_short = resolved_target[:8]
         flag_str = f" [{', '.join(parsed_flags)}]" if parsed_flags else ""
         return f"Edge created: {src_short} -> {tgt_short}{flag_str}\nContext: {linking_context}"
+    finally:
+        db.close()
+
+
+def impl_update(
+    memory_id: str,
+    content: str = "",
+    summary: str = "",
+    themes: str = "",
+    category: str = "",
+    priority: int = -1,
+    flags: str = "",
+    decay_rate: float = -999,
+    confidence: float = -999,
+) -> str:
+    """Update an existing memory in-place, preserving edges, feedback, and stats."""
+    db = get_db()
+    try:
+        resolved, err = _resolve_id(db, memory_id)
+        if err:
+            return err
+        memory_id = resolved
+
+        mem = db.execute(
+            "SELECT * FROM memories WHERE id = ? AND status != 'deleted'",
+            (memory_id,),
+        ).fetchone()
+        if not mem:
+            return f"Memory not found (or deleted): {memory_id}"
+
+        updates = []
+        params = []
+        changed_fields = []
+        needs_reembed = False
+        needs_fts = False
+
+        # --- Content ---
+        if content:
+            content = _strip_sensitive(content)
+            updates.append("content = ?")
+            params.append(content)
+            updates.append("token_count = ?")
+            params.append(count_tokens(content))
+            changed_fields.append("content")
+            needs_reembed = True
+
+        # --- Summary ---
+        if summary:
+            summary = _strip_sensitive(summary)
+            updates.append("summary = ?")
+            params.append(summary)
+            changed_fields.append("summary")
+            needs_reembed = True
+            needs_fts = True
+
+        # --- Themes ---
+        if themes:
+            themes_list = json.loads(themes) if isinstance(themes, str) else themes
+            themes_list = normalize_themes(themes_list)
+            themes_json = json.dumps(themes_list)
+            updates.append("themes = ?")
+            params.append(themes_json)
+            changed_fields.append("themes")
+            needs_reembed = True
+            needs_fts = True
+
+        # --- Category ---
+        if category:
+            valid_categories = {"episodic", "semantic", "procedural", "reflection", "meta", "entity"}
+            if category not in valid_categories:
+                return f"Invalid category '{category}'. Must be one of: {', '.join(sorted(valid_categories))}"
+            updates.append("category = ?")
+            params.append(category)
+            changed_fields.append("category")
+            needs_reembed = True
+
+        # --- Priority ---
+        if priority != -1:
+            priority = max(1, min(10, priority))
+            updates.append("base_priority = ?")
+            params.append(priority)
+            changed_fields.append("priority")
+
+        # --- Flags ---
+        if flags:
+            flags_list = json.loads(flags) if isinstance(flags, str) else flags
+            updates.append("flags = ?")
+            params.append(json.dumps(flags_list))
+            changed_fields.append("flags")
+
+        # --- Decay rate ---
+        if decay_rate != -999:
+            dr = None if decay_rate < 0 else decay_rate
+            updates.append("decay_rate = ?")
+            params.append(dr)
+            changed_fields.append("decay_rate")
+
+        # --- Confidence ---
+        if confidence != -999:
+            confidence = max(0.1, min(0.95, confidence))
+            updates.append("confidence = ?")
+            params.append(confidence)
+            changed_fields.append("confidence")
+
+        if not updates:
+            return "Nothing to update — no fields provided."
+
+        # Re-embed if content, summary, themes, or category changed
+        if needs_reembed:
+            new_content = content if content else mem["content"]
+            new_category = category if category else mem["category"]
+            if themes:
+                new_themes_list = json.loads(themes) if isinstance(themes, str) else themes
+                new_themes_list = normalize_themes(new_themes_list)
+            else:
+                new_themes_list = json.loads(mem["themes"]) if mem["themes"] else []
+            new_summary = summary if summary else (mem["summary"] or "")
+
+            enriched = build_enriched_text(new_content, new_category, new_themes_list, new_summary)
+            embedding = embed_text(enriched)
+
+            vec_rowid = db.execute(
+                "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?",
+                (memory_id,),
+            ).fetchone()
+            if vec_rowid:
+                db.execute(
+                    "UPDATE memory_vec SET embedding = ? WHERE rowid = ?",
+                    (serialize_f32(embedding), vec_rowid["rowid"]),
+                )
+
+        # Apply the UPDATE
+        params.append(memory_id)
+        db.execute(
+            f"UPDATE memories SET {', '.join(updates)} WHERE id = ?", params
+        )
+
+        # Update FTS if summary or themes changed
+        if needs_fts:
+            update_fts(db, memory_id)
+
+        _log_event(db, memory_id, "updated", context={"fields": changed_fields})
+        db.commit()
+        invalidate_reranker_cache()
+
+        label = summary or mem["summary"] or mem["content"][:60]
+        return f"Updated ({', '.join(changed_fields)}): [{category or mem['category']}] {label}\nID: {memory_id[:8]}"
     finally:
         db.close()
 

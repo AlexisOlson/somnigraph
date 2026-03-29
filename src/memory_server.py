@@ -3,23 +3,22 @@
 # dependencies = ["sqlite-vec>=0.1.6", "openai>=2.0.0", "tiktoken>=0.7.0", "mcp[cli]>=1.2.0", "lightgbm>=4.0"]
 # ///
 """
-Somnigraph Memory MCP Server — persistent memory with hybrid search.
+Claude Memory MCP Server — persistent memory with hybrid search.
 
 MCP wiring layer — tool decorators delegate to memory/ package modules.
-11 tools: startup_load, remember, recall, recall_feedback, link, forget,
+12 tools: startup_load, remember, recall, recall_feedback, link, update, forget,
   reflect, review_pending, consolidate, reembed_all, memory_stats
 
 Stack: SQLite + sqlite-vec (vector KNN) + FTS5 (keyword) + OpenAI embeddings API
 Transport: stdio (spawned by Claude Code)
-Database: ~/.somnigraph/memory.db (override with SOMNIGRAPH_DATA_DIR)
+Database: ~/.claude/data/memory.db
 """
 
 import logging
 import os
 import sys
 
-# If SOMNIGRAPH_DATA_DIR isn't set (env passthrough failed), fall back to
-# the standard production location so the server always finds the real DB.
+# Ensure DATA_DIR points to production DB regardless of which memory_server.py runs
 if "SOMNIGRAPH_DATA_DIR" not in os.environ:
     _default = os.path.join(os.path.expanduser("~"), ".claude", "data")
     if os.path.isdir(_default):
@@ -32,6 +31,39 @@ logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(levelname)s
 logger = logging.getLogger("claude-memory")
 
 # ---------------------------------------------------------------------------
+# Re-exports for sleep script compatibility (sleep_nrem.py, sleep_rem.py, sleep.py)
+# These scripts do: from memory_server import get_db, embed_text, ...
+# ---------------------------------------------------------------------------
+
+from memory.constants import *  # noqa: E402,F403 — all tuning constants
+from memory.vectors import (  # noqa: E402
+    serialize_f32, deserialize_f32, _dot, _vec_sub, _vec_scale, _norm, _novelty_score,
+)
+from memory.privacy import _strip_sensitive  # noqa: E402
+from memory.embeddings import (  # noqa: E402
+    get_openai_client, get_tokenizer, count_tokens,
+    embed_text, embed_batch, build_enriched_text,
+)
+from memory.formatting import (  # noqa: E402
+    format_memory_compact, format_memory_full, format_memory_pending,
+)
+from memory.fts import KNOWN_PHRASES, sanitize_fts_query, _themes_for_fts, update_fts, delete_fts  # noqa: E402
+from memory.themes import (  # noqa: E402
+    THEME_VARIANTS, CONTENT_THEME_PHRASES, LEARNED_MAPPINGS_PATH,
+    _get_all_mappings, add_theme_mapping, normalize_themes,
+    normalize_all_themes, split_theme_on_memories,
+)
+from memory.db import get_db, DB_PATH, _resolve_id  # noqa: E402
+from memory.sync import _row_get, _log_event  # noqa: E402
+from memory.decay import effective_priority  # noqa: E402
+from memory.write import _insert_memory  # noqa: E402
+from memory.graph import (  # noqa: E402
+    _create_edge, _handle_temporal_evolution, _find_related_memories,
+    _check_fast_path, _compute_shadow_load, _source_confidence_modifier,
+)
+from memory.stats import compute_stats  # noqa: E402
+
+# ---------------------------------------------------------------------------
 # Tool implementations
 # ---------------------------------------------------------------------------
 
@@ -41,6 +73,7 @@ from memory.tools import (  # noqa: E402
     impl_recall,
     impl_recall_feedback,
     impl_link,
+    impl_update,
     impl_forget,
     impl_reflect,
     impl_review_pending,
@@ -48,17 +81,6 @@ from memory.tools import (  # noqa: E402
     impl_reembed_all,
     impl_memory_stats,
 )
-from memory.reranker import load_model as _load_reranker  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Eagerly load reranker model (if present) at import time
-# ---------------------------------------------------------------------------
-
-_reranker = _load_reranker()
-if _reranker:
-    logger.info("Reranker model loaded — scoring via learned model")
-else:
-    logger.info("No reranker model — scoring via formula")
 
 # ---------------------------------------------------------------------------
 # MCP Server
@@ -96,7 +118,9 @@ def remember(
         content: The memory content. Embedded as a vector for semantic similarity search —
             write in natural language with full context, relationships, and reasoning.
             Richer context produces better semantic matches.
-        category: One of: episodic, semantic, procedural, reflection, meta.
+        category: One of: episodic, semantic, procedural, reflection, meta, entity.
+            Entity memories are curated summaries of named entities (people, projects,
+            places) that serve as retrieval hubs linked to detailed memories.
         priority: Importance 1-10 (10 = pinned, never decays).
         themes: JSON array of tags, indexed by FTS5 for keyword retrieval.
             Use canonical hyphenated terms, e.g. '["skyrim-modding","identity"]'.
@@ -212,6 +236,37 @@ def link(
             Empty array [] for contextual/thematic links (the common case).
     """
     return impl_link(source_id, target_id, linking_context, flags)
+
+
+@mcp.tool()
+def update(
+    memory_id: str,
+    content: str = "",
+    summary: str = "",
+    themes: str = "",
+    category: str = "",
+    priority: int = -1,
+    flags: str = "",
+    decay_rate: float = -999,
+    confidence: float = -999,
+) -> str:
+    """Update an existing memory in-place, preserving edges, feedback stats, and co-retrieval history.
+
+    Only provide fields you want to change — omitted fields are left untouched.
+    Re-embeds automatically if content, summary, themes, or category change.
+
+    Args:
+        memory_id: Full or prefix ID of the memory to update.
+        content: New content (replaces existing). Empty = no change.
+        summary: New summary. Empty = no change.
+        themes: New themes as JSON array, e.g. '["home-office","furniture"]'. Empty = no change.
+        category: New category. Empty = no change.
+        priority: New priority 1-10. -1 = no change.
+        flags: New flags as JSON array. Empty = no change.
+        decay_rate: New decay rate. -999 = no change. -1 = use category default. 0 = timeless.
+        confidence: New confidence 0.1-0.95. -999 = no change.
+    """
+    return impl_update(memory_id, content, summary, themes, category, priority, flags, decay_rate, confidence)
 
 
 @mcp.tool()
