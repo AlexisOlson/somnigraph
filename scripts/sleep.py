@@ -107,10 +107,24 @@ def detect_theme_variants():
                 candidates.append((a, counter[a], b, counter[b], reason))
 
     if candidates:
+        # Group by variant type, then sort each group by combined frequency
+        by_type = {}
+        for c in candidates:
+            by_type.setdefault(c[4], []).append(c)
+
+        # Order types: mechanical first (casing, separator, plural, verb), then prefix
+        type_order = ["casing", "separator", "separator (no-sep vs hyphenated)",
+                       "singular/plural", "verb form (-ing)", "prefix (rare compound)"]
+        ordered_types = [t for t in type_order if t in by_type]
+        ordered_types += [t for t in by_type if t not in ordered_types]
+
         print(f"  Found {len(candidates)} potential variant pair(s):\n")
-        for a, ca, b, cb, reason in sorted(candidates, key=lambda x: -(x[1] + x[3])):
-            print(f"    \"{a}\" ({ca}) <-> \"{b}\" ({cb}) — {reason}")
-        print()
+        for vtype in ordered_types:
+            pairs = sorted(by_type[vtype], key=lambda x: -(x[1] + x[3]))
+            print(f"    [{vtype}] ({len(pairs)} pairs)")
+            for a, ca, b, cb, reason in pairs:
+                print(f"      \"{a}\" ({ca}) <-> \"{b}\" ({cb})")
+            print()
     else:
         print("  No potential variants detected\n")
 
@@ -202,99 +216,8 @@ def _ensure_subprocess_workspace():
         head_file.write_text("ref: refs/heads/main\n")
 
 
-def review_themes_with_llm():
-    """Send full theme list to an LLM for semantic variant detection.
-
-    Returns structured suggestions and writes them to theme_review.json
-    for the next session's instance to act on.
-    """
-    print(f"{'─' * 60}")
-    print(f"  Post-sleep: LLM theme review")
-    print(f"{'─' * 60}")
-
-    # Gather theme frequencies
-    db = sqlite3.connect(str(DB_PATH))
-    db.row_factory = sqlite3.Row
-    rows = db.execute(
-        "SELECT themes FROM memories WHERE status IN ('active', 'pending')"
-    ).fetchall()
-    db.close()
-
-    counter = collections.Counter()
-    for r in rows:
-        themes = json.loads(r["themes"]) if r["themes"] else []
-        for t in themes:
-            counter[t] += 1
-
-    # Build the theme list sorted by frequency
-    theme_lines = []
-    for theme, count in counter.most_common():
-        theme_lines.append(f"  {count:3d}  {theme}")
-    theme_block = "\n".join(theme_lines)
-
-    # Load current THEME_VARIANTS from themes.py source (avoid importing full module)
-    existing_mappings = _load_theme_variants_from_source()
-    if existing_mappings:
-        existing_mappings = "\n".join(f"  {k} -> {v}" for k, v in sorted(existing_mappings.items()))
-    else:
-        existing_mappings = "  (none loaded)"
-
-    prompt = f"""You are reviewing theme tags used in a personal memory system. These tags are used for FTS5 keyword search and clustering. Your job is to identify problems and suggest normalizations.
-
-## Current themes (count, tag):
-{theme_block}
-
-## Existing normalization mappings (already applied):
-{existing_mappings}
-
-## Two passes — obvious first, then nuanced:
-
-### Pass 1: Obvious mechanical fixes (up to 50)
-
-Sweep the full list for zero-risk normalizations. These require no judgment:
-
-- **Casing**: "FTS" and "fts" → pick lowercase
-- **Separators**: "eval_retrieval" and "eval-retrieval" → pick hyphenated
-- **Singular/plural**: "pattern" and "patterns" → pick singular
-- **Verb forms**: "overclaim" and "overclaiming" → pick the more common form
-- **Abbreviations**: "eval" and "evaluation" → pick the more common form
-- **No-separator vs hyphenated**: "journalmanager" and "journal-manager" → pick hyphenated
-- **File extensions as tags**: "core.md" → "core-md" (consistent separator)
-
-Be thorough — get ALL of these in one pass. Up to 50.
-
-### Pass 2: Nuanced suggestions (up to 10)
-
-Now think harder about these:
-
-1. **Semantic duplicates**: Different words for the same concept. Only flag if clearly the same.
-2. **Overly specific singletons**: Tags used once that are just a longer version of an established tag, where the memory probably already has the base tag.
-3. **Tags that should be split**: A compound tag better served as two separate established tags (e.g., "skyrim-modding-gotchas" → ["skyrim-modding", "gotcha"]).
-4. **Prefer split over merge**: When a compound tag's components are both established tags (5+ uses each), suggest a split.
-
-## What NOT to flag:
-
-- Tags that are genuinely distinct even if one is a prefix (e.g., "skyrim" and "skyrim-modding" are different concepts)
-- Rare tags that serve as precise search hooks for specific memories
-- Tags already in the existing normalization mappings
-
-## Output format:
-
-Return ONLY a JSON object:
-{{
-  "merge": [
-    {{"from": "variant-tag", "to": "canonical-tag", "reason": "brief explanation"}}
-  ],
-  "split": [
-    {{"tag": "compound-tag", "into": ["tag1", "tag2"], "reason": "brief explanation"}}
-  ],
-  "drop": [
-    {{"tag": "useless-tag", "reason": "brief explanation"}}
-  ]
-}}
-
-Include both Pass 1 and Pass 2 results in the same lists. Be thorough on mechanical fixes, thoughtful on nuanced ones."""
-
+def _call_claude_json(prompt: str, model: str = "sonnet", timeout: int = 300, label: str = "LLM") -> dict | None:
+    """Call claude -p and parse JSON response. Returns parsed dict or None."""
     _ensure_subprocess_workspace()
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)
@@ -309,7 +232,7 @@ Include both Pass 1 and Pass 2 results in the same lists. Be thorough on mechani
         result = subprocess.run(
             [
                 claude_bin, "-p",
-                "--model", "sonnet",
+                "--model", model,
                 "--no-session-persistence",
                 "--strict-mcp-config",
                 "--mcp-config", EMPTY_MCP_CONFIG,
@@ -325,48 +248,186 @@ Include both Pass 1 and Pass 2 results in the same lists. Be thorough on mechani
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=300,
+            timeout=timeout,
             cwd=str(_SUBPROCESS_CWD),
             env=env,
             **kwargs,
         )
     except subprocess.TimeoutExpired:
-        print("  WARNING: LLM theme review timed out", file=sys.stderr)
+        print(f"  WARNING: {label} timed out ({timeout}s)", file=sys.stderr)
         return None
     except FileNotFoundError:
-        print("  ERROR: 'claude' CLI not found on PATH", file=sys.stderr)
+        print(f"  ERROR: 'claude' CLI not found on PATH", file=sys.stderr)
         return None
 
     if result.returncode != 0:
         stderr_preview = (result.stderr or "")[:200]
-        print(f"  WARNING: claude -p returned {result.returncode}: {stderr_preview}", file=sys.stderr)
+        print(f"  WARNING: {label} returned {result.returncode}: {stderr_preview}", file=sys.stderr)
         return None
 
-    # Parse JSON from response
     raw = result.stdout.strip()
-    # Strip markdown fences if present
     if raw.startswith("```"):
         lines = raw.split("\n")
         lines = [l for l in lines if not l.startswith("```")]
         raw = "\n".join(lines)
 
     try:
-        suggestions = json.loads(raw)
+        return json.loads(raw)
     except json.JSONDecodeError:
-        # Try to extract JSON from the response
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start >= 0 and end > start:
             try:
-                suggestions = json.loads(raw[start:end])
+                return json.loads(raw[start:end])
             except json.JSONDecodeError:
-                print(f"  WARNING: could not parse LLM response: {raw[:300]}", file=sys.stderr)
-                return None
-        else:
-            print(f"  WARNING: no JSON found in LLM response: {raw[:300]}", file=sys.stderr)
-            return None
+                pass
+        print(f"  WARNING: {label} response not valid JSON: {raw[:200]}", file=sys.stderr)
+        return None
 
-    # Print summary
+
+def review_themes_with_llm(detected_variants: list | None = None):
+    """Run mechanical and nuanced theme reviews in parallel.
+
+    Mechanical review: uses detected variant pairs (fast, Haiku).
+    Nuanced review: uses full theme list (slower, Sonnet).
+    Results merged into one suggestion set.
+    """
+    print(f"{'─' * 60}")
+    print(f"  Post-sleep: LLM theme review")
+    print(f"{'─' * 60}")
+
+    # Gather theme frequencies
+    counter = _get_theme_counter()
+
+    # Build variant block grouped by type for mechanical review
+    variant_block = ""
+    if detected_variants:
+        by_type = {}
+        for c in detected_variants:
+            by_type.setdefault(c[4], []).append(c)
+        type_order = ["casing", "separator", "separator (no-sep vs hyphenated)",
+                       "singular/plural", "verb form (-ing)"]
+        lines = []
+        for vtype in type_order:
+            if vtype not in by_type:
+                continue
+            lines.append(f"\n  [{vtype}]")
+            for a, ca, b, cb, _ in sorted(by_type[vtype], key=lambda x: -(x[1] + x[3])):
+                lines.append(f"    \"{a}\" ({ca}) <-> \"{b}\" ({cb})")
+        variant_block = "\n".join(lines)
+
+    # Build theme list for nuanced review — only themes with 3+ uses (skip mechanical territory)
+    # Also exclude themes already flagged as mechanical variants
+    mechanical_themes = set()
+    if detected_variants:
+        for a, ca, b, cb, reason in detected_variants:
+            if reason != "prefix (rare compound)":
+                mechanical_themes.add(a)
+                mechanical_themes.add(b)
+    theme_lines = [f"  {count:3d}  {theme}" for theme, count in counter.most_common()
+                   if count >= 3 and theme not in mechanical_themes]
+    theme_block = "\n".join(theme_lines)
+
+    existing_mappings = _load_theme_variants_from_source()
+    if existing_mappings:
+        mappings_block = "\n".join(f"  {k} -> {v}" for k, v in sorted(existing_mappings.items()))
+    else:
+        mappings_block = "  (none loaded)"
+
+    # --- Mechanical prompt (fast, focused on detected variants) ---
+    mechanical_prompt = f"""You are normalizing theme tags in a personal memory system. Below are detected variant pairs grouped by type. For each pair, decide the canonical form and suggest a merge.
+
+## Detected variant pairs:
+{variant_block}
+
+## Existing mappings (already handled, skip these):
+{mappings_block}
+
+## Rules:
+- For casing: prefer lowercase
+- For separators: prefer hyphenated (e.g., "eval-retrieval" not "eval_retrieval")
+- For singular/plural: prefer singular
+- For verb forms: prefer the more common form (higher count)
+- Skip any pair where both forms are genuinely distinct concepts
+- Up to 50 suggestions
+
+## Output format:
+Return ONLY a JSON object:
+{{
+  "merge": [{{"from": "variant", "to": "canonical", "reason": "type"}}],
+  "split": [],
+  "drop": []
+}}""" if variant_block else None
+
+    # --- Nuanced prompt (deeper analysis of full theme list) ---
+    nuanced_prompt = f"""You are reviewing theme tags in a personal memory system for deeper quality issues. Mechanical variants (casing, plurals, separators) are handled separately — focus on semantic and structural problems.
+
+## Current themes (count, tag):
+{theme_block}
+
+## Existing mappings (already handled):
+{mappings_block}
+
+## What to look for (up to 10 suggestions):
+
+1. **Semantic duplicates**: Different words for the same concept. Only flag if clearly the same.
+2. **Overly specific singletons**: Tags used once that are just a longer version of an established tag, where the memory probably already has the base tag.
+3. **Tags that should be split**: A compound tag better served as two separate established tags (e.g., "skyrim-modding-gotchas" -> ["skyrim-modding", "gotcha"]).
+4. **Prefer split over merge**: When a compound tag's components are both established tags (5+ uses each), suggest a split.
+
+## What NOT to flag:
+- Casing, separator, plural, or verb-form variants (handled separately)
+- Tags that are genuinely distinct even if one is a prefix
+- Tags already in the existing mappings
+
+## Output format:
+Return ONLY a JSON object:
+{{
+  "merge": [{{"from": "variant-tag", "to": "canonical-tag", "reason": "brief explanation"}}],
+  "split": [{{"tag": "compound-tag", "into": ["tag1", "tag2"], "reason": "brief explanation"}}],
+  "drop": [{{"tag": "useless-tag", "reason": "brief explanation"}}]
+}}"""
+
+    # Launch both reviews in parallel
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    futures = {}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        if mechanical_prompt:
+            futures["mechanical"] = pool.submit(
+                _call_claude_json, mechanical_prompt, "haiku", 120, "mechanical review"
+            )
+        futures["nuanced"] = pool.submit(
+            _call_claude_json, nuanced_prompt, "sonnet", 300, "nuanced review"
+        )
+
+        results = {}
+        for name, future in futures.items():
+            results[name] = future.result()
+
+    # Merge results
+    merged = {"merge": [], "split": [], "drop": []}
+    for name in ["mechanical", "nuanced"]:
+        r = results.get(name)
+        if r:
+            merged["merge"].extend(r.get("merge", []))
+            merged["split"].extend(r.get("split", []))
+            merged["drop"].extend(r.get("drop", []))
+            print(f"  {name.capitalize()}: {sum(len(r.get(k, [])) for k in ('merge', 'split', 'drop'))} suggestions")
+        else:
+            print(f"  {name.capitalize()}: failed")
+
+    # Deduplicate merges (both might suggest the same thing)
+    seen = set()
+    unique_merges = []
+    for m in merged["merge"]:
+        key = (m.get("from", ""), m.get("to", ""))
+        if key not in seen:
+            seen.add(key)
+            unique_merges.append(m)
+    merged["merge"] = unique_merges
+
+    suggestions = merged
     merges = suggestions.get("merge", [])
     splits = suggestions.get("split", [])
     drops = suggestions.get("drop", [])
@@ -904,8 +965,8 @@ def main():
         [sys.executable, str(SCRIPTS / "sleep_rem.py")],
     )
 
-    detect_theme_variants()
-    suggestions = review_themes_with_llm()
+    variants = detect_theme_variants()
+    suggestions = review_themes_with_llm(variants)
     if suggestions:
         apply_theme_suggestions(suggestions)
 
