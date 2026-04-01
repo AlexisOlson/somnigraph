@@ -9,7 +9,7 @@ from pathlib import Path
 
 import sqlite_vec
 
-from memory.constants import DATA_DIR
+from memory.constants import DATA_DIR, EMBEDDING_DIM
 from memory.fts import _themes_for_fts
 
 logger = logging.getLogger("claude-memory")
@@ -210,9 +210,10 @@ def _init_schema(db: sqlite3.Connection):
     """)
 
     # sqlite-vec virtual table (must be outside executescript)
-    db.execute("""
+    # EMBEDDING_DIM is set at creation time — changing backend won't alter an existing table.
+    db.execute(f"""
         CREATE VIRTUAL TABLE IF NOT EXISTS memory_vec USING vec0(
-            embedding float[1536] distance_metric=cosine
+            embedding float[{EMBEDDING_DIM}] distance_metric=cosine
         )
     """)
 
