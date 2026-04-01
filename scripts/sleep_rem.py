@@ -2076,11 +2076,28 @@ Return JSON:
         log("  Seed curation: LLM call failed")
         return stats
 
+    # Strip markdown fences if present
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.split("\n")
+        lines = [l for l in lines if not l.startswith("```")]
+        cleaned = "\n".join(lines)
+
     try:
-        result = json.loads(raw)
+        result = json.loads(cleaned)
     except json.JSONDecodeError:
-        log(f"  Seed curation: failed to parse LLM response")
-        return stats
+        # Try to extract JSON from the response
+        start = cleaned.find("{")
+        end = cleaned.rfind("}") + 1
+        if start >= 0 and end > start:
+            try:
+                result = json.loads(cleaned[start:end])
+            except json.JSONDecodeError:
+                log("  Seed curation: failed to parse LLM response")
+                return stats
+        else:
+            log("  Seed curation: no JSON found in LLM response")
+            return stats
 
     graduated = result.get("graduated", [])
     new_seed = result.get("rewritten_seed", "")
