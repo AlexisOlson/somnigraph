@@ -426,8 +426,11 @@ Return ONLY a JSON object:
 {{
   "merge": [{{"from": "variant-tag", "to": "canonical-tag", "reason": "brief explanation"}}],
   "split": [{{"tag": "compound-tag", "into": ["tag1", "tag2"], "reason": "brief explanation"}}],
-  "drop": [{{"tag": "useless-tag", "reason": "brief explanation"}}]
-}}"""
+  "drop": [{{"tag": "useless-tag", "reason": "brief explanation"}}],
+  "keep_distinct": [{{"a": "tag1", "b": "tag2", "reason": "why these are genuinely different"}}]
+}}
+
+The "keep_distinct" list is important: for any pair you considered and decided NOT to merge, say so explicitly. This prevents re-evaluation on future runs."""
 
     # Launch both reviews in parallel
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -447,14 +450,20 @@ Return ONLY a JSON object:
             results[name] = future.result()
 
     # Merge results
-    merged = {"merge": [], "split": [], "drop": []}
+    merged = {"merge": [], "split": [], "drop": [], "keep_distinct": []}
     for name in ["mechanical", "nuanced"]:
         r = results.get(name)
         if r:
             merged["merge"].extend(r.get("merge", []))
             merged["split"].extend(r.get("split", []))
             merged["drop"].extend(r.get("drop", []))
-            print(f"  {name.capitalize()}: {sum(len(r.get(k, [])) for k in ('merge', 'split', 'drop'))} suggestions")
+            merged["keep_distinct"].extend(r.get("keep_distinct", []))
+            action_count = sum(len(r.get(k, [])) for k in ("merge", "split", "drop"))
+            distinct_count = len(r.get("keep_distinct", []))
+            label = f"{action_count} suggestions"
+            if distinct_count:
+                label += f", {distinct_count} keep_distinct"
+            print(f"  {name.capitalize()}: {label}")
         else:
             print(f"  {name.capitalize()}: failed")
 
@@ -541,6 +550,7 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
     merges = suggestions.get("merge", [])
     splits = suggestions.get("split", [])
     drops = suggestions.get("drop", [])
+    keep_distinct = suggestions.get("keep_distinct", [])
 
     applied = []
 
@@ -621,6 +631,13 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
             decided[_pair_key(m["from"], m["to"])] = "merged"
         for s in splits:
             decided[s["tag"].lower()] = "split"
+        for kd in keep_distinct:
+            key = _pair_key(kd.get("a", ""), kd.get("b", ""))
+            if key and "|" in key:
+                decided[key] = "keep_distinct"
+        new_distinct = len(keep_distinct)
+        if new_distinct:
+            print(f"  Recorded {new_distinct} pair(s) as keep_distinct")
         _save_decisions(decisions)
 
     # --- Clear review file ---
@@ -983,20 +1000,6 @@ def main():
     if suggestions:
         apply_theme_suggestions(suggestions)
 
-    # Record remaining detected pairs as "keep_distinct" — the LLM saw them
-    # (via the theme list) and chose not to suggest action
-    if variants:
-        decisions = _load_decisions()
-        decided = decisions.setdefault("decided", {})
-        new_distinct = 0
-        for a, ca, b, cb, reason in variants:
-            key = _pair_key(a, b)
-            if key not in decided:
-                decided[key] = "keep_distinct"
-                new_distinct += 1
-        if new_distinct:
-            _save_decisions(decisions)
-            print(f"  Recorded {new_distinct} pairs as keep_distinct")
 
     # Phase 3: Retrieval probe — generate feedback signal for underserved memories
     sys.path.insert(0, str(SCRIPTS))
