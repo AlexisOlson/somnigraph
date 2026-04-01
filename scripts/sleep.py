@@ -368,7 +368,7 @@ Return ONLY a JSON object:
 ## Existing mappings (already handled):
 {mappings_block}
 
-## What to look for (up to 10 suggestions):
+## What to look for (up to 20 suggestions):
 
 1. **Semantic duplicates**: Different words for the same concept. Only flag if clearly the same.
 2. **Overly specific singletons**: Tags used once that are just a longer version of an established tag, where the memory probably already has the base tag.
