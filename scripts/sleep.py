@@ -455,7 +455,7 @@ Return ONLY a JSON object:
         "timestamp": datetime.now().isoformat(),
         "suggestions": suggestions,
         "theme_count": len(counter),
-        "memory_count": len(rows),
+        "memory_count": sum(counter.values()),
     }
     THEME_REVIEW_LOG.parent.mkdir(parents=True, exist_ok=True)
     THEME_REVIEW_LOG.write_text(json.dumps(review_data, indent=2), encoding="utf-8")
