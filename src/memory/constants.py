@@ -117,8 +117,18 @@ DISAPPOINTED_RETRIEVAL_SCORE = 0.25  # top_score above this = retrieval failure;
 # Fixed — structural
 # ---------------------------------------------------------------------------
 
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIM = 1536
+EMBEDDING_BACKEND = os.environ.get("SOMNIGRAPH_EMBEDDING_BACKEND", "openai")
+
+_BACKEND_CONFIG = {
+    "openai": {"model": "text-embedding-3-small", "dim": 1536},
+    "fastembed": {"model": "BAAI/bge-small-en-v1.5", "dim": 384},
+}
+
+if EMBEDDING_BACKEND not in _BACKEND_CONFIG:
+    raise ValueError(f"Unknown embedding backend: {EMBEDDING_BACKEND}. Must be one of: {list(_BACKEND_CONFIG)}")
+
+EMBEDDING_MODEL = _BACKEND_CONFIG[EMBEDDING_BACKEND]["model"]
+EMBEDDING_DIM = _BACKEND_CONFIG[EMBEDDING_BACKEND]["dim"]
 
 DEDUP_THRESHOLD = 0.1  # cosine distance; similarity > 0.9
 PENDING_STALE_DAYS = 14

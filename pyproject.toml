@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+fastembed = ["fastembed>=0.4.0"]
 tuning = ["optuna>=4.0", "scikit-learn>=1.0", "matplotlib>=3.8"]
 
 [project.urls]

@@ -104,7 +104,9 @@ def add_theme_mapping(from_theme: str, to_theme: str):
 def normalize_themes(themes_list: list[str], content: str = "") -> list[str]:
     """Normalize variant themes to canonical forms. Optionally auto-expand from content. Deduplicates."""
     mappings = _get_all_mappings()
-    result = [mappings.get(t, t) for t in themes_list]
+    # Auto-hyphenate underscore/space variants before checking explicit mappings
+    canonicalized = [t.replace("_", "-").replace(" ", "-") for t in themes_list]
+    result = [mappings.get(t, t) for t in canonicalized]
 
     # Content-aware auto-expansion
     if content:
