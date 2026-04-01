@@ -380,17 +380,16 @@ IMPORTANT query style rules:
 - Each query should target 1-3 of the provided memories (not all of them)
 - Think: "what FTS5 tokens would match THIS specific memory?"
 
-CONTEXT field (optional, for vector search):
+CONTEXT field (always required):
 - "context" is a longer natural-language description (1-2 sentences) of what you're looking for.
-- Use context when the keywords are ambiguous or shared across domains (e.g. "training" could mean ML training or sports training), OR when a semantic description would reach memories the keywords might miss.
-- Leave context as "" when the keywords are already specific enough (proper nouns, unique technical terms).
-- Roughly half the queries should have context, half should not.
+- This drives vector search. Always provide it — real recalls always have both query and context.
+- The query provides FTS5 keywords; context provides the semantic signal. Both matter.
 
 Memories:
 {memories}
 
 Return a JSON array of objects:
-[{{"query": "keyword string here", "context": "optional longer description or empty string", "target_ids": ["id1", "id2"], "intent": "brief description of what the searcher wants"}}]"""
+[{{"query": "keyword string here", "context": "natural-language description of what you're looking for", "target_ids": ["id1", "id2"], "intent": "brief description of what the searcher wants"}}]"""
 
 
 def craft_queries(group: list[dict], n_queries: int, model: str, timeout: int) -> list[dict]:
