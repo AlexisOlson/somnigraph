@@ -55,6 +55,7 @@ from memory import DB_PATH
 _SUBPROCESS_CWD = DATA_DIR / "subprocess_workspace"
 EMPTY_MCP_CONFIG = json.dumps({"mcpServers": {}})
 THEME_REVIEW_LOG = DATA_DIR / "theme_review.json"
+THEME_DECISIONS_LOG = DATA_DIR / "theme_decisions.json"
 
 
 def run_theme_normalization():
@@ -73,13 +74,31 @@ def run_theme_normalization():
     return updated
 
 
-def detect_theme_variants():
-    """Detect potential theme variants. Prints candidates for human review.
+def _load_decisions() -> dict:
+    """Load theme decisions (applied merges/splits + declined pairs).
 
-    High-confidence: casing, underscore/hyphen, singular/plural.
-    Medium-confidence: prefix where short form is established (>=5 uses)
-    and long form is rare (<=2 uses) — suggests the compound was unnecessary.
+    Format: {"decided": {"a|b": "keep_distinct"/"merged"/"split", ...}}
     """
+    if THEME_DECISIONS_LOG.exists():
+        try:
+            return json.loads(THEME_DECISIONS_LOG.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return {"decided": {}}
+
+
+def _save_decisions(decisions: dict):
+    THEME_DECISIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
+    THEME_DECISIONS_LOG.write_text(json.dumps(decisions, indent=2), encoding="utf-8")
+
+
+def _pair_key(a: str, b: str) -> str:
+    """Canonical key for a theme pair (sorted, pipe-separated)."""
+    return "|".join(sorted([a.lower(), b.lower()]))
+
+
+def detect_theme_variants():
+    """Detect potential theme variants, excluding already-decided pairs."""
     print(f"{'─' * 60}")
     print(f"  Post-sleep: Theme variant detection")
     print(f"{'─' * 60}")
@@ -97,22 +116,31 @@ def detect_theme_variants():
         for t in themes:
             counter[t] += 1
 
+    decisions = _load_decisions()
+    decided = decisions.get("decided", {})
+
     themes = sorted(counter.keys())
     candidates = []
+    skipped = 0
 
     for i, a in enumerate(themes):
         for b in themes[i + 1:]:
             reason = _variant_reason(a, b, counter[a], counter[b])
             if reason:
+                key = _pair_key(a, b)
+                if key in decided:
+                    skipped += 1
+                    continue
                 candidates.append((a, counter[a], b, counter[b], reason))
 
+    if skipped:
+        print(f"  ({skipped} pairs skipped — already decided)")
+
     if candidates:
-        # Group by variant type, then sort each group by combined frequency
         by_type = {}
         for c in candidates:
             by_type.setdefault(c[4], []).append(c)
 
-        # Order types: mechanical first (casing, separator, plural, verb), then prefix
         type_order = ["casing", "separator", "separator (no-sep vs hyphenated)",
                        "singular/plural", "verb form (-ing)", "prefix (rare compound)"]
         ordered_types = [t for t in type_order if t in by_type]
@@ -359,6 +387,16 @@ Return ONLY a JSON object:
   "drop": []
 }}""" if variant_block else None
 
+    # --- Build decided-pairs context for nuanced prompt ---
+    decisions = _load_decisions()
+    decided = decisions.get("decided", {})
+    decided_lines = []
+    for key, action in sorted(decided.items()):
+        if action == "keep_distinct":
+            a, b = key.split("|", 1)
+            decided_lines.append(f"  {a} <-> {b} (distinct)")
+    decided_block = "\n".join(decided_lines) if decided_lines else "  (none yet)"
+
     # --- Nuanced prompt (deeper analysis of full theme list) ---
     nuanced_prompt = f"""You are reviewing theme tags in a personal memory system for deeper quality issues. Mechanical variants (casing, plurals, separators) are handled separately — focus on semantic and structural problems.
 
@@ -367,6 +405,9 @@ Return ONLY a JSON object:
 
 ## Existing mappings (already handled):
 {mappings_block}
+
+## Previously reviewed pairs (already decided — skip these):
+{decided_block}
 
 ## What to look for (up to 20 suggestions):
 
@@ -378,7 +419,7 @@ Return ONLY a JSON object:
 ## What NOT to flag:
 - Casing, separator, plural, or verb-form variants (handled separately)
 - Tags that are genuinely distinct even if one is a prefix
-- Tags already in the existing mappings
+- Tags already in the existing mappings or the previously reviewed pairs list
 
 ## Output format:
 Return ONLY a JSON object:
@@ -571,6 +612,16 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
             print(f"  {line}")
     else:
         print("\n  Nothing to apply")
+
+    # --- Record decisions ---
+    if not dry_run:
+        decisions = _load_decisions()
+        decided = decisions.setdefault("decided", {})
+        for m in merges:
+            decided[_pair_key(m["from"], m["to"])] = "merged"
+        for s in splits:
+            decided[s["tag"].lower()] = "split"
+        _save_decisions(decisions)
 
     # --- Clear review file ---
     if not dry_run and THEME_REVIEW_LOG.exists():
@@ -931,6 +982,21 @@ def main():
     suggestions = review_themes_with_llm(variants)
     if suggestions:
         apply_theme_suggestions(suggestions)
+
+    # Record remaining detected pairs as "keep_distinct" — the LLM saw them
+    # (via the theme list) and chose not to suggest action
+    if variants:
+        decisions = _load_decisions()
+        decided = decisions.setdefault("decided", {})
+        new_distinct = 0
+        for a, ca, b, cb, reason in variants:
+            key = _pair_key(a, b)
+            if key not in decided:
+                decided[key] = "keep_distinct"
+                new_distinct += 1
+        if new_distinct:
+            _save_decisions(decisions)
+            print(f"  Recorded {new_distinct} pairs as keep_distinct")
 
     # Phase 3: Retrieval probe — generate feedback signal for underserved memories
     sys.path.insert(0, str(SCRIPTS))
