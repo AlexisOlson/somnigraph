@@ -247,25 +247,36 @@ def review_themes_with_llm():
 ## Existing normalization mappings (already applied):
 {existing_mappings}
 
-## What to look for:
+## Two passes — obvious first, then nuanced:
 
-1. **Semantic duplicates**: Different words for the same concept (e.g., "the-commons" and "inter-instance-community" might overlap). Only flag if they're clearly the same concept.
+### Pass 1: Obvious mechanical fixes (up to 50)
 
-2. **Overly specific singletons**: Tags used once that are just a longer version of an established tag. The memory probably already has the base tag too, so the compound adds nothing to search.
+Sweep the full list for zero-risk normalizations. These require no judgment:
 
-3. **Tags that should be split**: A compound tag that would be better as two separate established tags (e.g., "skyrim-modding-gotchas" -> use ["skyrim-modding", "gotcha"] instead).
+- **Casing**: "FTS" and "fts" → pick lowercase
+- **Separators**: "eval_retrieval" and "eval-retrieval" → pick hyphenated
+- **Singular/plural**: "pattern" and "patterns" → pick singular
+- **Verb forms**: "overclaim" and "overclaiming" → pick the more common form
+- **Abbreviations**: "eval" and "evaluation" → pick the more common form
+- **No-separator vs hyphenated**: "journalmanager" and "journal-manager" → pick hyphenated
+- **File extensions as tags**: "core.md" → "core-md" (consistent separator)
 
-4. **Inconsistencies**: Mixed conventions (casing, separators, abbreviations).
+Be thorough — get ALL of these in one pass. Up to 50.
 
-5. **Prefer split over merge**: When a compound tag's components are both established tags
-   (5+ uses each), suggest a split rather than a merge. E.g., "writing-calibration" should
-   split into ["writing", "calibration"], not merge into just "calibration".
+### Pass 2: Nuanced suggestions (up to 10)
+
+Now think harder about these:
+
+1. **Semantic duplicates**: Different words for the same concept. Only flag if clearly the same.
+2. **Overly specific singletons**: Tags used once that are just a longer version of an established tag, where the memory probably already has the base tag.
+3. **Tags that should be split**: A compound tag better served as two separate established tags (e.g., "skyrim-modding-gotchas" → ["skyrim-modding", "gotcha"]).
+4. **Prefer split over merge**: When a compound tag's components are both established tags (5+ uses each), suggest a split.
 
 ## What NOT to flag:
 
-- Tags that are genuinely distinct even if one is a prefix of another (e.g., "skyrim" and "skyrim-modding" are different concepts)
+- Tags that are genuinely distinct even if one is a prefix (e.g., "skyrim" and "skyrim-modding" are different concepts)
 - Rare tags that serve as precise search hooks for specific memories
-- Tags that are already in the existing normalization mappings
+- Tags already in the existing normalization mappings
 
 ## Output format:
 
@@ -282,7 +293,7 @@ Return ONLY a JSON object:
   ]
 }}
 
-Be conservative. Only suggest changes you're confident about. An empty list is fine if nothing needs changing. Aim for 5-15 suggestions max."""
+Include both Pass 1 and Pass 2 results in the same lists. Be thorough on mechanical fixes, thoughtful on nuanced ones."""
 
     _ensure_subprocess_workspace()
     env = dict(os.environ)
