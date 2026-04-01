@@ -483,18 +483,9 @@ def _get_theme_counter() -> collections.Counter:
 
 
 def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
-    """Auto-apply high-confidence theme suggestions, queue the rest.
-
-    Thresholds:
-    - Merge auto-apply: heuristic-detected variant (casing/separator/plural/verb-form),
-      OR target has 15x+ source count AND source <= 2,
-      OR LLM-confirmed merge where source <= 5 uses
-    - Split auto-apply: ALL resulting tags already exist with 5+ uses
-    - Merge → split conversion: source is compound of established tags (5+ each)
-    - Drops: never auto-apply
-    """
+    """Apply all LLM theme suggestions. The LLM review is the quality gate."""
     print(f"{'─' * 60}")
-    print(f"  Post-sleep: Auto-applying theme suggestions")
+    print(f"  Post-sleep: Applying theme suggestions")
     print(f"{'─' * 60}")
 
     from memory import (
@@ -502,6 +493,8 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
         normalize_all_themes,
         split_theme_on_memories,
     )
+    from memory.themes import normalize_themes
+    from memory.fts import update_fts
 
     counter = _get_theme_counter()
     merges = suggestions.get("merge", [])
@@ -509,69 +502,64 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
     drops = suggestions.get("drop", [])
 
     applied = []
-    queued_merges = []
-    queued_splits = []
-    queued_drops = list(drops)  # drops always queued
 
     # --- Process merges ---
     for m in merges:
         src, tgt = m["from"], m["to"]
         src_count = counter.get(src, 0)
-        tgt_count = counter.get(tgt, 0)
-        reason = m.get("reason", "")
 
         # Check if this should be converted to a split instead
-        # Source contains hyphens and components are each established themes
         parts = src.split("-")
         if len(parts) >= 2 and all(counter.get(p, 0) >= 5 for p in parts):
-            # All parts are established themes — convert merge to split
             if dry_run:
                 applied.append(f'  SPLIT (converted): "{src}" -> {parts}')
             else:
                 updated = split_theme_on_memories(src, parts)
-                applied.append(
-                    f'  SPLIT (converted): "{src}" -> {parts} ({updated} memories)'
-                )
+                applied.append(f'  SPLIT (converted): "{src}" -> {parts} ({updated} memories)')
             continue
 
-        # Check if heuristic-detected (mechanical variant)
-        is_heuristic = _variant_reason(src, tgt, src_count, tgt_count) is not None
-
-        # Check ratio threshold: target 15x+ source AND source <= 2
-        ratio_ok = tgt_count >= 15 * max(src_count, 1) and src_count <= 2
-
-        # LLM-confirmed low-frequency: source <=5 uses, trust the LLM's judgment
-        # The LLM review IS the quality gate for these — no need for a second filter
-        llm_low_freq = src_count <= 5
-
-        if is_heuristic or ratio_ok or llm_low_freq:
-            ratio_str = f"ratio {tgt_count}:{max(src_count, 1)}"
-            label = "heuristic" if is_heuristic else ratio_str if ratio_ok else f"llm-confirmed, {src_count} uses"
-            if dry_run:
-                applied.append(f'  MERGE: "{src}" -> "{tgt}" ({label})')
-            else:
-                add_theme_mapping(src, tgt)
-                applied.append(f'  MERGE: "{src}" -> "{tgt}" ({label})')
+        if dry_run:
+            applied.append(f'  MERGE: "{src}" -> "{tgt}" ({src_count} uses)')
         else:
-            queued_merges.append(m)
+            add_theme_mapping(src, tgt)
+            applied.append(f'  MERGE: "{src}" -> "{tgt}" ({src_count} uses)')
 
     # --- Process splits ---
     for s in splits:
         tag = s["tag"]
         into = s["into"]
-
-        # Auto-apply if ALL target tags have 5+ uses
-        if all(counter.get(t, 0) >= 5 for t in into):
-            if dry_run:
-                applied.append(f'  SPLIT: "{tag}" -> {into}')
-            else:
-                updated = split_theme_on_memories(tag, into)
-                applied.append(f'  SPLIT: "{tag}" -> {into} ({updated} memories)')
+        if dry_run:
+            applied.append(f'  SPLIT: "{tag}" -> {into}')
         else:
-            queued_splits.append(s)
+            updated = split_theme_on_memories(tag, into)
+            applied.append(f'  SPLIT: "{tag}" -> {into} ({updated} memories)')
+
+    # --- Process drops ---
+    if not dry_run and drops:
+        db = sqlite3.connect(str(DB_PATH))
+        db.row_factory = sqlite3.Row
+        for d in drops:
+            tag = d["tag"]
+            rows = db.execute(
+                "SELECT id, themes FROM memories WHERE status='active' AND themes LIKE ?",
+                (f'%"{tag}"%',),
+            ).fetchall()
+            for row in rows:
+                themes = json.loads(row["themes"]) if row["themes"] else []
+                if tag in themes:
+                    themes.remove(tag)
+                    db.execute("UPDATE memories SET themes=? WHERE id=?",
+                               (json.dumps(themes), row["id"]))
+                    update_fts(db, row["id"])
+            db.commit()
+            applied.append(f'  DROP: "{tag}" ({len(rows)} memories)')
+        db.close()
+    elif dry_run:
+        for d in drops:
+            applied.append(f'  DROP: "{d["tag"]}"')
 
     # --- Run normalize_all_themes if we added any merge mappings ---
-    if not dry_run and any(line.startswith("  MERGE:") for line in applied):
+    if not dry_run and any("MERGE:" in line for line in applied):
         norm_count = normalize_all_themes()
         if norm_count:
             print(f"  (normalized {norm_count} memories after merges)")
@@ -582,37 +570,11 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
         for line in applied:
             print(f"  {line}")
     else:
-        print("\n  No suggestions met auto-apply thresholds")
+        print("\n  Nothing to apply")
 
-    total_queued = len(queued_merges) + len(queued_splits) + len(queued_drops)
-    if total_queued:
-        print(f"\n  Queued {total_queued} for review:")
-        for m in queued_merges:
-            print(f'    MERGE: "{m["from"]}" -> "{m["to"]}" ({m.get("reason", "")})')
-        for s in queued_splits:
-            print(f'    SPLIT: "{s["tag"]}" -> {s["into"]} ({s.get("reason", "")})')
-        for d in queued_drops:
-            print(f'    DROP: "{d["tag"]}" ({d.get("reason", "")})')
-
-    # --- Rewrite theme_review.json with only queued items ---
-    if not dry_run:
-        remaining = {
-            "merge": queued_merges,
-            "split": queued_splits,
-            "drop": queued_drops,
-        }
-        if total_queued:
-            review_data = {
-                "timestamp": datetime.now().isoformat(),
-                "suggestions": remaining,
-                "note": "Auto-applied suggestions removed; these need manual review",
-            }
-            THEME_REVIEW_LOG.write_text(json.dumps(review_data, indent=2), encoding="utf-8")
-        else:
-            # All applied — remove the file
-            if THEME_REVIEW_LOG.exists():
-                THEME_REVIEW_LOG.unlink()
-                print(f"\n  Cleared {THEME_REVIEW_LOG} (all suggestions applied)")
+    # --- Clear review file ---
+    if not dry_run and THEME_REVIEW_LOG.exists():
+        THEME_REVIEW_LOG.unlink()
 
     print()
 
