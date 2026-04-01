@@ -395,7 +395,7 @@ Return ONLY a JSON object:
     with ThreadPoolExecutor(max_workers=2) as pool:
         if mechanical_prompt:
             futures["mechanical"] = pool.submit(
-                _call_claude_json, mechanical_prompt, "haiku", 120, "mechanical review"
+                _call_claude_json, mechanical_prompt, "sonnet", 180, "mechanical review"
             )
         futures["nuanced"] = pool.submit(
             _call_claude_json, nuanced_prompt, "sonnet", 300, "nuanced review"
