@@ -257,6 +257,8 @@ def impl_remember(
         except json.JSONDecodeError:
             themes_list = []
         themes_list = normalize_themes(themes_list, content=content)
+        if len(themes_list) > MAX_THEMES:
+            themes_list = themes_list[:MAX_THEMES]
         themes_json = json.dumps(themes_list)
 
         # Resolve decay_rate sentinel: -1 means use category default (NULL in DB)

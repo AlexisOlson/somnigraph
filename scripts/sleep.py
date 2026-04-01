@@ -117,6 +117,11 @@ def detect_theme_variants():
     return candidates
 
 
+def _normalize_separators(s: str) -> str:
+    """Collapse all separator variants (spaces, dots, underscores) to hyphens."""
+    return s.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+
+
 def _variant_reason(a: str, b: str, count_a: int, count_b: int) -> str | None:
     """Return a reason string if a and b look like theme variants, else None.
 
@@ -128,14 +133,24 @@ def _variant_reason(a: str, b: str, count_a: int, count_b: int) -> str | None:
     if al == bl and a != b:
         return "casing"
 
-    # Underscore vs hyphen — always flag
-    if al.replace("_", "-") == bl.replace("_", "-") and a != b:
-        return "underscore/hyphen"
+    # Separator normalization: spaces, underscores, dots, hyphens all equivalent
+    an, bn = _normalize_separators(a), _normalize_separators(b)
+    if an == bn and a != b:
+        return "separator"
+
+    # No-separator vs hyphenated (e.g., "virtualtrebuchet" vs "virtual-trebuchet")
+    if an != bn and an.replace("-", "") == bn.replace("-", ""):
+        return "separator (no-sep vs hyphenated)"
 
     # Singular/plural (trailing 's' difference) — always flag
     if al != bl and len(al) >= 4 and len(bl) >= 4:
         if al + "s" == bl or bl + "s" == al:
             return "singular/plural"
+
+    # Verb form variants: -ing suffix (e.g., "overclaim" vs "overclaiming")
+    if al != bl and len(al) >= 5 and len(bl) >= 5:
+        if al + "ing" == bl or bl + "ing" == al:
+            return "verb form (-ing)"
 
     # Prefix match — only flag when the shorter form is established (>=5 uses)
     # and the longer form is rare (<=2 uses), suggesting unnecessary compound
@@ -399,8 +414,9 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
     """Auto-apply high-confidence theme suggestions, queue the rest.
 
     Thresholds:
-    - Merge auto-apply: target has 15x+ source count AND source <= 2,
-      OR heuristic-detected variant (casing/underscore/plural)
+    - Merge auto-apply: heuristic-detected variant (casing/separator/plural/verb-form),
+      OR target has 15x+ source count AND source <= 2,
+      OR LLM-confirmed merge where source <= 5 uses
     - Split auto-apply: ALL resulting tags already exist with 5+ uses
     - Merge → split conversion: source is compound of established tags (5+ each)
     - Drops: never auto-apply
@@ -452,9 +468,13 @@ def apply_theme_suggestions(suggestions: dict, dry_run: bool = False):
         # Check ratio threshold: target 15x+ source AND source <= 2
         ratio_ok = tgt_count >= 15 * max(src_count, 1) and src_count <= 2
 
-        if is_heuristic or ratio_ok:
+        # LLM-confirmed low-frequency: source <=5 uses, trust the LLM's judgment
+        # The LLM review IS the quality gate for these — no need for a second filter
+        llm_low_freq = src_count <= 5
+
+        if is_heuristic or ratio_ok or llm_low_freq:
             ratio_str = f"ratio {tgt_count}:{max(src_count, 1)}"
-            label = "heuristic" if is_heuristic else ratio_str
+            label = "heuristic" if is_heuristic else ratio_str if ratio_ok else f"llm-confirmed, {src_count} uses"
             if dry_run:
                 applied.append(f'  MERGE: "{src}" -> "{tgt}" ({label})')
             else:

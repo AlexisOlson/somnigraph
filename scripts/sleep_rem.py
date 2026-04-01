@@ -643,6 +643,11 @@ def score_clusters(db, clusters: list[dict]) -> list[dict]:
         topic_id = cluster.get("topic_id")
         memory_ids = cluster["memory_ids"]
 
+        # Token floor: skip topics whose details are small enough to retrieve directly
+        cluster_tokens = sum(m["token_count"] or 0 for m in cluster["memories"])
+        if cluster_tokens < SUMMARY_MIN_DETAIL_TOKENS:
+            continue
+
         # Match summary by topic_id (exact match only — no theme-overlap fallback)
         existing_summary = summary_by_topic.get(topic_id) if topic_id else None
 
@@ -807,29 +812,36 @@ def generate_summaries(db, clusters: list[dict]) -> tuple[int, int]:
         cluster_topic_id = cluster.get("topic_id")
 
         if existing_summary_id:
-            # Insert new summary first (so superseded_by FK is valid)
-            new_id = str(uuid.uuid4())
-            _insert_memory(
-                db, new_id, content, theme_name, "semantic",
-                themes_json, importance, "sleep", "active", embedding,
-                layer="summary", generated_from=source_ids,
-            )
-            # Set topic_id on the new summary
-            if cluster_topic_id:
-                db.execute(
-                    "UPDATE memories SET topic_id = ? WHERE id = ?",
-                    (cluster_topic_id, new_id),
-                )
+            # Update existing summary in place — no new ID, no superseded chain
+            now_iso = datetime.now(timezone.utc).isoformat()
             db.execute(
-                "UPDATE memories SET status='deleted', superseded_by=? WHERE id=?",
-                (new_id, existing_summary_id),
+                "UPDATE memories SET content=?, summary=?, themes=?, base_priority=?, "
+                "generated_from=?, last_sleep_processed=? WHERE id=?",
+                (content, theme_name, themes_json, importance,
+                 json.dumps(source_ids), now_iso, existing_summary_id),
             )
-            # Create derived_from edges
+            # Update embedding
+            vec_rowid = db.execute(
+                "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?",
+                (existing_summary_id,),
+            ).fetchone()
+            if vec_rowid:
+                db.execute(
+                    "UPDATE memory_vec SET embedding = ? WHERE rowid = ?",
+                    (serialize_f32(embedding), vec_rowid["rowid"]),
+                )
+            # Update FTS
+            update_fts(db, existing_summary_id)
+            # Refresh derived_from edges: remove old, add current
+            db.execute(
+                "DELETE FROM memory_edges WHERE source_id = ? AND edge_type = 'derived_from'",
+                (existing_summary_id,),
+            )
             for sid in source_ids:
-                _create_edge(db, new_id, sid, edge_type="derived_from", flags=["derivation"], created_by="sleep")
+                _create_edge(db, existing_summary_id, sid, edge_type="derived_from", flags=["derivation"], created_by="sleep")
             db.commit()
             refreshed += 1
-            log(f"  Refreshed summary: {theme_name} ({new_id[:8]})")
+            log(f"  Refreshed summary: {theme_name} ({existing_summary_id[:8]})")
         else:
             # Insert new summary
             new_id = str(uuid.uuid4())
@@ -917,6 +929,11 @@ def generate_parent_summaries(db) -> int:
         if len(unique_topics) < 3:
             continue
 
+        # Token floor: only generate parent when child summaries total >= threshold
+        child_tokens = sum(s["token_count"] or 0 for _, s in children)
+        if child_tokens < SUMMARY_MIN_DETAIL_TOKENS:
+            continue
+
         parent_info = topic_map.get(parent_id, {})
         parent_label = parent_info.get("label", parent_id)
         log(f"  Parent summary candidate: {parent_label} ({len(unique_topics)} subtopics)")
@@ -983,27 +1000,50 @@ def generate_parent_summaries(db) -> int:
         enriched = build_enriched_text(content, "semantic", raw_themes, summary_line)
         embedding = embed_text(enriched)
 
-        new_id = str(uuid.uuid4())
-        _insert_memory(
-            db, new_id, content, summary_line, "semantic",
-            themes_json, importance, "sleep", "active", embedding,
-            layer="summary", generated_from=child_ids,
-        )
-        db.execute("UPDATE memories SET topic_id = ? WHERE id = ?", (parent_id, new_id))
-
         if existing_parent:
+            # Update in place — no new ID, no superseded chain
+            existing_id = existing_parent["id"]
+            now_iso = datetime.now(timezone.utc).isoformat()
             db.execute(
-                "UPDATE memories SET status='deleted', superseded_by=? WHERE id=?",
-                (new_id, existing_parent["id"]),
+                "UPDATE memories SET content=?, summary=?, themes=?, base_priority=?, "
+                "generated_from=?, last_sleep_processed=? WHERE id=?",
+                (content, summary_line, themes_json, importance,
+                 json.dumps(child_ids), now_iso, existing_id),
             )
-
-        # Create derived_from edges to child summaries
-        for cid in child_ids:
-            _create_edge(db, new_id, cid, edge_type="derived_from", flags=["derivation"], created_by="sleep")
-
-        db.commit()
-        generated += 1
-        log(f"  Generated parent summary: {summary_line} ({new_id[:8]})")
+            vec_rowid = db.execute(
+                "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?",
+                (existing_id,),
+            ).fetchone()
+            if vec_rowid:
+                db.execute(
+                    "UPDATE memory_vec SET embedding = ? WHERE rowid = ?",
+                    (serialize_f32(embedding), vec_rowid["rowid"]),
+                )
+            update_fts(db, existing_id)
+            # Refresh derived_from edges
+            db.execute(
+                "DELETE FROM memory_edges WHERE source_id = ? AND edge_type = 'derived_from'",
+                (existing_id,),
+            )
+            for cid in child_ids:
+                _create_edge(db, existing_id, cid, edge_type="derived_from", flags=["derivation"], created_by="sleep")
+            db.commit()
+            generated += 1
+            log(f"  Refreshed parent summary: {summary_line} ({existing_id[:8]})")
+        else:
+            # Truly new parent summary
+            new_id = str(uuid.uuid4())
+            _insert_memory(
+                db, new_id, content, summary_line, "semantic",
+                themes_json, importance, "sleep", "active", embedding,
+                layer="summary", generated_from=child_ids,
+            )
+            db.execute("UPDATE memories SET topic_id = ? WHERE id = ?", (parent_id, new_id))
+            for cid in child_ids:
+                _create_edge(db, new_id, cid, edge_type="derived_from", flags=["derivation"], created_by="sleep")
+            db.commit()
+            generated += 1
+            log(f"  Generated parent summary: {summary_line} ({new_id[:8]})")
 
     return generated
 
@@ -1012,7 +1052,8 @@ def generate_parent_summaries(db) -> int:
 # Summary Maintenance Constants
 # ---------------------------------------------------------------------------
 
-SUMMARY_AUDIT_THRESHOLD = 25   # Trigger LLM audit when active summaries exceed this
+SUMMARY_AUDIT_THRESHOLD = 100  # Trigger LLM audit when active summaries exceed this (relaxed — token floor gates creation)
+SUMMARY_MIN_DETAIL_TOKENS = 2000  # Don't create/refresh a summary unless topic details exceed this
 SUMMARY_STUB_MIN_LENGTH = 50   # Summaries shorter than this are stubs (thin format ~600-800 chars)
 SUMMARY_DORMANCY_DAYS = 90     # No access in this many days → dormancy candidate
 MAX_SUPERSEDED_CHAIN = 2       # Keep this many deleted predecessors per topic
