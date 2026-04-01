@@ -325,7 +325,7 @@ Include both Pass 1 and Pass 2 results in the same lists. Be thorough on mechani
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=120,
+            timeout=300,
             cwd=str(_SUBPROCESS_CWD),
             env=env,
             **kwargs,
