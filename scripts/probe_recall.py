@@ -482,7 +482,7 @@ def run_probe(
     recall_limit: int = 15,
     timeout: int = 240,
     extra_queries_path: str = None,
-    workers: int = 3,
+    workers: int = 1,
 ):
     _init_log()
     log(f"=== Retrieval Probe ===")
@@ -720,8 +720,8 @@ def main():
                         help="Subprocess timeout in seconds")
     parser.add_argument("--extra-queries", type=str, default=None,
                         help="JSON file with extra queries to run (skips craft step)")
-    parser.add_argument("--workers", type=int, default=3,
-                        help="Parallel worker threads for group processing")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Parallel worker threads (default 1; >1 risks OOM from Bun subprocesses)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show plan without executing")
     args = parser.parse_args()
