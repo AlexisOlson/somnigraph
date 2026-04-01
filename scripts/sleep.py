@@ -309,7 +309,7 @@ Include both Pass 1 and Pass 2 results in the same lists. Be thorough on mechani
         result = subprocess.run(
             [
                 claude_bin, "-p",
-                "--model", "haiku",
+                "--model", "sonnet",
                 "--no-session-persistence",
                 "--strict-mcp-config",
                 "--mcp-config", EMPTY_MCP_CONFIG,
