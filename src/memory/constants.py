@@ -17,7 +17,9 @@ DATA_DIR = Path(os.environ.get("SOMNIGRAPH_DATA_DIR",
                 Path.home() / ".somnigraph"))
 
 # Reranker model path — learned scoring replaces the hand-tuned formula when present
-MODEL_PATH = DATA_DIR / "tuning_studies" / "reranker_model.pkl"
+# Native LightGBM text format (no pickle/sklearn import overhead)
+MODEL_PATH = DATA_DIR / "tuning_studies" / "reranker_model.txt"
+MODEL_FEATURES_PATH = DATA_DIR / "tuning_studies" / "reranker_features.json"
 
 # ---------------------------------------------------------------------------
 # Core — wm38 study (2026-03-16), 500q GT, blended ratio=0.5, tight refinement

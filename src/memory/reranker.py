@@ -22,17 +22,19 @@ Falls back to None if model not found (caller should use legacy pipeline).
 import json
 import logging
 import math
-import pickle
 import struct
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import lightgbm as lgb
+
 from memory.constants import (
     CATEGORY_DECAY_RATES,
     DEFAULT_DECAY_RATE,
     MODEL_PATH,
+    MODEL_FEATURES_PATH,
     PPR_DAMPING,
 )
 
@@ -92,16 +94,16 @@ def _load_model():
         return None
 
     try:
-        with open(MODEL_PATH, "rb") as f:
-            data = pickle.load(f)
-        sklearn_model = data["model"]
-        # Extract the underlying Booster for dependency-free prediction
-        booster = sklearn_model.booster_
+        booster = lgb.Booster(model_file=str(MODEL_PATH))
+        feature_names = []
+        if MODEL_FEATURES_PATH.exists():
+            with open(MODEL_FEATURES_PATH) as f:
+                feature_names = json.load(f)
         _cache["model"] = booster
-        _cache["feature_names"] = data.get("feature_names", [])
+        _cache["feature_names"] = feature_names
         _cache["loaded"] = True
         logger.info("Reranker model loaded from %s (%d features)",
-                     MODEL_PATH, len(_cache["feature_names"]))
+                     MODEL_PATH, len(feature_names))
         return booster
     except Exception as e:
         logger.warning("Failed to load reranker model: %s", e)
@@ -118,6 +120,7 @@ def _load_memory_meta(db):
     if count == _cache["meta_mem_count"] and _cache["memory_meta"] is not None:
         return _cache["memory_meta"]
 
+    _t0 = time.time()
     now_dt = datetime.now(timezone.utc)
     rows = db.execute("""
         SELECT id, category, base_priority, created_at, token_count,
@@ -315,6 +318,8 @@ def _load_memory_meta(db):
         session_retrievals[r["session_id"]].append((r["query"], r["memory_id"]))
     meta["__session_retrievals__"] = dict(session_retrievals)
 
+    logger.info("_load_memory_meta took %.1fs (%d memories, %d edges)",
+                time.time() - _t0, count, len(edge_rows))
     _cache["memory_meta"] = meta
     _cache["meta_mem_count"] = count
     return meta
@@ -575,6 +580,14 @@ def rerank(
     scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
     scores_dict = {mid: float(s) for mid, s in scored}
     return [mid for mid, _ in scored], scores_dict
+
+
+def warmup(db):
+    """Eagerly load model + precompute metadata so first recall() is fast."""
+    t0 = time.time()
+    _load_model()
+    _load_memory_meta(db)
+    logger.info("Reranker warmup complete in %.1fs", time.time() - t0)
 
 
 def invalidate_cache():
