@@ -26,9 +26,21 @@ if "SOMNIGRAPH_DATA_DIR" not in os.environ:
 
 from mcp.server.fastmcp import FastMCP
 
-# All logging to stderr (stdout is JSON-RPC)
-logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(levelname)s: %(message)s")
+# Log to file for post-mortem debugging (stderr is discarded by Claude Code)
+_log_path = os.path.join(
+    os.environ.get("SOMNIGRAPH_DATA_DIR", os.path.join(os.path.expanduser("~"), ".claude", "data")),
+    "memory_server.log",
+)
+logging.basicConfig(
+    handlers=[
+        logging.FileHandler(_log_path, encoding="utf-8"),
+        logging.StreamHandler(sys.stderr),
+    ],
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s",
+)
 logger = logging.getLogger("claude-memory")
+logger.info("Memory server starting (PID %d)", os.getpid())
 
 # ---------------------------------------------------------------------------
 # Re-exports for sleep script compatibility (sleep_nrem.py, sleep_rem.py, sleep.py)
@@ -183,6 +195,7 @@ def recall(
         internal: Set true for subagent/background use. Suppresses retrieval event
             logging and feedback ID footer (prevents stop hook from tracking these recalls).
     """
+    logger.info("recall() called: query=%r, limit=%d", query[:80], limit)
     return impl_recall(query, context, budget, category, limit, exclude_ids, since, before, boost_themes, min_priority, internal)
 
 
@@ -335,6 +348,7 @@ def reembed_all() -> str:
 def memory_stats() -> str:
     """Diagnostic overview of the memory store. Returns counts, access stats,
     decay distribution, and token budget without loading memory content."""
+    logger.info("memory_stats() called")
     return impl_memory_stats()
 
 
@@ -343,4 +357,20 @@ def memory_stats() -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import atexit
+    import threading
+    from memory.reranker import warmup as _reranker_warmup
+
+    atexit.register(lambda: logger.info("Memory server exiting (PID %d)", os.getpid()))
+
+    # Eager-load reranker model in background so first recall() doesn't block
+    def _warmup_thread():
+        try:
+            db = get_db()
+            _reranker_warmup(db)
+        except Exception as e:
+            logger.warning("Background reranker warmup failed: %s", e)
+
+    threading.Thread(target=_warmup_thread, daemon=True).start()
+
     mcp.run(transport="stdio")

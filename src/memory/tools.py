@@ -1,8 +1,11 @@
 """MCP tool implementations — business logic for all memory tools."""
 
 import json
+import logging
 import re
 import sqlite3
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -34,7 +37,7 @@ from memory.session import detect_session_id, get_session_id
 from memory.scoring import (
     rrf_fuse, apply_hebbian, expand_via_ppr,
 )
-from memory.reranker import rerank as reranker_rerank, invalidate_cache as invalidate_reranker_cache
+from memory.reranker import rerank as reranker_rerank, invalidate_cache as invalidate_reranker_cache, warmup as reranker_warmup
 from memory.stats import compute_stats
 
 
@@ -214,6 +217,22 @@ def impl_startup_load(budget: int = 3000) -> str:
         )
     db.commit()
     db.close()
+
+    # Warm recall caches in background (embedding model, reranker pickle, memory meta)
+    # so first recall() doesn't pay the cold-start penalty.
+    def _warmup():
+        _logger = logging.getLogger("claude-memory")
+        try:
+            # Eagerly init embedding model (fastembed TextEmbedding or OpenAI client)
+            embed_text("warmup")
+            # Eagerly load reranker model + precompute memory metadata
+            warmup_db = get_db()
+            reranker_warmup(warmup_db)
+            warmup_db.close()
+        except Exception as e:
+            _logger.warning("Recall warmup failed: %s", e)
+
+    threading.Thread(target=_warmup, daemon=True).start()
 
     return result
 
@@ -424,8 +443,11 @@ def impl_recall(
         before_date = before
 
         # Generate query embedding — use context for vector search if provided
+        _t0 = time.time()
         vector_input = context.strip() if context and context.strip() else query
         query_embedding = embed_text(vector_input)
+        _logger = logging.getLogger("claude-memory")
+        _logger.info("recall: embed_text took %.1fs", time.time() - _t0)
 
         # --- Build rowid→memory_id lookup (one query, replaces per-row lookups) ---
         _rowid_map = {}
@@ -433,6 +455,7 @@ def impl_recall(
             _rowid_map[r["rowid"]] = r["memory_id"]
 
         # --- Vector search ---
+        _t1 = time.time()
         vec_k = max(limit * 5, 200)
         vec_results = db.execute(
             """
@@ -451,6 +474,8 @@ def impl_recall(
             if mid:
                 vec_ranked[mid] = rank
                 vec_distances[mid] = row["distance"]
+
+        _logger.info("recall: vec search took %.1fs", time.time() - _t1)
 
         # --- Keyword search (keep raw BM25 scores for reranker) ---
         fts_ranked = {}  # memory_id -> rank (0-based)
@@ -619,6 +644,8 @@ def impl_recall(
 
             ppr_cache = {(round(_PPR_DAMPING, 3), query): ppr_scores_for_query}
 
+            _logger.info("recall: search pipeline took %.1fs (since embed)", time.time() - _t1)
+            _t2 = time.time()
             result = reranker_rerank(
                 db, query,
                 fts_ranked=fts_ranked, vec_ranked=vec_ranked,
@@ -627,6 +654,7 @@ def impl_recall(
                 feedback_raw=fb_raw, hebb_data=hebb_data,
                 ppr_cache=ppr_cache,
             )
+            _logger.info("recall: reranker took %.1fs", time.time() - _t2)
             if result is not None:
                 sorted_ids, rrf_scores = result
                 top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
