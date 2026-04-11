@@ -49,6 +49,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | Title | File | Summary |
 |-------|------|---------|
 | [2WikiMultiHopQA](https://github.com/Alab-NII/2wikimultihop) | 2wikimultihop.md | 192K template-generated multi-hop QA questions with structured evidence triples and 28 logical inference rules (COLING 2020). Vocabulary gap taxonomy useful for multi-hop failure analysis; benchmark itself has significant shortcuts (DiRe 63.4). |
+| [AMB: Agent Memory Benchmark](https://github.com/vectorize-io/agent-memory-benchmark) | amb.md | Meta-benchmark harness aggregating 7 datasets (BEAM, LifeBench, LoCoMo, LongMemEval, PersonaMem, MemBench, MemSim) with standardized memory-provider adapters and public leaderboard. Built by Hindsight team; conflict-of-interest concern (tuned adapter tops own leaderboard). |
 | [AMA-Bench](https://arxiv.org/abs/2602.22769) | ama-bench.md | 2,496 expert-annotated QA pairs across six agentic domains testing memory over machine-generated data streams (code diffs, JSON, ASCII tables). |
 | [AMemGym](https://arxiv.org/abs/2603.01966) | amemgym.md | On-policy interactive benchmark with simulated users enabling diagnostic decomposition of write/read/utilization failures (ICLR 2026). |
 | [BEAM: Beyond a Million Tokens](https://arxiv.org/abs/2510.27246) | beam.md | 100 conversations spanning 100K-10M tokens with 2,000 validated questions across 10 memory abilities, plus LIGHT retrieval framework (ICLR 2026). |
@@ -63,6 +64,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [MEMTRACK](https://arxiv.org/abs/2510.01353) | memtrack.md | 47 multi-platform software engineering workflows (Linear + Slack + Gitea) where even GPT-5 achieves only 60% correctness. |
 | [PERMA](https://arxiv.org/abs/2603.23231) | perma.md | 10 synthetic users, 20 domains, 2,166 preferences with event-driven emergence across sessions. Key finding: all systems collapse on cross-domain synthesis (0.548→0.306). Decoupled memory fidelity evaluation. |
 | [TReMu](https://arxiv.org/abs/2502.01630) | tremu.md | 600 temporal multiple-choice questions on LoCoMo, plus a neuro-symbolic framework raising GPT-4o from 30% to 78% on temporal questions (ACL Findings 2025). |
+| [WRIT: Write Integrity Benchmark](https://github.com/markmhendrickson/writ) | writ.md | 50 hand-authored scenarios testing write-path integrity (drift, update fidelity, provenance, forgetting) — the first benchmark targeting whether stored facts survive agent writes. Very early (4 commits, April 2026). |
 
 ## Surveys
 

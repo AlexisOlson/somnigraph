@@ -319,6 +319,12 @@ PERMA (arXiv:2603.23231, March 2026) evaluates personalized memory agents on pre
 
 **Effort:** 2-3 sessions. Session 1: ingest pipeline + MCQ evaluation. Session 2: interactive evaluation + analysis. Session 3: ablations (graph contribution, feedback contribution, sleep contribution).
 
+### AMB LoCoMo cross-evaluation *(Idea)*
+
+AMB (Agent Memory Benchmark, Vectorize.io) is a meta-benchmark harness wrapping 7 datasets including LoCoMo. Their LoCoMo adapter uses Gemini judge/reader with "generous grading" prompts. Hindsight claims 92.0% on LoCoMo via AMB; we score 85.1% (Opus judge). Writing a Somnigraph adapter for AMB and running just the LoCoMo split would give an apples-to-apples comparison under identical generation/judging conditions — isolating retrieval quality from reader/judge differences. The adapter interface (`ingest` + `retrieve`) maps cleanly to our `remember` + `recall`. See `research/sources/amb.md` for full analysis, including conflict-of-interest concerns (Hindsight's adapter is heavily tuned vs. generic baselines).
+
+**Effort:** 1-2 sessions. Adapter + one evaluation run.
+
 ### What's measurable but unmeasured
 
 - **Contradiction detection:** All systems 0.025–0.037 F1. Somnigraph's NREM catches adjacent contradictions only — likely in the same range. No formal measurement yet.
