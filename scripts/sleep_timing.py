@@ -1,3 +1,15 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "sqlite-vec>=0.1.6",
+#     "openai>=2.0.0",
+#     "tiktoken>=0.7.0",
+#     "mcp[cli]>=1.2.0",
+#     "numpy>=1.26",
+#     "lightgbm>=4.0",
+#     "fastembed>=0.4.0",
+# ]
+# ///
 """Parse sleep progress log and compute batch timing stats."""
 import sys
 from pathlib import Path

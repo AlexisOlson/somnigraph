@@ -1,6 +1,14 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["sqlite-vec>=0.1.6", "openai>=2.0.0", "tiktoken>=0.7.0", "mcp[cli]>=1.2.0"]
+# dependencies = [
+#     "sqlite-vec>=0.1.6",
+#     "openai>=2.0.0",
+#     "tiktoken>=0.7.0",
+#     "mcp[cli]>=1.2.0",
+#     "numpy>=1.26",
+#     "lightgbm>=4.0",
+#     "fastembed>=0.4.0",
+# ]
 # ///
 """
 Sleep REM pipeline — higher-order memory consolidation.
@@ -525,12 +533,27 @@ Also provide:
 - A descriptive one-line summary (10-15 words) for search indexing
 - Up to 6 discriminating theme tags (prefer terms not already in the content)
 
+OPPORTUNISTIC TASK: While the source memories are loaded in your context, surface any clear
+pairwise relationships among them. These become graph edges and improve future retrieval and
+reasoning. Skip merely-topical pairs (the cluster anchor already implies topical proximity);
+flag only relationships that carry independent signal.
+
+Relationship types:
+- "contradicts" — sources say incompatible things about the same fact, decision, or state
+- "supersedes" — one source is a newer/correct version of another (older source is now stale)
+- "supports" — one source elaborates on, evidences, or refines a claim in another
+- "related" — clear non-redundant link (e.g. cause/effect, prerequisite/consequence)
+
+Cap at 5 relationships. Empty list is fine — quality matters more than recall here. Use the
+full memory UUID (as shown in [brackets] above each source) in the "a" and "b" fields.
+
 Respond with JSON (no markdown fences):
 {
   "summary": "descriptive one-liner for search indexing",
   "content": "the dense paragraph (MUST be under 1400 characters)",
   "themes": ["tag1", "tag2", ...],
-  "importance": 7-9
+  "importance": 7-9,
+  "relationships": [{"a": "full-uuid-1", "b": "full-uuid-2", "type": "contradicts|supersedes|supports|related", "note": "brief reason"}]
 }
 
 importance: 9 = domain context not covered elsewhere, 8 = adds experiential depth,
@@ -862,7 +885,73 @@ def generate_summaries(db, clusters: list[dict]) -> tuple[int, int]:
             generated += 1
             log(f"  Generated summary: {theme_name} ({new_id[:8]})")
 
+        # Opportunistic edges among the source memories. Same principle as
+        # the probe/recall_feedback path: while these memories are loaded in
+        # Opus's context for summary generation, harvest pairwise
+        # relationships at no extra LLM cost. Empty list is a fine outcome.
+        rel_count = _create_rem_relationship_edges(
+            db, summary_json.get("relationships") or [], set(source_ids)
+        )
+        if rel_count:
+            log(f"    Relationship edges from cluster: {rel_count}")
+
     return generated, refreshed
+
+
+# Map LLM-returned relationship type to (flags, label). flags are the
+# structural-edge tag used by _create_edge for dedup; label is embedded in
+# linking_context for human-readable provenance.
+_REM_REL_TYPE_MAP = {
+    "related":     ([], "related"),
+    "supports":    ([], "supports"),
+    "contradicts": (["contradiction"], "contradicts"),
+    "supersedes":  (["revision"], "supersedes"),
+}
+
+
+def _create_rem_relationship_edges(db, relationships: list,
+                                    valid_source_ids: set) -> int:
+    """Create graph edges from REM-time relationship observations.
+
+    The summary LLM call already had every source memory in its context, so
+    surfacing pairwise relationships there is free piggyback. Validation:
+    both endpoints must be from the cluster's source set (rejects LLM
+    hallucinations), valid type, distinct IDs. _create_edge handles dedup
+    against any prior source (NREM, co_retrieval, recall_feedback, prior
+    REMs).
+    """
+    if not relationships:
+        return 0
+    edges_created = 0
+    for rel in relationships[:5]:  # match prompt cap
+        if not isinstance(rel, dict):
+            continue
+        a = (rel.get("a") or "").strip()
+        b = (rel.get("b") or "").strip()
+        rel_type = (rel.get("type") or "").strip().lower()
+        note = (rel.get("note") or "").strip()
+        if not a or not b or a == b:
+            continue
+        if a not in valid_source_ids or b not in valid_source_ids:
+            continue  # LLM hallucinated an ID outside the cluster
+        mapping = _REM_REL_TYPE_MAP.get(rel_type)
+        if mapping is None:
+            continue
+        flags, type_label = mapping
+        linking_context = (
+            f"[rem:{type_label}] {note}" if note else f"[rem:{type_label}]"
+        )
+        edge_id = _create_edge(
+            db, a, b,
+            linking_context=linking_context,
+            flags=flags or None,
+            created_by="sleep_rem",
+        )
+        if edge_id:
+            edges_created += 1
+    if edges_created:
+        db.commit()
+    return edges_created
 
 
 # ---------------------------------------------------------------------------

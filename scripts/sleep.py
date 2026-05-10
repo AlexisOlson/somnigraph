@@ -1,6 +1,14 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["sqlite-vec>=0.1.6", "openai>=2.0.0", "tiktoken>=0.7.0", "mcp[cli]>=1.2.0"]
+# dependencies = [
+#     "sqlite-vec>=0.1.6",
+#     "openai>=2.0.0",
+#     "tiktoken>=0.7.0",
+#     "mcp[cli]>=1.2.0",
+#     "numpy>=1.26",
+#     "lightgbm>=4.0",
+#     "fastembed>=0.4.0",
+# ]
 # ///
 """
 Full sleep cycle: deep NREM then REM.
@@ -23,7 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from memory.constants import DATA_DIR
 
-SCRIPTS = Path(__file__).parent
+SCRIPTS = Path(__file__).resolve().parent
 
 # Ensure claude CLI is on PATH (npm global bin may not be in PowerShell PATH)
 _NPM_BIN = Path.home() / "AppData" / "Roaming" / "npm"
@@ -669,7 +677,7 @@ def repair_retrieval_failures():
 
     # 1. Gather unprocessed retrieval failures
     all_misses = db.execute(
-        "SELECT id, query, context, created_at FROM memory_events "
+        "SELECT id, memory_id, query, context, created_at FROM memory_events "
         "WHERE event_type = 'recall_miss' ORDER BY created_at ASC"
     ).fetchall()
 
@@ -709,9 +717,18 @@ def repair_retrieval_failures():
     batch = unprocessed[:10]
     print(f"  Processing {len(batch)} retrieval failure(s) (of {len(unprocessed)} pending)")
 
-    # 2. Find returned memories for each miss and build cases
-    cases = []
+    # 2. Build cases. Probe-sourced misses are folded by target memory_id —
+    # when natural AND mild both miss the same target, the LLM sees both
+    # query phrasings together and can propose stronger fixes than from
+    # either alone. Non-probe misses stay one-per-case.
+    organic_cases = []
+    probe_groups: dict[str, dict] = {}  # target_id -> aggregated group
+
     for miss in batch:
+        miss_ctx = json.loads(miss["context"]) if miss["context"] else {}
+        is_probe = miss_ctx.get("source") == "probe"
+        probe_mode = miss_ctx.get("mode", "")
+
         retrieved = db.execute(
             "SELECT DISTINCT memory_id, similarity_score FROM memory_events "
             "WHERE event_type = 'retrieved' AND query = ? "
@@ -721,7 +738,6 @@ def repair_retrieval_failures():
         ).fetchall()
 
         if not retrieved:
-            # No retrieved events found — mark processed and skip
             _log_event(db, "_recall", "recall_miss_repaired",
                        query=miss["query"],
                        context={"miss_event_id": miss["id"], "skipped": "no_retrieved_events"})
@@ -743,9 +759,41 @@ def repair_retrieval_failures():
             db.commit()
             continue
 
+        if is_probe and miss["memory_id"]:
+            tid = miss["memory_id"]
+            if tid not in probe_groups:
+                target_row = db.execute(
+                    "SELECT id, content, summary, themes FROM memories "
+                    "WHERE id = ? AND status = 'active'",
+                    (tid,),
+                ).fetchone()
+                probe_groups[tid] = {
+                    "miss_rows": [],
+                    "queries": [],   # list of (mode, query_text)
+                    "memories": {},  # id -> row, dedup union across queries
+                    "target": target_row,
+                }
+            probe_groups[tid]["miss_rows"].append(miss)
+            probe_groups[tid]["queries"].append((probe_mode, miss["query"]))
+            for mem in memories:
+                probe_groups[tid]["memories"][mem["id"]] = mem
+        else:
+            organic_cases.append({
+                "is_probe": False,
+                "miss_rows": [miss],
+                "queries": [("", miss["query"])],
+                "memories": memories,
+                "target": None,
+            })
+
+    cases = list(organic_cases)
+    for tid, grp in probe_groups.items():
         cases.append({
-            "miss": miss,
-            "memories": memories,
+            "is_probe": True,
+            "miss_rows": grp["miss_rows"],
+            "queries": grp["queries"],
+            "memories": list(grp["memories"].values()),
+            "target": grp["target"],
         })
 
     if not cases:
@@ -753,8 +801,13 @@ def repair_retrieval_failures():
         db.close()
         return 0
 
+    folded = sum(1 for c in cases if c["is_probe"] and len(c["miss_rows"]) > 1)
+    if folded:
+        print(f"  Folded {folded} probe target(s) with multiple-mode misses into joint cases")
+
     # 3. Build LLM prompt
     case_blocks = []
+    has_probe_case = False
     for i, case in enumerate(cases, 1):
         mem_lines = []
         for mem in case["memories"]:
@@ -763,20 +816,64 @@ def repair_retrieval_failures():
             mem_lines.append(
                 f'  [{prefix}] themes: {json.dumps(themes)} | summary: "{mem["summary"] or ""}"'
             )
+
+        header = f'### Case {i}'
+        target_block = ""
+        if case["is_probe"]:
+            has_probe_case = True
+            modes_label = ",".join(sorted({m for m, _ in case["queries"] if m}))
+            header += f' [probe-{modes_label}]'
+            if case["target"]:
+                t = case["target"]
+                t_themes = json.loads(t["themes"]) if t["themes"] else []
+                t_prefix = t["id"][:8]
+                target_block = (
+                    f'\nTarget memory (NOT retrieved on any of these queries — should have surfaced):\n'
+                    f'  [{t_prefix}] themes: {json.dumps(t_themes)} | '
+                    f'summary: "{t["summary"] or ""}" | '
+                    f'content: "{(t["content"] or "")[:400]}"\n'
+                )
+
+        # List all query phrasings for this case. Multiple lines when a
+        # probe target was missed by both natural and mild — gives the LLM
+        # complementary signal about what vocabulary the target needs to
+        # bridge.
+        if len(case["queries"]) == 1:
+            query_lines = f'Query: "{case["queries"][0][1]}"'
+        else:
+            query_lines = "Queries (all missed this target):\n" + "\n".join(
+                f'  [{m or "organic"}] "{q}"' for m, q in case["queries"]
+            )
+
         case_blocks.append(
-            f'### Case {i}\nQuery: "{case["miss"]["query"]}"\n'
+            f'{header}\n{query_lines}\n'
+            f'{target_block}'
             f'Returned memories (all rated useless):\n' + "\n".join(mem_lines)
+        )
+
+    probe_rules = ""
+    if has_probe_case:
+        probe_rules = (
+            "\n\nProbe-sourced cases (marked [probe-natural] or [probe-mild]):\n"
+            "- These cases include a Target memory that SHOULD have surfaced but did not.\n"
+            "- Recommended repair: add 1-2 themes to the target so future queries with similar\n"
+            "  vocabulary or intent can find it. Use the target's content as guidance for what\n"
+            "  themes accurately describe it.\n"
+            "- You may also propose adjustments to returned memories' themes if they're\n"
+            "  causing false positives that crowd out the target.\n"
+            "- If the target's themes already adequately describe its content and the issue is\n"
+            "  upstream (query vocabulary mismatch the system can't bridge), leave it alone.\n"
         )
 
     prompt = (
         "You are diagnosing retrieval failures in a personal memory system. Each case shows\n"
-        "a query where the system returned memories that the user rated as completely useless\n"
-        "(utility <= 0.2). Your job: figure out WHY these memories surfaced and suggest theme\n"
-        "modifications to prevent it.\n\n"
+        "a query where the system returned memories that were rated as completely useless\n"
+        "(utility <= 0.2). Your job: figure out WHY and suggest theme modifications to fix it.\n\n"
         "Possible repairs:\n"
         "1. Remove themes that are too broad and cause false matches. Only remove if genuinely\n"
         "   misleading — not just because it didn't help for one query.\n"
-        "2. Add themes that make the memory more precisely findable for its actual topic.\n\n"
+        "2. Add themes that make a memory more precisely findable for its actual topic.\n"
+        + probe_rules + "\n"
         "Cases:\n\n" + "\n\n".join(case_blocks) + "\n\n"
         "Output format:\n"
         '{\n'
@@ -953,14 +1050,18 @@ def repair_retrieval_failures():
                 repair_count += 1
                 print(f"    Repaired {mem_prefix}: -{actual_removed} +{actual_added}")
 
-        # Mark this case as processed
-        _log_event(db, "_recall", "recall_miss_repaired",
-                   query=case["miss"]["query"],
-                   context={
-                       "miss_event_id": case["miss"]["id"],
-                       "repairs_applied": len(applied_for_case),
-                       "repairs": applied_for_case,
-                   })
+        # Mark every miss row that contributed to this case as processed.
+        # Folded probe cases have multiple rows; emit one repaired event per
+        # row so the existing dedup query (filtering on miss_event_id) keeps
+        # working without changes.
+        for miss_row in case["miss_rows"]:
+            _log_event(db, "_recall", "recall_miss_repaired",
+                       query=miss_row["query"],
+                       context={
+                           "miss_event_id": miss_row["id"],
+                           "repairs_applied": len(applied_for_case),
+                           "repairs": applied_for_case,
+                       })
 
     db.commit()
     db.close()
@@ -974,8 +1075,19 @@ def repair_retrieval_failures():
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Full sleep cycle: NREM then REM.")
+    parser.add_argument("--deep", action="store_true",
+                        help="Run deep NREM (all active memories) instead of standard (recent only).")
+    parser.add_argument("--probes", type=int, default=10,
+                        help="Number of unique memories to probe in Phase 3 (default 10). "
+                             "Each memory gets 3 queries (one per mode) in mixed mode, so "
+                             "default = 30 total queries. Set to 0 to skip the probe.")
+    args = parser.parse_args()
+    nrem_mode = "deep" if args.deep else "standard"
+
     print(f"{'═' * 60}")
-    print(f"  SLEEP CYCLE (deep NREM + REM)")
+    print(f"  SLEEP CYCLE ({nrem_mode} NREM + REM)")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'═' * 60}\n")
 
@@ -984,11 +1096,9 @@ def main():
     run_theme_normalization()
 
     nrem_time = run_phase(
-        "Phase 1: NREM — edge classification + dedup",
-        [sys.executable, str(SCRIPTS / "sleep_nrem.py"), "deep"],
+        f"Phase 1: NREM ({nrem_mode}) — edge classification + dedup",
+        [sys.executable, str(SCRIPTS / "sleep_nrem.py"), nrem_mode],
     )
-
-    repair_retrieval_failures()
 
     rem_time = run_phase(
         "Phase 2: REM — summaries, gestalt, dormancy, health",
@@ -1001,17 +1111,32 @@ def main():
         apply_theme_suggestions(suggestions)
 
 
-    # Phase 3: Retrieval probe — generate feedback signal for underserved memories
-    sys.path.insert(0, str(SCRIPTS))
-    from probe_recall import run_probe
-    print(f"{'─' * 60}")
-    print(f"  Phase 3: Retrieval probe")
-    print(f"{'─' * 60}")
-    print(flush=True)
-    probe_start = time.time()
-    run_probe()
-    probe_time = int(time.time() - probe_start)
-    print(f"\n  Probe complete ({probe_time}s)\n", flush=True)
+    # Phase 3: Retrieval probe — generate feedback signal for underserved memories.
+    # --probes counts unique memories. Mixed mode emits 3 queries per memory
+    # (natural + mild + hard), so total query budget = probes × 3.
+    probe_time = 0
+    if args.probes > 0:
+        sys.path.insert(0, str(SCRIPTS))
+        from probe_recall import run_probe
+        QUERIES_PER_MEMORY = 3  # mixed mode default: natural + mild + hard
+        total_queries = args.probes * QUERIES_PER_MEMORY
+        print(f"{'─' * 60}")
+        print(f"  Phase 3: Retrieval probe ({args.probes} memories × "
+              f"{QUERIES_PER_MEMORY} modes = {total_queries} queries)")
+        print(f"{'─' * 60}")
+        print(flush=True)
+        probe_start = time.time()
+        run_probe(num_queries=total_queries)
+        probe_time = int(time.time() - probe_start)
+        print(f"\n  Probe complete ({probe_time}s)\n", flush=True)
+    else:
+        print(f"{'─' * 60}")
+        print(f"  Phase 3: Retrieval probe — SKIPPED (--probes 0)")
+        print(f"{'─' * 60}\n")
+
+    # Phase 4: Retrieval failure repair — runs after probe so misses queued
+    # by this cycle's probe get processed in the same cycle, not deferred.
+    repair_retrieval_failures()
 
     total = int(time.time() - total_start)
     mins, secs = divmod(total, 60)
