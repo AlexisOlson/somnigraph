@@ -1,0 +1,2 @@
+- [GT must mirror actual usage](feedback_gt_must_mirror_usage.md) — synthetic GT shape mismatch caused the 2026-05-08 reranker Goodhart; design GT around production (query, context) distribution
+- [Don't run long commands](feedback_dont_run_long_commands.md) — multi-minute scripts (retrain, audit, sleep) belong in Alexis's terminal; provide the command and stop

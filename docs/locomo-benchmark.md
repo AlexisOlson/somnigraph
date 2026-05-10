@@ -4,6 +4,8 @@ Tracking retrieval quality on the [LoCoMo benchmark](https://arxiv.org/abs/2402.
 
 Metric: R@k (does any evidence turn appear in the top-k retrieved?), MRR (mean reciprocal rank of first evidence hit). OVERALL excludes adversarial questions (no ground truth answer — retrieval "evidence" is ambiguous).
 
+**Comparability note:** All results here use **turn-level** granularity — each of the ~300 dialog turns per conversation is a separate retrieval candidate. Some external systems (e.g., context-mem) report LoCoMo scores at **session-level** granularity (~25 sessions per conversation), enriched with LoCoMo's own summary/observation/event metadata and benchmark-specific synonym expansions injected at eval time. Session-level R@10 on ~25 enriched documents is a fundamentally easier task than turn-level R@10 on ~300 raw turns; the numbers are not comparable. See `research/sources/context-mem.md` § Benchmark Methodology for details.
+
 ## Run history
 
 ### Level 0 — Bare RRF (2026-03-20)

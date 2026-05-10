@@ -97,6 +97,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Claude Total Memory](https://github.com/vbcherepanov/claude-total-memory) | claude-total-memory.md | Single-file MCP server with SQLite/FTS5 + optional ChromaDB and session transcript extraction. |
 | [Claudest](https://github.com/gupsammy/Claudest) | claudest.md | Zero-dependency Python plugin using SQLite/FTS5 with session import/sync hooks. |
 | [cognee](https://github.com/topoteretes/cognee) | cognee.md | Production knowledge engine converting raw data into knowledge graphs with pluggable backends. |
+| [context-mem](https://github.com/JubaKitiashvili/context-mem) | context-mem.md | TypeScript MCP memory for coding assistants: 14 content-type summarizers, 8-strategy BM25 + optional vector hybrid search, adaptive compression tiers, 44 tools. Claims 98%+ LoCoMo but at session-level granularity with enriched metadata and benchmark-specific synonyms — not comparable to turn-level evaluations. |
 | [cortex-engine](https://github.com/Fozikio/cortex-engine) | cortex-engine.md | TypeScript MCP cognitive engine (57 tools) with FSRS-6 scheduling, 8-phase dream consolidation, prediction-error gating with adaptive density, HyDE + query-conditioned spreading activation, Fiedler value graph diagnostic, hindsight audit for silently hardened beliefs. |
 | [CortexGraph](https://github.com/prefrontal-systems/cortexgraph) | cortexgraph.md | MCP server with Ebbinghaus-style forgetting curves, consolidation, and Obsidian vault promotion. |
 | [Daem0n-MCP](https://github.com/DasBluEyedDevil/Daem0n-MCP) | daem0n.md | Async MCP memory/decision system with Qdrant vectors, Leiden community detection, and E2B sandboxing. |
@@ -134,6 +135,7 @@ Analyses of papers, repositories, benchmarks, and other resources surveyed durin
 | [Vestige + FSRS](https://github.com/samvallad33/vestige) | vestige-fsrs.md | Rust MCP memory applying FSRS-6 spaced repetition scheduling with SvelteKit 3D visualization. |
 | [Vibe Cognition](https://github.com/Haagndaazer/vibe-cognition) | vibe-cognition.md | Claude Code plugin with ChromaDB + NetworkX project knowledge graph (8 node types, 7 edge types), JSONL event-sourced persistence, optional Ollama semantic edge curation, git-committed team-shared memory. Local-only, vector-only retrieval. |
 | [virtual-context](https://github.com/virtual-context/virtual-context) | virtual-context.md | OS-style context window manager: 3-layer compression (raw/summary/tag), 3-signal RRF with gravity/hub dampening, structured fact supersession, tool-augmented paging. 95% on LongMemEval. |
+| [YantrikDB](https://github.com/yantrikos/yantrikdb-server) | yantrikdb.md | Rust/PyO3 cognitive memory engine (closed-source core) with five coordinated indexes (HNSW, graph, temporal, decay heap, KV), MCP server, explicit `think()` consolidation loop, contradiction detection, retrieval hints, CRDT sync. AGPL + patent (US 19/573,392). No external benchmarks. 384d embeddings. |
 | [Zep (repo)](https://github.com/getzep/zep) | zep-repo.md | Open-source examples and integrations; the actual engine lives in the Graphiti repo. |
 
 ## Discussions
