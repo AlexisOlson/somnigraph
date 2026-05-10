@@ -205,10 +205,11 @@ def recall_feedback(
     query: str = "",
     reason: str = "",
     cutoff_rank: int = -1,
+    relationships: str = "[]",
 ) -> str:
     """Report utility feedback on recalled memories to improve future retrieval.
 
-    Flat format — each key is a memory ID (8-char prefix or full UUID), value is either:
+    Flat feedback format — each key is a memory ID (8-char prefix or full UUID), value is either:
       - A float 0.0-1.0 (utility only)
       - A list [utility, durability] where durability is -1.0 to 1.0
 
@@ -217,14 +218,26 @@ def recall_feedback(
     Utility scale: 0.0 = useless, 0.3 = marginal, 0.6 = useful, 0.9 = critical.
     Durability: -1.0 = stale, 0.0 = neutral, 1.0 = enduring.
 
+    Optional `relationships` lets you opportunistically surface pairwise
+    relationships among the recalled memories at no extra LLM cost — you
+    already have them in context. JSON array of objects:
+      {"a": "id1_short", "b": "id2_short", "type": "related|supports|contradicts|supersedes", "note": "brief reason"}
+    Only flag relationships you noticed clearly while using the memories;
+    both memories must rate >= 0.6 utility above. Skip pairs that are merely
+    topically near. Cap at 5. Empty list is fine — quality matters more
+    than recall.
+
     Args:
         feedback: JSON object mapping memory IDs to utility scores.
         query: The recall query that produced these results (for context tracking).
         reason: Short explanation of how these memories were used.
         cutoff_rank: Position of last useful result (1-indexed). 0 = nothing useful.
             -1 (default) = not reporting cutoff. Used to tune quality floor threshold.
+        relationships: JSON array of pairwise relationship objects (see above).
+            Default "[]". Free piggyback — only fill in if you noticed clear
+            relationships while rating, not as a requirement.
     """
-    return impl_recall_feedback(feedback, query, reason, cutoff_rank)
+    return impl_recall_feedback(feedback, query, reason, cutoff_rank, relationships)
 
 
 @mcp.tool()

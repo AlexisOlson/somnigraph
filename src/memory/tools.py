@@ -820,6 +820,7 @@ def impl_recall_feedback(
     query: str = "",
     reason: str = "",
     cutoff_rank: int = -1,
+    relationships: str = "[]",
 ) -> str:
     try:
         fb = json.loads(feedback) if isinstance(feedback, str) else feedback
@@ -831,6 +832,17 @@ def impl_recall_feedback(
 
     if not fb:
         return "No memory feedback provided."
+
+    # Optional pairwise-relationship piggyback: when the caller has the
+    # recalled memories in context anyway, they can surface relationships
+    # between them in the same call. Validated and processed after the
+    # utility/co-utility logic below.
+    try:
+        rels = json.loads(relationships) if isinstance(relationships, str) else relationships
+    except (json.JSONDecodeError, TypeError):
+        rels = []
+    if not isinstance(rels, list):
+        rels = []
 
     db = get_db()
     recorded = 0
@@ -1022,6 +1034,56 @@ def impl_recall_feedback(
                 if edge_id:
                     edges_created += 1
 
+    # Bundled-relationship edges: when the caller surfaced explicit pairwise
+    # relationships at feedback time (Task 2 of the rate prompt, or any
+    # session-Claude using the relationships param), create typed edges.
+    # Free piggyback — the caller already had these memories in context.
+    rel_edges_created = 0
+    if rels:
+        # Build short-prefix → full-id map from the resolved feedback set
+        # so we can reject IDs the caller hallucinated outside the rated set.
+        prefix_to_full = {mid[:8]: mid for mid, _ in resolved_feedback}
+        utility_by_full = {mid: u for mid, u in resolved_feedback}
+        _REL_EDGE_TYPE_MAP = {
+            "related":     ([], "related"),
+            "supports":    ([], "supports"),
+            "contradicts": (["contradiction"], "contradicts"),
+            "supersedes":  (["revision"], "supersedes"),
+        }
+        for rel in rels[:5]:  # cap matches the prompt
+            if not isinstance(rel, dict):
+                continue
+            a_short = (rel.get("a") or "").strip()[:8]
+            b_short = (rel.get("b") or "").strip()[:8]
+            rel_type = (rel.get("type") or "").strip().lower()
+            note = (rel.get("note") or "").strip()
+            if not a_short or not b_short or a_short == b_short:
+                continue
+            mapping = _REL_EDGE_TYPE_MAP.get(rel_type)
+            if mapping is None:
+                continue
+            a_full = prefix_to_full.get(a_short)
+            b_full = prefix_to_full.get(b_short)
+            if not a_full or not b_full:
+                continue
+            # Floor: both rated at least useful for this query
+            if (utility_by_full.get(a_full, 0) < CO_UTILITY_THRESHOLD or
+                    utility_by_full.get(b_full, 0) < CO_UTILITY_THRESHOLD):
+                continue
+            flags, type_label = mapping
+            linking_context = (
+                f"[feedback:{type_label}] {note}"
+                if note else f"[feedback:{type_label}] {query[:120]}"
+            )
+            edge_id = _create_edge(
+                db, a_full, b_full,
+                linking_context=linking_context,
+                flags=flags or None,
+                created_by="recall_feedback",
+            )
+            if edge_id:
+                rel_edges_created += 1
+
     # Disappointed-recall detection: all memories scored low utility
     if resolved_feedback and query:
         max_util = max(u for _, u in resolved_feedback)
@@ -1115,6 +1177,8 @@ def impl_recall_feedback(
         parts.append(f"Decay rate adjusted for {decay_adjusted}.")
     if edges_created:
         parts.append(f"{edges_created} co-utility edge(s) created.")
+    if rel_edges_created:
+        parts.append(f"{rel_edges_created} relationship edge(s) created.")
     if cutoff_msg:
         parts.append(cutoff_msg.strip())
     return " ".join(parts)
