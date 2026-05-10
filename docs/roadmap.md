@@ -207,6 +207,30 @@ The cliff detector (`apply_quality_floor` in `scoring.py`) becomes dead code. `C
 **Effort:** 2–3 sessions.
 **Hypothesis:** Large impact on temporal queries, negligible on everything else.
 
+### Should memories carry source-event provenance?
+
+**What we know:** Memories have `created_at`. Edges between memories carry `linking_context` and retrieval-shaped weights. There is no link from a memory to the session or sleep event that produced it. Sleep-created entries (entity refreshes, theme adjustments) are indistinguishable from session-created ones in their provenance.
+**What we don't know:** Whether a `caused_by` field (event ID + type) would enable diagnostics current edges can't — e.g., distinguishing high-utility memories that trace back to feedback-driven sleep runs vs. direct writes, or detecting whether sleep-modified memories drift in feedback distribution.
+**Experiment:** Add a lightweight `caused_by` field. Backfill conservatively for session and sleep events going forward (no historical reconstruction). After ~1 month of accumulation: compare feedback distributions across event types.
+**Effort:** 1 session for schema + write-path; several months for the diagnostic queries to be interpretable.
+**Hypothesis:** Provenance surfaces a real category that edges don't. Sleep-driven modifications have systematically different feedback profiles than direct stores. See `research/sources/connectome.md` — Connectome's `causedBy[]` is the analog at the record level.
+
+### Should the DB itself be branchable?
+
+**What we know:** Counterfactual sleep evaluation (#14) requires forking the DB to compare sleep-on vs sleep-off on the same query set — currently a manual `cp` of the SQLite file. Several other Tier 2 experiments (paraphrase robustness, generalization, embedding staleness, graph null models) would benefit from cheap variant comparison on the same memory set.
+**What we don't know:** Whether SQLite write patterns admit cheap branching (copy-on-write at the page level, or versioned tables), and whether the resulting workflow lowers the friction of counterfactual studies enough to change which experiments are routine.
+**Experiment:** Prototype a branch operation. Measure cost of (a) creating a branch, (b) running recall + sleep on it, (c) detecting divergence vs. parent. Test on counterfactual sleep evaluation as the first consumer.
+**Effort:** 2–3 sessions for prototype; depends on whether SQLite carries it or a wrapper is needed.
+**Hypothesis:** Cheap branching turns one-off counterfactual experiments into routine ones (different feedback histories, sleep runs, reranker versions). Above some corpus size, page-level COW becomes necessary, which is a larger lift. See `research/sources/connectome.md` — Chronicle's first-class branchable record store.
+
+### Should sleep produce autobiographical narrative summaries?
+
+**What we know:** NREM produces structured artifacts (theme normalization, edge weights, contradiction classifications, summary refresh). REM does probe recall and dormancy classification. Neither produces narrative — diary-entry-style summaries written by the agent in its own voice over recent activity. That role is currently filled outside the DB (the agent's seed.md and Personal Vault Journal — manual and hand-curated).
+**What we don't know:** Whether narrative summaries as memories (`category="reflection"`, `decay_rate=0`, themes derived from content) surface differently than structured extractions on retrieval — particularly on cross-domain or thematic queries that structured memories handle poorly. Risk: hierarchical merge produces increasingly polished but less faithful narrative, the failure mode visible in Connectome's autobiographical strategy.
+**Experiment:** Add a sleep mode that generates a narrative summary of recent session activity (e.g., the last 3 sessions' episodic memories) in the agent's voice. Test retrieval on the cross-domain GT queries identified by query difficulty clustering (#11). Hierarchical merge: when N narrative entries accumulate, merge into a longer-period entry. Track fidelity by comparing entries against source memories.
+**Effort:** 2 sessions for implementation + initial evaluation; longer-running natural experiment as material accumulates.
+**Hypothesis:** Narrative entries fill a different retrieval niche — "how was the project going around date X" type queries — that structured memories handle poorly. Hierarchical merge will show measurable fidelity drift; the question is whether the legibility gain offsets it. See `research/sources/connectome.md` — Connectome's AutobiographicalStrategy is the analog as a context-window strategy.
+
 ---
 
 ## Proposed experiments
