@@ -453,6 +453,53 @@ An MMR-style feature (`max_sim_to_higher`: max cosine similarity to any higher-r
 
 A classifier that categorized queries into types (factual, exploratory, reflective) and adjusted scoring weights per type. Implementation: 0% fire rate in production. Queries don't cleanly decompose into intent categories, and the scoring pipeline is robust enough across query types that differential treatment adds complexity without benefit.
 
+### `-1.0` sentinel for missing feedback features (fixed 2026-05-08)
+
+For memories without feedback events, `fb_last`/`fb_mean`/`fb_time_weighted` were set to `-1.0` as a "missing" sentinel. Real feedback values live in [0, 1], so `-1.0` reads to LightGBM as "worse than any real value." The trees learned to aggressively demote any memory whose feedback features hit the sentinel — i.e., every cold-start memory. This routed self-reinforcement bias through a feature-encoding accident: memories that had never been retrieved couldn't be retrieved because the encoding said they were the worst possible.
+
+Fix: use `float("nan")` instead. LightGBM treats NaN as a separate split direction, learning a "missing branch" without forcing it to be more negative than any real value. After retraining, the audit's pathology count dropped from 89 to 61 — but the catastrophic bucket (gap > 250) grew, because removing the explicit penalty let the model find other features to encode the same bias. Lesson: feature-encoding sentinels and self-reinforcement bias are coupled, and fixing one doesn't fix the other.
+
+### `fts_bm25_norm` normalization always-zero bug (fixed 2026-05-08)
+
+The 31-feature batch added `fts_bm25_norm = score / max_score`, intended as a per-query normalization of BM25 strength. The code guarded `if max_fts > 0 else 0.0`. SQLite FTS5 returns *negative* BM25 scores (more-negative = better match), so `max_fts` is always ≤ 0 and the else branch always fired. Every memory got `fts_bm25_norm = 0`. The feature was dead weight in the production model and contributed zero to the trained gain.
+
+Fix: normalize by `abs(min(scores))` so the strongest match has magnitude 1.0. After retraining, `fts_bm25_norm` jumped from importance 0.0 to #2 (352.0), and `query_coverage` rose into the top 6. The lesson: features that can fail silently (returning a constant) should be sanity-checked at training time — a feature with std=0 across 178K samples is structurally meaningless and should fail loudly.
+
+### Single-shape synthetic GT (Goodhart-confirmed 2026-05-08)
+
+Adding `(memory.summary, memory.id, 1.0)` for every active memory dropped audit pathologies from 61 to 0 on summary-as-query. Run with `--query-from content-residual` (content tokens minus summary tokens, the strongest free OOD test), pathology count was **239/468** — worse than the broken baseline. The audit and the synthetic GT both used summary-shape; the model learned "summary-shape → trust channels" and "anything else → fall back to age + fb_count bias."
+
+The follow-up fix (2026-05-08, same day): synthetic anchors restructured to mirror real production calls — `query = themes-joined` (FTS-style, ~10 tokens, matching real-GT distribution), `context = summary` (vec-style, longer text). The (query, context) asymmetry recorded in a sidecar JSON that merges into `vector_input_map` at training time, with real `recall_meta` taking precedence on collision. This dropped content-residual pathologies from 239 → 167 (-30%).
+
+Lesson: GT must mirror actual production usage. Real recall takes (query, context) where vec runs on context and FTS on query — synthetic anchors that don't preserve that asymmetry teach shape-memorization rather than retrieval semantics. Single-shape (summary, summary) anchors are particularly bad because they train the model that vec and FTS should agree on the same text, which they don't in production.
+
+### Sentinel-encoded missing values (fixed 2026-05-08)
+
+After the synthetic-GT fix landed, content-residual pathologies stayed at 167. Per-case SHAP analysis on the worst offenders pointed at `session_recency` as a dominant bias channel. The cause was the same bug-shape as the May 8 fb-NaN fix: `session_recency_map.get(mid, -1)` for memories never co-retrieved in the current session. Real `session_recency` values are positive integers (`queries_ago >= 1`), so `-1` reads as "more recent than any real co-retrieval" — the model used it as a cold-start detector and demoted accordingly. Fix: NaN-encode missing. Pathologies dropped 167 → 108 (-35%).
+
+Audit of the remaining feature missing-encodings revealed five more bug-shape sentinels:
+
+- `fts_rank`, `vec_rank`, `theme_rank` all defaulted to `-1` for "not in this channel's results." Real ranks are 0-199 (smaller=better), so `-1` reads as "better than the top result."
+- `fts_bm25` defaulted to `0.0`. Real BM25 is negative; `0` reads as "no match" — direction-correct but still sentinel-encoded.
+- `vec_dist` defaulted to `0.0`. Real cosine distance is non-negative (smaller=closer); `0` reads as **"perfect match"** — wrong-direction sentinel, the worst of the lot.
+- `fts_bm25_norm`, `vec_dist_norm` had per-candidate missing defaults of `0` that masqueraded as legitimate normalized values.
+
+All seven NaN-encoded in one pass. Pathologies dropped 108 → 37 (-66%). Cumulative: 239 → 37 (-85%) across the day's three sentinel fixes.
+
+Codified policy in both `src/memory/reranker.py` and `scripts/train_reranker.py`: any feature whose missing value would masquerade as a real measurement uses `float("nan")` so LightGBM learns an explicit missing-branch split. Features whose `0` has a legitimate meaning (no overlap, no PMI, zero count) keep `0`. The `memory_meta`-missing default block (category=1, priority=5, ...) still uses masquerading defaults but is dead-code in practice — backlog item for next refactor.
+
+### The audit's ceiling (acknowledged 2026-05-08)
+
+`scripts/audit_reranker_pathology.py` was a sharp tool for catching the three sentinel-bug classes. After all three were fixed, the residual 37 content-residual pathologies turned out to be a structural artifact of the audit's construction, not a model bug. Per-case SHAP analysis: the dominant culprit features are `fts_rank` (mean delta -0.28) and `fts_bm25_norm` (-0.18) — *not* the self-reinforcement features (`age_days`, `fb_count`, `session_recency` are all -0.006 or smaller).
+
+The structural issue: FTS indexes summary + themes (BM25 weights 13.278 / 5.731). Content tokens aren't in FTS unless they also appear in summary or themes. Content-residual = content tokens MINUS summary tokens — by construction the residual is *guaranteed to not appear in target's summary*. Themes are usually derived from the summary's key concepts, so the residual rarely matches there either. **The target memory's FTS signal on its own content-residual query is structurally weak by design.**
+
+Other memories' FTS indexes are unaffected by what we removed from target's summary. If any residual tokens happen to be in another memory's summary or themes, that memory FTS-matches strongly. So content-residual isn't a clean OOD test — it's a "handicap target's FTS while leaving other memories' FTS intact" test. The model's preference for FTS-strong candidates is correct production behavior; the audit guarantees target's FTS signal will be weak relative to imposters.
+
+Per-case confirmation across the 8 worst pathologies: target `fts_rank` is `NaN` (residual tokens nowhere in summary/themes) or weak in every case; top-1 has perfect FTS (`fts_rank=0`, `fts_bm25_norm=1.0`) in every case. In two cases (`f29ed752`, `81324e46`), top-1 also has a *better* `vec_rank` than target — those aren't pathologies at all, top-1 is unambiguously the better answer.
+
+The audit retains regression-detection value for sentinel-class bugs. It is no longer the primary signal for model quality. **Probe Phase-1 miss-rate** (per `scripts/probe_recall.py`) is the trustworthy generalization metric because it uses LLM-crafted natural queries rather than self-derived shapes that systematically disadvantage target's FTS index. To repair the audit as an OOD test, the residual query construction would need to preserve target's FTS index — e.g., paraphrased-summary (preserves semantics, different tokens) or content-minus-themes (preserves summary). Or the structural fix: LLM-crafted natural queries with judged top-K labels (the "synthetic mini-benchmark per memory" approach in `docs/roadmap.md`).
+
 ### Shadow penalty in scoring (details)
 
 The original design assumed that a memory heavily shadowed by newer versions was "stale" and should rank lower. This conflates two meanings of relevance:

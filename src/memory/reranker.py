@@ -402,8 +402,10 @@ def rerank(
 
     pool_size = len(candidate_ids)
 
-    # Per-query max for normalized score features
-    max_fts = max(fts_scores.values()) if fts_scores else 0.0
+    # Per-query magnitude for normalized score features.
+    # SQLite FTS5 BM25 is negative (more-negative = better match), so we
+    # normalize by the absolute value of the strongest match in the pool.
+    abs_best_fts = abs(min(fts_scores.values())) if fts_scores else 0.0
     max_vec = max(vec_distances.values()) if vec_distances else 0.0
 
     # Hebbian PMI
@@ -485,25 +487,37 @@ def rerank(
     # Use list-of-lists to avoid numpy dependency at prediction time
     features = [[0.0] * 31 for _ in range(n)]
 
+    # Missing-encoding policy (see docs/architecture.md "What didn't work"):
+    # any feature whose missing value would masquerade as a real measurement
+    # uses NaN so LightGBM learns an explicit missing-branch split. Features
+    # whose 0 has a legitimate meaning (no overlap, no PMI, zero count) keep 0.
+    nan = float("nan")
+
     for i, mid in enumerate(candidate_list):
         f = features[i]
-        f[0] = fts_ranked.get(mid, -1)                     # fts_rank
-        f[1] = vec_ranked.get(mid, -1)                      # vec_rank
-        f[2] = theme_ranked.get(mid, -1)                    # theme_rank
-        f[3] = ppr_scores.get(mid, 0.0)                     # ppr_score
-        f[4] = fts_scores.get(mid, 0.0)                     # fts_bm25
-        f[5] = vec_distances.get(mid, 0.0)                  # vec_dist
-        f[6] = theme_overlap_map.get(mid, 0)                # theme_overlap
+        # Channel ranks: real values 0-199 (smaller=better). -1 used to read
+        # as "better than rank 0" — bug-shape sentinel, NaN-ified 2026-05-08.
+        f[0] = fts_ranked.get(mid, nan)                     # fts_rank
+        f[1] = vec_ranked.get(mid, nan)                      # vec_rank
+        f[2] = theme_ranked.get(mid, nan)                    # theme_rank
+        f[3] = ppr_scores.get(mid, 0.0)                     # ppr_score (0 legitimate)
+        # Raw channel scores: BM25 is negative (more-negative=better),
+        # vec_dist is non-negative (smaller=closer). Default 0 misrepresented
+        # both — fts as "no match" and vec as "perfect match." NaN now.
+        f[4] = fts_scores.get(mid, nan)                     # fts_bm25
+        f[5] = vec_distances.get(mid, nan)                   # vec_dist
+        f[6] = theme_overlap_map.get(mid, 0)                # theme_overlap (0 legitimate)
 
-        # Feedback
+        # Feedback — NaN for missing so LightGBM learns a separate "missing"
+        # branch instead of treating no-feedback as worse than any real value.
         fb = feedback_raw.get(mid)
         if fb and fb["count"] > 0:
             f[7] = fb["utilities"][-1]                       # fb_last
             f[8] = sum(fb["utilities"]) / fb["count"]        # fb_mean
             f[9] = fb["count"]                               # fb_count
         else:
-            f[7] = -1.0
-            f[8] = -1.0
+            f[7] = float("nan")
+            f[8] = float("nan")
             f[9] = 0
 
         f[10] = hebbian_pmi_map.get(mid, 0.0)              # hebbian_pmi
@@ -558,19 +572,31 @@ def rerank(
                     w = math.exp(-fb_lambda * age_fb)
                     weighted_sum += w * util
                     weight_sum += w
-                f[24] = weighted_sum / weight_sum if weight_sum > 0 else -1.0
+                f[24] = weighted_sum / weight_sum if weight_sum > 0 else float("nan")
             else:
-                f[24] = -1.0
+                f[24] = float("nan")
         else:
-            f[24] = -1.0
+            f[24] = float("nan")
 
-        f[25] = session_recency_map.get(mid, -1)            # session_recency
+        # NaN for missing — real session_recency is queries_ago >= 1, so -1 reads
+        # as "more recent than any real co-retrieval" and routes self-reinforcement
+        # bias the same way the fb-NaN sentinel did before 2026-05-08.
+        f[25] = session_recency_map.get(mid, float("nan"))  # session_recency
 
         # Tier 3
         f[26] = q_len                                            # query_length
         f[27] = pool_size                                        # candidate_pool_size
-        f[28] = (fts_scores.get(mid, 0.0) / max_fts) if max_fts > 0 else 0.0  # fts_bm25_norm
-        f[29] = (vec_distances.get(mid, 0.0) / max_vec) if max_vec > 0 else 0.0  # vec_dist_norm
+        # Normalized channel scores: real values 0-1. Per-candidate missing
+        # used to default 0, which reads as "weakest match" for FTS and
+        # "closest" (wrong direction!) for vec. NaN now.
+        if mid in fts_scores and abs_best_fts > 0:
+            f[28] = abs(fts_scores[mid]) / abs_best_fts
+        else:
+            f[28] = nan                                                  # fts_bm25_norm
+        if mid in vec_distances and max_vec > 0:
+            f[29] = vec_distances[mid] / max_vec
+        else:
+            f[29] = nan                                                  # vec_dist_norm
         f[30] = m.get("decay_rate", DEFAULT_DECAY_RATE) if m else DEFAULT_DECAY_RATE  # decay_rate
 
     # Predict using Booster (list-of-lists input, no numpy needed)

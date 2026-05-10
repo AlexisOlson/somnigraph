@@ -6,6 +6,7 @@ Reference for how production code (`~/.claude/servers/memory/`) was adapted duri
 - Configurable via `SOMNIGRAPH_DATA_DIR` env var, defaults to `~/.somnigraph/`
 - Personal data (KNOWN_PHRASES, THEME_VARIANTS, CONTENT_THEME_PHRASES) load from JSON in `DATA_DIR`, with small generic defaults
 - API key: `OPENAI_API_KEY` env var, fallback to `DATA_DIR/openai_api_key` file
+- Embedding backend: `SOMNIGRAPH_EMBEDDING_BACKEND` env var, defaults to `openai` (1536d). Set to `fastembed` (384d, BAAI/bge-small-en-v1.5, local) when running scripts against a DB built with fastembed — `db.py` now hard-fails at connection time on dim mismatch rather than silently writing wrong-dim vectors. Production runs on fastembed; the MCP server inherits the env var from its launch environment.
 - `pyproject.toml` license field uses table format for non-SPDX identifier
 - Production `sync.py` → somnigraph `events.py` (name clarified; old JSON sync layer was removed in production 2026-03-06)
 - Production `memory_server.py` re-exports for sleep script compat stripped — somnigraph server is pure MCP wiring

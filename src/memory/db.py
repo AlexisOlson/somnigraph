@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import sqlite3
 import threading
 from datetime import datetime
@@ -9,7 +10,7 @@ from pathlib import Path
 
 import sqlite_vec
 
-from memory.constants import DATA_DIR, EMBEDDING_DIM
+from memory.constants import DATA_DIR, EMBEDDING_BACKEND, EMBEDDING_DIM
 from memory.fts import _themes_for_fts
 
 logger = logging.getLogger("claude-memory")
@@ -216,6 +217,26 @@ def _init_schema(db: sqlite3.Connection):
             embedding float[{EMBEDDING_DIM}] distance_metric=cosine
         )
     """)
+
+    # Guard against backend/DB dim mismatch. The CREATE above is a no-op when the
+    # table already exists, so connecting to a populated DB with the wrong backend
+    # would otherwise silently emit dim-N vectors against a dim-M index — fail loud.
+    existing = db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='memory_vec'"
+    ).fetchone()
+    if existing and existing[0]:
+        m = re.search(r"float\[(\d+)\]", existing[0])
+        if m:
+            existing_dim = int(m.group(1))
+            if existing_dim != EMBEDDING_DIM:
+                raise RuntimeError(
+                    f"Embedding-dim mismatch: memory_vec at {DB_PATH} was created with "
+                    f"dim={existing_dim}, but the active backend "
+                    f"(SOMNIGRAPH_EMBEDDING_BACKEND={EMBEDDING_BACKEND!r}) produces "
+                    f"dim={EMBEDDING_DIM}. Set SOMNIGRAPH_EMBEDDING_BACKEND to match the "
+                    f"backend that built this DB (typical: 'fastembed' for 384, 'openai' "
+                    f"for 1536)."
+                )
 
     # FTS5 virtual table — indexes only curated metadata (summary + themes)
     # Content is handled by vector search; FTS5 owns keyword precision
