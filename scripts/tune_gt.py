@@ -367,35 +367,44 @@ def precompute_searches(db: sqlite3.Connection, gt_queries: list[str],
 
 
 def precompute_ppr_cache(gt_queries: list[str], search_data: dict,
-                         ppr_adj: dict, cache_path: Path) -> dict:
-    """Pre-compute PPR scores for all GT queries across damping grid."""
+                         ppr_adj: dict, cache_path: Path,
+                         dampings: list[float] | None = None) -> dict:
+    """Pre-compute PPR scores for all GT queries across a damping grid.
+
+    Args:
+      dampings: damping values to ensure are cached. None = full PPR_DAMPING_GRID
+        (tune_gt's hyperparameter sweep). Trainers that read a single damping
+        should pass [PPR_DAMPING] to skip computing the other ~100 grid points.
+    """
+    grid = list(dampings) if dampings is not None else PPR_DAMPING_GRID
 
     if cache_path.exists():
         with open(cache_path, "rb") as f:
             cache = pickle.load(f)
         print(f"  PPR cache loaded: {len(cache)} entries")
-        # Check for missing grid entries and fill incrementally
-        missing_dampings = set()
-        if cache and gt_queries:
-            sample_q = gt_queries[0]
-            for d in PPR_DAMPING_GRID:
-                if (round(d, 3), sample_q) not in cache:
-                    missing_dampings.add(d)
-        if not missing_dampings:
-            return cache
-        print(f"  Extending PPR cache with {len(missing_dampings)} new damping values...")
     else:
-        missing_dampings = None  # compute all
+        cache: dict[tuple, dict] = {}
 
-    n_dampings = len(missing_dampings) if missing_dampings else len(PPR_DAMPING_GRID)
-    print(f"  Computing PPR cache ({len(gt_queries)} queries x {n_dampings} dampings)...")
+    # Per-query missing detection across the requested grid. The prior
+    # implementation inspected only gt_queries[0]; queries added after the
+    # cache was last built would silently get empty PPR scores at score time.
+    missing_per_query: dict[str, list[float]] = {}
+    for q in gt_queries:
+        miss = [d for d in grid if (round(d, 3), q) not in cache]
+        if miss:
+            missing_per_query[q] = miss
+
+    if not missing_per_query:
+        return cache
+
+    total_missing = sum(len(v) for v in missing_per_query.values())
+    print(f"  Extending PPR cache: {total_missing} (query, damping) pairs "
+          f"across {len(missing_per_query)} queries (grid size {len(grid)})")
     fts_results = search_data["fts_results"]
     vec_results = search_data["vec_results"]
 
-    if not cache_path.exists():
-        cache: dict[tuple, dict] = {}
-
-    for qi, q in enumerate(gt_queries):
+    queries_to_process = list(missing_per_query.keys())
+    for qi, q in enumerate(queries_to_process):
         fts_ids = fts_results.get(q, [])
         vec_ids = vec_results.get(q, [])
         fts_ranked = {mid: rank for rank, mid in enumerate(fts_ids)}
@@ -437,15 +446,14 @@ def precompute_ppr_cache(gt_queries: list[str], search_data: dict,
         if not sub_adj:
             continue
 
-        dampings_to_compute = sorted(missing_dampings) if missing_dampings else PPR_DAMPING_GRID
-        for damping in dampings_to_compute:
+        for damping in sorted(missing_per_query[q]):
             raw_ppr = personalized_pagerank(sub_adj, seed_weights, damping=damping)
             ppr_scores = {mid: ps for mid, ps in raw_ppr.items()
                           if mid not in seed_set and ps > 0}
             cache[(round(damping, 3), q)] = ppr_scores
 
         if (qi + 1) % 20 == 0:
-            print(f"    {qi + 1}/{len(gt_queries)} queries done")
+            print(f"    {qi + 1}/{len(queries_to_process)} queries done")
 
     with open(cache_path, "wb") as f:
         pickle.dump(cache, f)
@@ -1013,8 +1021,20 @@ def _print_trial(trial, searchable, n_completed, n_trials, best_val, best_at, t_
 # ---------------------------------------------------------------------------
 
 
-def load_tuning_data(gt_path: str) -> tuple[dict, dict, str]:
+def load_tuning_data(gt_path: str,
+                     vec_input_overrides_path: str | None = None,
+                     ppr_dampings: list[float] | None = None) -> tuple[dict, dict, str]:
     """Load and pre-compute all data needed for tuning.
+
+    Args:
+      gt_path: GT JSON of {query: {memory_id: label}}.
+      vec_input_overrides_path: Optional sidecar JSON of {query: context} produced
+        by build_gt_from_feedback.py for synthetic anchors. Real recall_meta
+        contexts (loaded from the DB) take precedence on collision — production
+        usage data is never overridden by synthetic shapes.
+      ppr_dampings: damping values to ensure are present in the PPR cache.
+        None = full PPR_DAMPING_GRID (tune_gt's hyperparameter sweep).
+        Trainers reading a single damping should pass [PPR_DAMPING].
 
     Returns (full_data, ground_truth, data_cache_path).
     """
@@ -1025,6 +1045,20 @@ def load_tuning_data(gt_path: str) -> tuple[dict, dict, str]:
     print("\nLoading data...")
     db = get_db()
     data = load_data(db, ground_truth)
+
+    if vec_input_overrides_path:
+        with open(vec_input_overrides_path) as f:
+            overrides = json.load(f)
+        merged = 0
+        ignored = 0
+        for q, ctx in overrides.items():
+            if q in data["vector_input_map"]:
+                ignored += 1  # real recall_meta wins
+            else:
+                data["vector_input_map"][q] = ctx
+                merged += 1
+        print(f"  Vec input overrides: {merged} merged, {ignored} ignored "
+              f"(real recall_meta took precedence) from {Path(vec_input_overrides_path).name}")
 
     embed_cache_path = DATA_DIR / "tune_gt_embeddings.pkl"
     print("\nPre-computing searches...")
@@ -1039,7 +1073,8 @@ def load_tuning_data(gt_path: str) -> tuple[dict, dict, str]:
     ppr_cache_path = DATA_DIR / "tuning_studies" / "tune_gt_ppr_cache.pkl"
     ppr_cache_path.parent.mkdir(parents=True, exist_ok=True)
     ppr_cache = precompute_ppr_cache(data["gt_queries"], search_data,
-                                      data["ppr_adj"], ppr_cache_path)
+                                      data["ppr_adj"], ppr_cache_path,
+                                      dampings=ppr_dampings)
     search_data["ppr_cache"] = ppr_cache
 
     full_data = {
