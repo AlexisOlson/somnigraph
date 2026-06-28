@@ -118,3 +118,5 @@ Don't over-link. The graph should reflect genuine relationships, not "these were
 **Narrating memory operations.** "Let me check my memories about..." adds no value. Just recall and use the results.
 
 **Storing unverified fixes.** A fix that hasn't been confirmed working can mislead future sessions. Wait until it works, then store.
+
+**Instruction decay over long context.** The guidance in this document weakens as the context window fills — a rule tens of thousands of tokens back gets quietly dropped. Two implications: the always-loaded snippet is kept short and front-loaded (this is *why* it's ~30 lines, not the full guide), and load-bearing behavior isn't left to a prose instruction alone. That's why `recall()` returns the feedback IDs in its output footer — the prompt to rate is coded into the tool surface rather than relying on you to remember this section. See [practitioner-signal.md](practitioner-signal.md).
