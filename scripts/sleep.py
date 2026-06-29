@@ -475,6 +475,19 @@ The "keep_distinct" list is important: for any pair you considered and decided N
         else:
             print(f"  {name.capitalize()}: failed")
 
+    # Drop malformed LLM items missing required keys, so neither the print
+    # loop, the saved review log, nor the later apply step trips over them.
+    def _ok(item, keys):
+        return isinstance(item, dict) and all(item.get(k) for k in keys)
+
+    for kind, keys in (("merge", ("from", "to")), ("split", ("tag", "into")),
+                       ("drop", ("tag",)), ("keep_distinct", ("a", "b"))):
+        kept = [it for it in merged[kind] if _ok(it, keys)]
+        dropped = len(merged[kind]) - len(kept)
+        if dropped:
+            print(f"  (skipped {dropped} malformed {kind} suggestion(s))")
+        merged[kind] = kept
+
     # Deduplicate merges (both might suggest the same thing)
     seen = set()
     unique_merges = []
@@ -498,15 +511,15 @@ The "keep_distinct" list is important: for any pair you considered and decided N
         if merges:
             print("  Merge:")
             for m in merges:
-                print(f"    \"{m['from']}\" -> \"{m['to']}\" ({m.get('reason', '')})")
+                print(f"    \"{m.get('from', '?')}\" -> \"{m.get('to', '?')}\" ({m.get('reason', '')})")
         if splits:
             print("  Split:")
             for s in splits:
-                print(f"    \"{s['tag']}\" -> {s['into']} ({s.get('reason', '')})")
+                print(f"    \"{s.get('tag', '?')}\" -> {s.get('into', '?')} ({s.get('reason', '')})")
         if drops:
             print("  Drop:")
             for d in drops:
-                print(f"    \"{d['tag']}\" ({d.get('reason', '')})")
+                print(f"    \"{d.get('tag', '?')}\" ({d.get('reason', '')})")
 
     # Save to file for next session to review
     review_data = {
