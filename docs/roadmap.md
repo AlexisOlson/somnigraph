@@ -231,6 +231,14 @@ The cliff detector (`apply_quality_floor` in `scoring.py`) becomes dead code. `C
 **Effort:** 2 sessions for implementation + initial evaluation; longer-running natural experiment as material accumulates.
 **Hypothesis:** Narrative entries fill a different retrieval niche — "how was the project going around date X" type queries — that structured memories handle poorly. Hierarchical merge will show measurable fidelity drift; the question is whether the legibility gain offsets it. See `research/sources/connectome.md` — Connectome's AutobiographicalStrategy is the analog as a context-window strategy.
 
+### Should the system surface recall hints before the agent asks?
+
+Recall is entirely pull-based, which leaves a structural blind spot: the agent can't decide to recall what it doesn't know exists, so relevant memory is missed whenever the agent never thinks to ask. Counterfactual coverage (proposed experiment #5) measures unseen-relevant memories only for queries the agent *did* make; the queries never made are unmeasured. This is the system's main missing capability, not a tuning refinement.
+
+The design is large enough to live on its own: see [`proactive-injection.md`](proactive-injection.md). In brief: a `UserPromptSubmit` hook runs cheap RRF-only retrieval each turn and, when a floor is cleared, injects a one-line hint (count + top score + a few topic handles, no snippets) that lets the agent decide whether to pull. A session cooldown suppresses repetition (anti-repetition, top of the exposure distribution) and stochastic Thompson gating over the per-memory Beta feedback model keeps the under-observed tail in play (anti-starvation), together containing the feedback self-reinforcement the design risks amplifying. The core assumption — that a coarse top-of-ranking surface floor carries usable signal even though the cliff detector found the fine-grained in-list cutoff anti-predictable (R² < 0) — is testable offline against the existing feedback logs before any code is written.
+
+**Effort:** 1 session for the offline floor study (data exists, no new collection); 1-2 sessions for the hook delivery layer and write-back path if positive. **Negative result is publishable:** if the binary surface signal is as weak as the cliff cutoff, that establishes score-based gating fails at both granularities.
+
 ---
 
 ## Proposed experiments
