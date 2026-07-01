@@ -15,8 +15,8 @@ See `docs/roadmap.md` for current research agenda and `STEWARDSHIP.md` for sessi
 ## Repo structure
 
 ```
-docs/           — Narrative documentation (architecture, experiments, similar-systems)
-research/       — 93 source analyses (papers, benchmarks, repos)
+docs/           — Narrative documentation; see docs/README.md for the map
+research/       — 184 source analyses (papers, benchmarks, repos)
 src/memory/     — 19 server modules
 src/memory_server.py — MCP entry point
 scripts/        — Sleep pipeline, tuning tools, ground truth
@@ -33,8 +33,10 @@ scripts/        — Sleep pipeline, tuning tools, ground truth
 
 ## Key files
 
+- `docs/README.md` — Documentation map (start here)
 - `docs/architecture.md` — Master narrative of design decisions
 - `docs/experiments.md` — Tuning methodology
-- `docs/roadmap.md` — Research agenda: what we learned, open questions, proposed experiments
+- `docs/benchmarks.md` — Benchmark scores (LoCoMo QA, PERMA)
+- `docs/roadmap.md` — Forward research agenda: open questions, proposed experiments
 - `docs/similar-systems.md` — Comparison with other systems
 - `research/sources/index.md` — Research source catalog
