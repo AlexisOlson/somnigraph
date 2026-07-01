@@ -73,7 +73,7 @@ Offline daemon-driven extraction + clustering + recurrence detection + persona u
 ### What YesMem does that Somnigraph doesn't
 - **Write-path quality gating at scale** (`extract.go`, `dedup.go`): content-aware truncation, 3-method dedup including pre-admission dedup, provenance labeling. Somnigraph has no write-time quality/dedup gate — this is the exact gap the Phase-18 source sweep flagged (write-path quality, not retrieval, is what LoCoMo leaders win on). YesMem is independent corroboration.
 - **Provenance-weighted ranking** (`OriginMultiplier`): trust as a first-class rank feature. Somnigraph's `reranker.py`/`scoring.py` have no source-trust feature.
-- **Anticipated queries**: a stored, embedded query-phrase bridge that targets Somnigraph's #1 documented ceiling — the ~88% multi-hop *vocabulary gap* (`docs/multihop-failure-analysis.md`). Convergent with Somnigraph L5b's synthetic-node bridges but realized at the memory level (each memory predicts its own queries).
+- **Anticipated queries**: a stored, embedded query-phrase bridge that targets Somnigraph's #1 documented ceiling — the ~88% multi-hop *vocabulary gap* (`docs/benchmarks.md`). Convergent with Somnigraph L5b's synthetic-node bridges but realized at the memory level (each memory predicts its own queries).
 - **Turn-based decay**: decay clocked on project activity, not wall time — arguably better-aligned to bursty coding work than Somnigraph's per-category wall-clock exponential decay.
 - **Entity/filepath and domain context boosts** at query time (`ComputeContextualScore`) — Somnigraph has no current-working-file signal.
 
@@ -124,7 +124,7 @@ Since the RRF score is discarded in favor of cosine-priority, there is nothing t
 
 ## Connections
 - **Write-path-quality thesis** (`docs/sessions/2026-06-28-phase18-source-sweep.md`, `ai-memory-comparison.md`, `agentmemory.md`, `byterover`): YesMem is another data point that the LoCoMo leaders win on the write path (dedup, provenance, anticipated queries), not on exotic fusion — its ranker is hand-tuned and its "RRF" is nominal, yet it hits 0.87. Strong convergent evidence.
-- **Vocabulary-bridge convergence**: anticipated queries are the memory-level cousin of Somnigraph's L5b synthetic-node bridges (`docs/multihop-failure-analysis.md`) and MemPalace-style query anticipation — multiple systems independently bridging the multi-hop vocabulary gap.
+- **Vocabulary-bridge convergence**: anticipated queries are the memory-level cousin of Somnigraph's L5b synthetic-node bridges (`docs/benchmarks.md`) and MemPalace-style query anticipation — multiple systems independently bridging the multi-hop vocabulary gap.
 - **Corrected-LoCoMo lineage**: like Somnigraph L5b, YesMem vendors the `dial481/locomo-audit` corrections (6.4% ceiling) — same dataset hygiene, making the 0.87 vs 85.1% comparison unusually apples-to-apples.
 - **Implicit-vs-explicit feedback**: YesMem's use/inject `precisionFactor` is the un-validated implicit form of Somnigraph's explicit feedback loop with measured r=0.70.
 

@@ -140,7 +140,7 @@ Reasonable for Midas's "measure the memory layer, not the reader" thesis, but So
 - **Supersession / belief revision**: convergent with the supersession pattern seen in memv and Zep-style temporal-validity systems — Midas independently arrives at bitemporal validity windows (`superseded_at` + `as_of`) *without* a graph DB, using only the supersession link. Strong corroboration that "annotate validity, resolve at query time" is the right shape.
 - **Write-path quality gating**: reinforces the Phase 18 source-sweep headline (ByteRover / MemPalace / agentmemory) that **write-path quality, not retrieval cleverness, is what the LoCoMo/LME leaders win on**. Midas is another independent vote: its `capture` policy floor + `ContentImportance` are write-time salience gates, and its own ablations say parsimony (dropping weak context) beats padding.
 - **Standing-directive pinning**: same idea as Letta core-memory (cited in-code), reached with a regex detector instead of an LLM — cf. any Letta analysis in the corpus.
-- **Eval honesty**: aligns with STEWARDSHIP Priority 1 (honest accounting) and the LoCoMo judge-leniency caveat in `docs/locomo-benchmark.md` — the dumb-reader ablation is the mechanism that caveat is asking for.
+- **Eval honesty**: aligns with STEWARDSHIP Priority 1 (honest accounting) and the LoCoMo judge-leniency caveat in `docs/benchmarks.md` — the dumb-reader ablation is the mechanism that caveat is asking for.
 
 ---
 

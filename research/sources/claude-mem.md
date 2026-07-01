@@ -82,7 +82,7 @@ Essentially the entire retrieval and lifecycle stack. Somnigraph has RRF fusion 
 ### 2. Passive transcript-driven capture as the answer to the manual-`remember()` gap (High — note-only)
 **What**: A hook that watches the session and asynchronously LLM-compresses activity into candidate memories, instead of relying on the agent to self-report.
 **Why**: This is the one architecturally interesting idea and it targets Somnigraph's real weakness. But it is a large surface and cuts against Somnigraph's deliberate agent-driven design; and claude-mem's version lacks exactly the quality gating Somnigraph's own thesis says is decisive. Adopt-worthy only paired with write-path discipline (semantic dedup, salience scoring) — not as-is.
-**How**: A `UserPromptSubmit`/`Stop` hook feeding a batched extraction queue, then routing candidates through `remember()`'s existing 0.9-similarity dedup + a salience gate before commit. Convergent-but-larger sibling of the already-designed `docs/proactive-injection.md`.
+**How**: A `UserPromptSubmit`/`Stop` hook feeding a batched extraction queue, then routing candidates through `remember()`'s existing 0.9-similarity dedup + a salience gate before commit. Convergent-but-larger sibling of the already-designed `docs/proposals/proactive-injection.md`.
 
 ---
 

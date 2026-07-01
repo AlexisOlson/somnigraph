@@ -68,7 +68,7 @@ No sleep, no LLM merge, no relationship discovery. "Consolidation" = **determini
 
 ### 2. Importance-driven tier selection under a token budget (Medium)
 **What**: At retrieval time, pick each memory's rendering tier (full/gist/micro) from an importance score (age/recency/frequency decay + query specificity boost) to fit a fixed context budget — `SurrogateTierSelector`/`FastRAGContextBuilder`.
-**Why**: Somnigraph has detail/summary/gestalt layers but injects a fixed granularity. Budget-aware tier selection would let low-value hits ride along as micro-surrogates instead of being dropped — relevant to the proactive-injection work (`docs/proactive-injection.md`), where compactness is the whole point.
+**Why**: Somnigraph has detail/summary/gestalt layers but injects a fixed granularity. Budget-aware tier selection would let low-value hits ride along as micro-surrogates instead of being dropped — relevant to the proactive-injection work (`docs/proposals/proactive-injection.md`), where compactness is the whole point.
 **How**: A selector in `scoring.py`/`tools.py` that, given a token budget and per-result reranker score + decay, emits the coarsest tier that keeps the budget. Reuses existing layer fields.
 
 ### 3. Write-time exact-dup probe as a cheap pre-filter (Low)

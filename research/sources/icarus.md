@@ -88,7 +88,7 @@ This is Icarus's real substance:
 
 ### 3. Recent-supersession surfacing in a pre-task hint (Low-Medium)
 **What**: `_recent_superseded` (30-day window) proactively injects "these facts were recently superseded — don't reuse them" into the pre-task briefing (`briefing.py:155-164`).
-**Why**: Same shape as the `docs/proactive-injection.md` design — surface a signal before the agent asks. Recently-invalidated facts are exactly the high-value negative hint the proactive floor could carry.
+**Why**: Same shape as the `docs/proposals/proactive-injection.md` design — surface a signal before the agent asks. Recently-invalidated facts are exactly the high-value negative hint the proactive floor could carry.
 **How**: When proactive injection ships, add a "recently invalidated" channel sourced from sleep-detected supersession/`valid_until` transitions, distinct from the positive recall hint.
 
 ---

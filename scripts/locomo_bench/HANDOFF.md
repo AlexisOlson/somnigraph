@@ -58,5 +58,5 @@ python scripts/locomo_bench/eval_retrieval.py --dataset locomo --configs locomo_
 ### Files modified this session
 - `scripts/locomo_bench/train_locomo_reranker.py` — `--synthetic-coverage` flag, coverage-based labels, conditional synthetic filter
 - `scripts/locomo_bench/eval_retrieval.py` — `--synthetic-coverage` flag, coverage-based scoring in `_score_locomo`
-- `docs/locomo-benchmark.md` — Level 5b results documented
+- `docs/benchmarks.md` — Level 5b results documented
 - `STEWARDSHIP.md` — P4 updated, changelog entry

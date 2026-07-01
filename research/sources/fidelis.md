@@ -93,7 +93,7 @@ our numbers without re-running the same benchmark.
 - **Query-side vocabulary bridge (`vocab_map` + `calibrate.py`).** An offline LLM pass builds a
   static plain-English→technical-term expansion dict, applied at recall with zero runtime LLM cost
   (`recall_b._expand_with_vocab_map`). This targets exactly the failure Somnigraph's
-  `docs/multihop-failure-analysis.md` names as the ~88% retrieval ceiling — the vocabulary gap
+  `docs/benchmarks.md` names as the ~88% retrieval ceiling — the vocabulary gap
   between query language and stored language. Somnigraph attacks it **document-side** (synthetic
   bridge nodes injected during sleep, per `project_extraction_v6`); fidelis attacks it **query-side**.
 - **Zero-LLM structural query decomposition** (`_build_subqueries`): stopword/scaffolding strip +
@@ -123,7 +123,7 @@ our numbers without re-running the same benchmark.
 **What**: A precomputed dict mapping plain-English query words to the short technical terms that
 appear verbatim in stored memories, built by a single offline LLM calibrate pass over sampled
 memories, then applied at recall with zero runtime cost to add sub-queries.
-**Why**: Somnigraph's own `multihop-failure-analysis.md` identifies the query↔store vocabulary gap
+**Why**: Somnigraph's own `benchmarks.md` identifies the query↔store vocabulary gap
 as the dominant retrieval ceiling (~88%). We currently only bridge it document-side (synthetic
 nodes at sleep). A query-side expansion is complementary and cheap, and could be tested on the
 LoCoMo multi-hop subset where the vocabulary gap was measured.
@@ -138,7 +138,7 @@ can add noise, which is why fidelis pairs it with a score floor.
 low-confidence memories (`recall_b._cosine_rerank`, floor 0.25 / gap 0.1).
 **Why**: Somnigraph always returns its top-k; a confident-abstain gate could reduce injecting
 irrelevant memories into context (relevant to the proactive-injection floor study in
-`docs/proactive-injection.md`, which is itself about a floor that carries signal the cliff cutoff
+`docs/proposals/proactive-injection.md`, which is itself about a floor that carries signal the cliff cutoff
 misses).
 **How**: A post-rerank check in `tools.py` recall path; expose the floor as a config constant and
 sweep it against the existing feedback logs before enabling.

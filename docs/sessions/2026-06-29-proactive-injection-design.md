@@ -1,10 +1,10 @@
 # 2026-06-29 — Proactive recall: design doc
 
-Design-only session. No code. Produced `docs/proactive-injection.md` (new standalone design) and a pointer entry in `docs/roadmap.md`, capturing what is arguably the system's main missing capability: surfacing recall hints before the agent asks.
+Design-only session. No code. Produced `docs/proposals/proactive-injection.md` (new standalone design) and a pointer entry in `docs/roadmap.md`, capturing what is arguably the system's main missing capability: surfacing recall hints before the agent asks.
 
 ## What shipped
 
-- **`docs/proactive-injection.md`** (new) — full design for proactive recall:
+- **`docs/proposals/proactive-injection.md`** (new) — full design for proactive recall:
   - **Doorbell, not delivery.** A `UserPromptSubmit` hook runs cheap RRF-only retrieval each turn; when a floor is cleared it injects a one-line hint (count + top score + 2-4 topic handles, no snippets) that lets the agent decide whether to pull via normal `recall()`. The score only rings the doorbell; the agent keeps the relevance and count decisions. The floor does strictly *less* than the removed cliff detector.
   - **Delivery is a new repo surface.** Proactive injection is not an MCP capability (MCP only answers tool calls); it needs a hook companion to the server, RRF-only so it can run synchronously every turn.
   - **Write-back.** Expensive synthesis triggered by a hint is written back as a memory, so the deep understanding amortizes and composes with the autobiographical-narrative idea.
@@ -26,7 +26,7 @@ Design-only session. No code. Produced `docs/proactive-injection.md` (new standa
 
 ## Files touched
 
-- `docs/proactive-injection.md` (new)
+- `docs/proposals/proactive-injection.md` (new)
 - `docs/roadmap.md` (open-question entry replaced with pointer)
 - `STEWARDSHIP.md` (changelog entry)
 - `docs/sessions/2026-06-29-proactive-injection-design.md` (this file)

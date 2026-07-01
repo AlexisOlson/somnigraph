@@ -187,7 +187,7 @@ Testing whether interpretation holds up when local signals are weakened. Not dir
 
 ## Connections
 
-- **LoCoMo multi-hop failure analysis** (`docs/multihop-failure-analysis.md`): The vocabulary gap we identified (88% of evidence turns have zero content-word overlap with queries) is exactly what A-MBER's implicit affect items test. "I'm fine" has zero overlap with the earlier setback that gives it meaning. Our synthetic vocabulary bridges are designed for this problem.
+- **LoCoMo multi-hop failure analysis** (`docs/benchmarks.md`): The vocabulary gap we identified (88% of evidence turns have zero content-word overlap with queries) is exactly what A-MBER's implicit affect items test. "I'm fine" has zero overlap with the earlier setback that gives it meaning. Our synthetic vocabulary bridges are designed for this problem.
 
 - **PERMA** (`research/sources/perma.md`): Both benchmarks test whether memory systems can maintain coherent user models across sessions, but through different lenses (preference consistency vs affective interpretation). If we pursue PERMA (Priority 5), A-MBER's trajectory-based reasoning concept should inform how we evaluate temporal evolution of user state.
 

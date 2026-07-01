@@ -105,7 +105,7 @@ Prune candidates surfaced when importance < 35 or stale > 60/120 days. Core entr
 
 ### What Somnigraph does better
 
-1. **Multi-channel retrieval.** Three-channel RRF (vector via sqlite-vec + FTS5 BM25 + theme channel, k=14, Bayesian-optimized). ByteRover is BM25-only; its high scores argue write quality can substitute, but Somnigraph's retrieval catches semantic variants BM25 misses — confirmed by the 88% vocabulary gap finding in `docs/multihop-failure-analysis.md`.
+1. **Multi-channel retrieval.** Three-channel RRF (vector via sqlite-vec + FTS5 BM25 + theme channel, k=14, Bayesian-optimized). ByteRover is BM25-only; its high scores argue write quality can substitute, but Somnigraph's retrieval catches semantic variants BM25 misses — confirmed by the 88% vocabulary gap finding in `docs/benchmarks.md`.
 
 2. **Learned reranker.** 31-feature LightGBM reranker (V5+3b, NDCG=0.8954, trained on 1885 real-data queries with adversarial probing). ByteRover's compound score is a hand-tuned 3-weight formula. Somnigraph's reranker (reranker.py) captures interaction effects invisible to any formula.
 

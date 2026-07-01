@@ -112,7 +112,7 @@ Deployment concerns irrelevant to a research artifact.
 ## Connections
 
 - **Phase 18 source sweep** (ByteRover, agentmemory, MemPalace; see `docs/sessions/2026-06-28-phase18-source-sweep.md`): VIR is another independent data point for "write-path quality, not retrieval, is what the leaders win on." VIR's whole value proposition *is* the write path (distillation + confidence gating); its retrieval is intentionally trivial. Strong convergent evidence.
-- **`docs/proactive-injection.md`**: VIR's `sync-claude` (top-5-per-category, confidence-gated, diff+confirm injection into `CLAUDE.md`) is a *static, non-query-conditioned* cousin of Somnigraph's planned floor-gated per-prompt hint injection. Somnigraph's design is strictly richer (query-conditioned, cooldown, Thompson gating) — VIR confirms the injection-into-CLAUDE.md channel is a real pattern others ship, but offers nothing to add.
+- **`docs/proposals/proactive-injection.md`**: VIR's `sync-claude` (top-5-per-category, confidence-gated, diff+confirm injection into `CLAUDE.md`) is a *static, non-query-conditioned* cousin of Somnigraph's planned floor-gated per-prompt hint injection. Somnigraph's design is strictly richer (query-conditioned, cooldown, Thompson gating) — VIR confirms the injection-into-CLAUDE.md channel is a real pattern others ship, but offers nothing to add.
 - **Other LLM-Wiki implementations** (lucasastorian/llmwiki, Pratiyush/llm-wiki, nashsu/llm_wiki): VIR positions itself as the Obsidian-native + retroactive variant. Same family; none benchmarked.
 
 ---

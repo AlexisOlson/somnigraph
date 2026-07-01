@@ -111,7 +111,7 @@ Historical; the live system is relational SQLite. No reusable graph-inference lo
 ## Connections
 
 - **Convergent with the Phase 18 write-path finding** (`docs/sessions/2026-06-28-phase18-source-sweep.md`, agentmemory/ByteRover/MemPalace): the LoCoMo leaders win on *write-path quality*, not retrieval. Nocturne is the extreme instance — it invests everything in human-curated write quality and versioning and *nothing* in retrieval sophistication. Independent corroboration that write-time discipline matters, though nocturne can't prove it (unbenchmarked).
-- **`disclosure` trigger** rhymes with the proactive-injection design (`docs/proactive-injection.md`): both surface a memory based on a pre-authored condition rather than a live query. Nocturne's is human-written and passive (FTS-indexed), Somnigraph's would be floor-gated and automatic — same "condition precedes query" shape.
+- **`disclosure` trigger** rhymes with the proactive-injection design (`docs/proposals/proactive-injection.md`): both surface a memory based on a pre-authored condition rather than a live query. Nocturne's is human-written and passive (FTS-indexed), Somnigraph's would be floor-gated and automatic — same "condition precedes query" shape.
 - **Versioning/supersession** overlaps memv's supersession pattern and MIRIX/Recall version chains (see `research/sources/`), but nocturne uniquely pairs it with a human accept/reject gate.
 - **Glossary auto-linking** is a manual, curated cousin of Somnigraph's Hebbian co-retrieval PMI edges — same goal (lateral association channels), opposite mechanism (hand-bound vs. learned from co-retrieval).
 

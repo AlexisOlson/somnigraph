@@ -1,81 +1,50 @@
 # Research Roadmap
 
-What we've learned, what's still open, and what's worth pursuing next. Read alongside `architecture.md` (how the system works) and `experiments.md` (how we tested it).
+The forward agenda: what's still open and what's worth pursuing next. The settled lessons this doc used to restate now live in `architecture.md` (how the system works) and `experiments.md` (how we tested it) — this roadmap points there rather than keeping a second copy.
 
 ---
 
 ## What we learned
 
-Seven findings from 93 source analyses and 20+ tuning studies that would change your first decisions if you were building a memory system from scratch.
+The settled lessons from 184 source analyses and 20+ tuning studies are canonized where the design and the evidence live. This section is a pointer, not a second copy — one home per fact. If you're building a memory system from scratch, these are the findings that would change your first decisions, each linked to its home:
 
-### 1. Feedback is the system
+| Finding | Canonical home |
+|---------|----------------|
+| **Feedback's dual role** — the dominant signal in the hand-tuned formula (`FEEDBACK_COEFF=5.15`), but near-zero contribution to the *learned reranker's* ranking; its real value is shaping the store over time (per-query GT correlation r=0.70). | `architecture.md` §§ Stage 1: Feedback boost, What feedback's role became; `experiments.md` § Utility calibration study |
+| **Theme boost was compensating for missing graph traversal** — PPR (wm19) collapsed it 0.97→0.19; the high pre-PPR importance measured compensation, not intrinsic value. | `architecture.md` § Stage 2: Theme boost |
+| **The parameter space has two basins** — feedback-dependent high-k (≈14) vs feedback-robust low-k (≈3); production chose Basin A (k=6) to leverage the feedback loop. | `experiments.md` § The two-basin discovery |
+| **Metric choice drives parameter values** — AUC/MRR/miss_rate optimize to different constants; MRR trades off harshly with miss_rate (r=−0.517). You choose what "good retrieval" means. | `experiments.md` §§ Metrics: why AUC over single-threshold, Multi-objective optimization |
+| **Intuitive scoring signals can be counterproductive** — quality floor (optimal ratio 0.0), shadow penalty, and confidence weight were all implemented, tested, and removed. | `architecture.md` § What didn't work |
+| **Contradiction detection is universally catastrophic** — 0.025–0.037 F1 across all systems; a representation problem, not a tuning one. | `architecture.md` § Open problems |
+| **Offline consolidation is viable but unmeasured** — the sleep pipeline runs and looks reasonable, but no metric proves it improves retrieval. The central open question. | `architecture.md` § Open problems; [Open questions](#open-questions) below |
 
-The retrieval feedback loop — where recalled memories receive explicit utility scores that reshape future scoring — is the dominant signal. Feature importance analysis (wm15): feedback accounts for 15–20% of AUC, but with a catch: it's only useful because the empirical Bayes Beta prior centers the scores. wm5 tested removal of the prior: `feedback_coeff` collapsed to near zero. Raw feedback is too noisy to help; the prior is the mechanism that makes it useful.
-
-As of v0.5.0, Ori-Mnemos also closes a feedback loop — but via behavioral inference (inferred from citations, edits, re-recalls) rather than explicit grading. No other surveyed system has explicit per-query feedback with measured GT correlation (r=0.70). This remains the primary architectural differentiator, though the category is no longer unique.
-
-### 2. Theme boost was compensating for missing graph traversal
-
-Theme boost had 67% AUC importance and 86% MRR importance in wm15 — the largest single feature. The original explanation: it converts continuous cosine similarity (noisy) to discrete signal (reliable). The revised explanation (post-PPR, wm19): theme boost was compensating for missing graph traversal. When PPR was added (wm19), `THEME_BOOST` collapsed from 0.97 to 0.19. Four independent external reviewers converged on the same conclusion: the high importance measured *compensation effect*, not intrinsic feature value. PPR is the correct implementation of what theme boost was approximating.
-
-### 3. The parameter space has structure
-
-Two distinct basins exist in the 7D parameter space (wm9):
-
-- **Basin A** (high-k ≈ 14): Broad candidate set, post-RRF signals do the ranking work. Depends on a healthy feedback loop.
-- **Basin B** (low-k ≈ 3): Sharp RRF ranking, post-RRF signals are refinements. More robust to feedback degradation but less responsive to learning.
-
-This isn't noise or randomness — it's a real choice between feedback-dependent and feedback-robust configurations. Production chose Basin A (k=6 compromise) because the feedback loop is the competitive advantage; better to fix it than route around it.
-
-### 4. Metric choice drives parameter values
-
-AUC, MRR, and miss_rate@5k optimize to different constants from the same data (wm15 NSGA-II). AUC and MRR barely trade off (shallow Pareto front), but MRR trades off harshly with miss_rate (r = −0.517). Optimizing for "find the first good result fast" actively hurts coverage.
-
-This isn't a bug. Different metrics ask different questions. You're choosing what "good retrieval" means, not finding the objectively correct answer.
-
-### 5. Intuitive scoring signals can be counterproductive
-
-Three signals were implemented, tested, and removed:
-
-- **Quality floor** (wm1: optimal ratio = 0.0). Cliff detection handles the case better because it adapts to score distributions; a fixed ratio can't.
-- **Shadow penalty** (all reviewers recommended removal). Confuses temporal relevance (is this memory current?) with query relevance (does this memory answer this query?). Now informs dormancy decisions during sleep instead.
-- **Confidence weighting** (<0.1% contribution). Correlates with feedback, so multiplying by confidence double-counts the feedback signal.
-
-Each seemed obviously right beforehand. Empirical testing disagreed.
-
-### 6. Contradiction detection is universally catastrophic
-
-0.025–0.037 F1 across all surveyed systems. This isn't a tuning problem — it's a representation problem. Current approaches detect contradictions between adjacent memories (vector neighbors), but distant contradictions and claim-level supersession go undetected. The `valid_from`/`valid_until` schema is a practical workaround, not a solution.
-
-### 7. Offline consolidation is viable but unmeasured
-
-The sleep pipeline (NREM edge detection, REM clustering/summarization, thematic consolidation) is the most novel piece of the system. It runs. It produces reasonable-looking results on manual inspection. We have no metrics proving it improves retrieval. This is the central unanswered question.
+The condensed advice version — the wrong turns you can skip — is [What we'd tell someone starting from scratch](#what-wed-tell-someone-starting-from-scratch) below.
 
 ---
 
 ## External review findings
 
-Four independent reviewers (Gemini 2.5 Pro, Claude Sonnet 4.6, Claude Opus 4.6, ChatGPT Pro) conducted blind reviews of the architecture and experiment documentation. The reviews converged on several findings that the internal perspective had missed.
+Four independent reviewers (Gemini 2.5 Pro, Claude Sonnet 4.6, Claude Opus 4.6, ChatGPT Pro) blind-reviewed the architecture and experiment docs. Their concerns split by disposition.
 
-### Convergent findings (all or most reviewers)
+**Now canonized** (linked to their homes, not duplicated here):
 
-- **Feedback self-reinforcement.** The feedback loop is selection-biased — only surfaced memories get rated — and six downstream signals amplify the same exposure event. The system may optimize for retrieval habits rather than retrieval needs. See `architecture.md` § Feedback loop self-reinforcement.
-- **Theme boost as compensation.** The high pre-PPR importance of theme boost (67% AUC) measured compensation for missing graph traversal, not intrinsic feature value. PPR (wm19) collapsed it from 0.97 to 0.19. The "discrete signal conversion" narrative was a post-hoc rationalization.
-- **Enriched embedding degradation.** Embeddings frozen at write time diverge from evolving themes and summaries, creating less channel independence than assumed. See `architecture.md` § Representation bifurcation.
-- **Sleep canonizing bias.** Sleep's editorial judgment (theme enrichment, summary generation, dormancy) may systematically favor certain memory types over others, but no measurement exists to detect this.
-- **Category as wrong decay axis.** Per-category decay rates assume categories map to importance curves, but within-category variance likely exceeds between-category variance. Per-memory decay (already supported via `decay_rate` column) may be the right granularity.
-- **Detail loss behind summaries.** Summaries compress for token efficiency but may lose the specific details that made a memory useful. No fidelity metric exists to detect this.
+- **Feedback loop self-reinforcement** — selection bias, six-signal amplification, prior shape, `startup_load`/preload contamination, channel entanglement → `architecture.md` § Feedback loop self-reinforcement.
+- **Representation bifurcation** — frozen embeddings drifting from sleep-evolved themes and summaries → `architecture.md` § Representation bifurcation.
+- **Theme boost as compensation** → `architecture.md` § Stage 2: Theme boost.
+- **PPR walking contradiction-flagged edges** — fixed in `scoring.py` (March 2026).
+- **Bimodal utility prior, PPR seed-set stability, false-bridge ratchet / edge accumulation without pruning, detail-loss behind summaries** → tracked as [Open questions](#open-questions) and [Proposed experiments](#proposed-experiments) below.
 
-### High-confidence unique findings
+**Still open, not yet tracked elsewhere:**
 
-- **PPR contradiction traversal** — PPR walked contradiction-flagged edges, actively co-surfacing conflicting information. Fixed in `scoring.py` (this session).
-- **Bimodal utility prior** — The global Beta prior assumes unimodal utility. If the distribution is actually bimodal (high-utility vs. noise), the prior smooths over a real structural boundary.
-- **Threshold coupling** — Small upstream perturbations (feedback, theme boost) may change PPR seed selection in ways that amplify downstream. Seed-set stability is unmeasured.
-- **Vocabulary co-adaptation** — Queries and stored themes may co-evolve vocabulary, so the system works well on habitual phrasings but fails on paraphrases.
-- **startup_load as cache** — Preload shapes query formation, creating ambiguity about whether feedback measures recall quality or preload effectiveness.
-- **False bridge ratchet** — Sleep-created edges between topically distant memories can only gain weight (through co-retrieval reinforcement), never lose it (no pruning mechanism). Misclassified edges persist indefinitely.
-- **Exact-token recall collapse** — When a query exactly matches stored themes/summary tokens, FTS dominates and vector similarity adds nothing. The system degrades to keyword search for its most familiar content.
-- **Edge accumulation without pruning** — No mechanism removes or weakens edges that are no longer useful. The graph grows monotonically, and old misclassified edges can permanently distort traversal.
+- **Sleep canonizing bias.** Sleep's editorial judgment (theme enrichment, summary generation, dormancy) may systematically favor certain memory types over others, but no measurement exists to detect it.
+- **Category as the wrong decay axis.** Per-category decay assumes categories map to importance curves, but within-category variance likely exceeds between-category variance. Per-memory decay (already supported via the `decay_rate` column) may be the right granularity.
+- **Vocabulary co-adaptation / exact-token recall collapse.** Queries and stored themes may co-evolve, so the system excels on habitual phrasings but degrades toward keyword-only search when a query exactly matches stored theme/summary tokens (FTS dominates, vector adds nothing). Partially probed by the paraphrase-robustness experiment below.
+
+---
+
+## Candidates from the external survey
+
+The 2026-06-30 carsteneu code-level survey produced a ranked ledger of external mechanisms worth stealing — [`ideas-considered.md`](ideas-considered.md) (17 adopt-tier, 87 consider-tier, 33 note-only). Those are *inputs* to this agenda, not commitments: an adopt-tier candidate becomes a proposed experiment here, or a priority in `STEWARDSHIP.md`, only once it's ranked and taken up. See the **Tier 1 — Adopt candidates** shortlist there for the current external menu.
 
 ---
 
@@ -235,7 +204,7 @@ The cliff detector (`apply_quality_floor` in `scoring.py`) becomes dead code. `C
 
 Recall is entirely pull-based, which leaves a structural blind spot: the agent can't decide to recall what it doesn't know exists, so relevant memory is missed whenever the agent never thinks to ask. Counterfactual coverage (proposed experiment #5) measures unseen-relevant memories only for queries the agent *did* make; the queries never made are unmeasured. This is the system's main missing capability, not a tuning refinement.
 
-The design is large enough to live on its own: see [`proactive-injection.md`](proactive-injection.md). In brief: a `UserPromptSubmit` hook runs cheap RRF-only retrieval each turn and, when a floor is cleared, injects a one-line hint (count + top score + a few topic handles, no snippets) that lets the agent decide whether to pull. A session cooldown suppresses repetition (anti-repetition, top of the exposure distribution) and stochastic Thompson gating over the per-memory Beta feedback model keeps the under-observed tail in play (anti-starvation), together containing the feedback self-reinforcement the design risks amplifying. The core assumption — that a coarse top-of-ranking surface floor carries usable signal even though the cliff detector found the fine-grained in-list cutoff anti-predictable (R² < 0) — is testable offline against the existing feedback logs before any code is written.
+The design is large enough to live on its own: see [`proposals/proactive-injection.md`](proposals/proactive-injection.md). In brief: a `UserPromptSubmit` hook runs cheap RRF-only retrieval each turn and, when a floor is cleared, injects a one-line hint (count + top score + a few topic handles, no snippets) that lets the agent decide whether to pull. A session cooldown suppresses repetition (anti-repetition, top of the exposure distribution) and stochastic Thompson gating over the per-memory Beta feedback model keeps the under-observed tail in play (anti-starvation), together containing the feedback self-reinforcement the design risks amplifying. The core assumption — that a coarse top-of-ranking surface floor carries usable signal even though the cliff detector found the fine-grained in-list cutoff anti-predictable (R² < 0) — is testable offline against the existing feedback logs before any code is written.
 
 **Effort:** 1 session for the offline floor study (data exists, no new collection); 1-2 sessions for the hook delivery layer and write-back path if positive. **Negative result is publishable:** if the binary surface signal is as weak as the cliff cutoff, that establishes score-based gating fails at both granularities.
 
@@ -317,71 +286,9 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 ## Comparative benchmarking
 
-`similar-systems.md` compares features. This section tracks where we have numbers next to other systems.
+Where Somnigraph has numbers next to other systems — LoCoMo retrieval and end-to-end QA (done), plus PERMA, AMB, and the measurable-but-unmeasured gaps (proposed) — now lives in [`benchmarks.md`](benchmarks.md). `similar-systems.md` compares features; `benchmarks.md` compares scores; this roadmap tracks only what is *next*.
 
-### LoCoMo end-to-end QA *(Complete)*
-
-Built and run. **85.1% overall accuracy** (Opus judge), beating Mem0 (66.88 J), Mem0g (68.44 J), and full-context baseline (72.90 J). See `docs/locomo-benchmark.md` for full results, per-category breakdown, and reference tables from the Mem0 paper.
-
-Pipeline: ingest LoCoMo conversations → recall with LoCoMo-specific reranker (12 features, forward stepwise) → GPT-4.1-mini reader → LLM judge. Ported from RedPlanet CORE's benchmark harness. All 10 conversations, 1540 non-adversarial questions.
-
-**Known limitations:** LoCoMo's GT has a 6.4% error rate (corrected GT vendored from locomo-audit). The LLM judge is generous — Opus is 3.2pp stricter than GPT-4.1-mini. GPT-5.4-mini (reasoning model) is -6.6pp worse as reader because it computes dates instead of quoting context.
-
-**Remaining:** Rerun with corrected GT, sleep/feedback ablations to isolate contributions.
-
-### PERMA personalization benchmark *(Proposed)*
-
-PERMA (arXiv:2603.23231, March 2026) evaluates personalized memory agents on preference-state maintenance across event-driven, multi-session, multi-domain interactions. 10 synthetic users, 20 domains, 2,166 preference details, 1.8M tokens. Decoupled evaluation: memory fidelity (BERT-F1, Memory Score 1-4) measured separately from task performance (MCQ accuracy, interactive Turn=1/Turn<=2). See `research/sources/perma.md` for full analysis.
-
-**Why it matters:** PERMA's hardest dimension — cross-domain synthesis — is where all benchmarked systems collapse (MemOS Turn=1 drops from 0.548 to 0.306). Somnigraph's graph-based retrieval (PPR, NREM edges, Hebbian co-retrieval) is architecturally positioned for exactly this, but untested. Fresh benchmark (March 2026) with no established SOTA beyond the paper's baselines.
-
-**SOTA targets to beat (memory systems only, Clean single-domain):**
-
-| Metric | Current SOTA | System | Notes |
-|--------|-------------|--------|-------|
-| MCQ Accuracy | 0.811 | MemOS | LLMs reach 0.882 (Kimi-K2.5) with full context |
-| BERT-F1 | 0.859 | RAG (BGE-M3) | Raw retrieval completeness |
-| Memory Score | 2.27 / 4.0 | MemOS | LLM-judged coverage + accuracy + noise |
-| Turn=1 (single-domain) | 0.548 | MemOS | One-shot interactive success |
-| Turn<=2 (single-domain) | 0.830 | Memobase | Success with one correction round |
-| Turn=1 (multi-domain) | 0.306 | MemOS | The hard problem — cross-domain synthesis |
-| Completion | 0.846 | EverMemOS | Task completion rate |
-
-**SOTA targets (Noisy):**
-
-| Metric | Current SOTA | System |
-|--------|-------------|--------|
-| MCQ Accuracy | 0.794 | MemOS |
-| Turn=1 | 0.524 | MemOS |
-
-**Primary goal: multi-domain Turn=1 (0.306).** This is where every system collapses and where graph-conditioned retrieval should differentiate. A strong result here (0.45+) would be the headline claim. All other metrics are secondary targets — we'd like to beat them all, but cross-domain synthesis is the story.
-
-**Somnigraph advantages for this benchmark:**
-- Learned reranker (vs. fixed top-k retrieval used by all benchmarked systems) — directly addresses the finding that expanding from top-10 to top-20 hurts most systems
-- PPR graph traversal for cross-domain bridging — no benchmarked system has graph-conditioned retrieval
-- Feedback loop — no benchmarked system adapts retrieval based on utility signals
-- Sleep-based consolidation — category-aware memory organization that MemOS achieves via write-time extraction
-
-**Pipeline requirements:** Ingest PERMA's event-driven dialogue sessions → build memory store → answer MCQ and interactive evaluation at Type 1/2/3 checkpoints. All memory systems in the paper use GPT-4o-mini as backbone. Code: https://github.com/PolarisBoy1/PERMA.
-
-**Effort:** 2-3 sessions. Session 1: ingest pipeline + MCQ evaluation. Session 2: interactive evaluation + analysis. Session 3: ablations (graph contribution, feedback contribution, sleep contribution).
-
-### AMB LoCoMo cross-evaluation *(Idea)*
-
-AMB (Agent Memory Benchmark, Vectorize.io) is a meta-benchmark harness wrapping 7 datasets including LoCoMo. Their LoCoMo adapter uses Gemini judge/reader with "generous grading" prompts. Hindsight claims 92.0% on LoCoMo via AMB; we score 85.1% (Opus judge). Writing a Somnigraph adapter for AMB and running just the LoCoMo split would give an apples-to-apples comparison under identical generation/judging conditions — isolating retrieval quality from reader/judge differences. The adapter interface (`ingest` + `retrieve`) maps cleanly to our `remember` + `recall`. See `research/sources/amb.md` for full analysis, including conflict-of-interest concerns (Hindsight's adapter is heavily tuned vs. generic baselines).
-
-**Effort:** 1-2 sessions. Adapter + one evaluation run.
-
-### What's measurable but unmeasured
-
-- **Contradiction detection:** All systems 0.025–0.037 F1. Somnigraph's NREM catches adjacent contradictions only — likely in the same range. No formal measurement yet.
-- **Latency:** Mem0 reports p95 1.44s. Somnigraph's latency is unmeasured but likely comparable (same underlying stack: SQLite + embedding API call).
-- **Consolidation:** No system benchmarks this. It's an open research problem (see `architecture.md` § Open Problems).
-
-### Proposed benchmarking experiments
-
-- **Contradiction detection rate** on the real corpus: manually annotate ~50 known contradictions, measure NREM's detection rate. Effort: 1 session.
-- **Latency profiling:** p50/p95/p99 for `recall()` at current corpus size. Effort: trivial (instrument one session).
+The forward benchmarking work: the [proposed experiments](benchmarks.md#proposed-benchmarking-experiments) (contradiction-detection rate, latency profiling), the PERMA ingest pipeline, and the LoCoMo ablations (expansion methods #21, sleep, feedback) that would let `experiments.md` document the retrieval arc end to end.
 
 ---
 

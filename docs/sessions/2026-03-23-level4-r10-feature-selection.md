@@ -4,7 +4,7 @@ Analyzed overnight results: forward-12 generalized better than backward-26 despi
 
 Final 17-feature model: baseline R@10=86.3%, expanded R@10=88.7%. Added BM25-damped IDF to keyword expansion term selection (tested 3 variants; aggressive IDF hurt multi-hop, BM25-damped recovered it).
 
-Updated locomo-benchmark.md with full Level 4 results.
+Updated benchmarks.md with full Level 4 results.
 
 ### Surprise
 
