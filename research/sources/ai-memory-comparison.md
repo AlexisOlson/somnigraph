@@ -2,6 +2,8 @@
 
 *Generated 2026-06-28 by Sonnet agent reading local clone*
 
+> **Update 2026-06-30.** Two claims below are now stale: **agentmemory and MIRIX were analyzed** in the Phase 18 sweep (`agentmemory.md`, `mirix.md`) — the "next priority / not yet in the corpus" notes predate that. A full light-touch triage of all 59 untouched rows (README + ≤2 docs each) is now recorded in [`docs/declined.md`](../../docs/declined.md); headline: **0 warranted a deep-dive** (the benchmark-cell leaders memU/m_flow/OpenViking all downgraded on inspection). That doc also flags two name-collisions where the table's `engram`/`agentmemory` rows point to *different repos* than our analyses.
+
 ---
 
 ## What This Is

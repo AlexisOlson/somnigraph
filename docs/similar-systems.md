@@ -1,6 +1,6 @@
 # Similar Systems
 
-An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (95+ sources), see `research/sources/index.md`.
+An opinionated comparison with memory systems we studied, built on, or explicitly decided against. Not comprehensive — focused on systems we learned something from. For the full research corpus (184 source analyses), see `research/sources/index.md`.
 
 ## Contents
 
@@ -9,6 +9,7 @@ An opinionated comparison with memory systems we studied, built on, or explicitl
 3. [What we borrowed](#what-we-borrowed)
 4. [Comparative analysis](#comparative-analysis)
 5. [What nobody does well](#what-nobody-does-well)
+6. [Practitioner signal](#practitioner-signal)
 
 ---
 
@@ -456,6 +457,59 @@ Somnigraph doesn't fit neatly into any of these. It stores discrete memories (li
 
 **What's interesting for us**: The static/dynamic memory distinction with precomputed profiles could reduce latency for common retrieval patterns. Explicit memory versioning (parentMemoryId → rootMemoryId → isLatest chains) is a more structured model than Somnigraph's contradiction edges — creating version chains during sleep rather than just adding edges would make temporal queries more tractable. The `forgetAfter` field for event-triggered expiry complements continuous decay. The PERMA results are a clean data point for the compression-accuracy tradeoff: extreme compression preserves single-domain performance but destroys cross-domain synthesis.
 
+### Systems from the carsteneu survey
+
+The profiles above predate a code-level survey of the [carsteneu/ai-memory-comparison](https://carsteneu.github.io/ai-memory-comparison/) directory — 59 systems, one Opus agent each reading the actual retrieval, write, and consolidation code. Most of that corpus is long-tail: the full per-system verdict table lives in [`declined.md`](declined.md), and every adoptable mechanism (137 nuggets) in [`ideas-considered.md`](ideas-considered.md). Three of the surveyed systems teach something the profiles above don't. All three sit behind Somnigraph on retrieval — no learned reranker, no feedback loop — and win, where they win, on the write and consolidation paths: independent corroboration of the [write-path-quality](#write-path-quality) thesis below.
+
+### m_flow
+
+**What it is**: A bio-inspired Graph-RAG engine (recovered from the PyPI sdist `mflow-ai==0.3.6` after its GitHub repo 404'd) whose thesis is sharp: most systems build a graph but still retrieve by embedding distance — m_flow makes the graph itself the scoring function. Memories are a four-layer "cone" (Episode → Facet → FacetPoint atomic assertion, with Entity nodes bridging across episodes), and every layer is a vector-searchable entry point.
+
+**What it does well**:
+- Min-cost path scoring. Each memory's score is the cheapest evidence chain connecting any query hit to it — `node_distance + edge_distance + hop_penalty` — with a deliberate penalty on matching a coarse summary directly, so fine-grained facts and cross-episode entities do the routing. Multi-hop reasoning becomes pure cost arithmetic, no LLM at query time. "One strong path is enough."
+- Multi-granularity entry. The query is embedded once and searched against all layers simultaneously (7 vector collections spanning summary → atomic fact → entity), so a paraphrased query enters at whatever granularity matches.
+- Query-adaptive fusion. Per-collection confidence (distance-to-baseline ratio × top1/top2 gap) shifts the semantic-vs-structural blend per query rather than using a fixed RRF k.
+- Coreference resolution at ingestion — pronouns resolved to antecedents before indexing.
+
+**Where it falls short**:
+- Everything downstream of the path scorer is hand-tuned — ~40 magic thresholds in one config file, exactly the formula regime Somnigraph abandoned when a learned reranker beat it +6.17pp.
+- No feedback loop, no learned reranker, no decay, no consolidation. The graph is built at write time and never revisited.
+- The 81.8% LoCoMo headline uses a gpt-4o-mini judge on a Cat-5-excluded slice — not comparable to our Opus-judged 85.1.
+
+**What's interesting for us**: The path-cost scorer is a structural answer to the multi-hop vocabulary-gap ceiling that `benchmarks.md` § Multi-hop vocabulary gap documents — the same target our L5b synthetic bridges chase, reached at inference time instead of via sleep-built vocabulary. The cheap first step is not a schema rebuild: add a best-path-cost feature (`neighbor_score + edge_weight + hop_penalty`) over PPR-expanded neighbors to the reranker and let LightGBM weight it. Query-adaptive fusion maps the same way — top1/top2 gap and distance ratio as reranker features rather than importing the hand-tuned thresholds.
+
+### EverOS
+
+**What it is**: A local-first, markdown-source-of-truth memory runtime (LanceDB + SQLite + `.md` files) wrapping the closed `everalgo` engine. The interesting layer for us is its retrieval granularity, not the runtime.
+
+**What it does well**:
+- Atomic-fact decomposition with MaxSim eviction. Each episode is split into ~28 independently-embedded atomic facts. Retrieval re-scores a parent episode by its best-matching child fact (max-pool), and — the sharp part — lets a precise child fact *replace* its parent in the results when the child's calibrated score wins. A long memory's mean-pooled embedding dilutes the one fact a multi-hop query needs; fact-level vectors recover it.
+- `cosine_to_lr_score` calibration — parent cosine, child cosine, and BM25 mapped to a shared logistic probability so heterogeneous scores are directly comparable before the eviction decision.
+- Foresight: a first-class forward-looking memory type (prediction + evidence + time window).
+- Content-hash-gated re-embedding (hash over content-bearing fields only) skips re-indexing when nothing embedding-relevant changed.
+
+**Where it falls short**:
+- The retrieval and extraction IP lives in closed `everalgo` wheels; the open repo is packaging. The 93.05 LoCoMo headline is engine-attributed, LLM-judged, and produced by a heavyweight agentic pipeline (multi-query + cross-encoder + round-2), not the default path.
+- No learned feature reranker, no feedback loop, no typed-edge graph or PPR, no time decay. The default hybrid path ships with LLM rerank off.
+
+**What's interesting for us**: Atomic-fact + MaxSim eviction targets, by construction, the exact vocabulary-gap ceiling we measured and couldn't cross with summary/gestalt layering — and it is orthogonal to those layers (they are LLM abstractions; this is atomic decomposition with independent vectors). A child-fact table with per-fact embeddings plus a max-pool-to-parent pass in `scoring.py`, evaluated on the LoCoMo multi-hop slice, is the concrete experiment. Foresight is the nearest existing analog to our unrealized proactive-injection candidates. Note the convergence with m_flow: two independent systems answer the multi-hop gap with sub-memory granularity rather than a cleverer scorer.
+
+### Honcho
+
+**What it is**: Peer-centric "reasoning-first" memory infrastructure (FastAPI + Postgres/pgvector) that stores LLM-derived conclusions per (observer, observed) pair rather than raw turns. The theory-of-mind framing is mostly out of scope for single-user Somnigraph; the write and consolidation paths are the transferable part.
+
+**What it does well**:
+- Surprisal-targeted consolidation. Before its offline "dream" specialists run, Honcho builds a spatial tree over observation embeddings, scores each memory's geometric surprisal, and hands the top-10% novel outliers to consolidation as exploration hints — an LLM-free "what deserves attention tonight" selector.
+- Write-time dedup with reinforcement. On a near-duplicate (cosine ≥ 0.95), a token-superiority score decides which text to keep, soft-deletes the loser, and carries a `times_derived` counter forward, so a fact independently re-derived N times accrues a salience count for free.
+- Reasoning-first extraction — stores explicit and deductive conclusions, not raw chunks.
+
+**Where it falls short**:
+- Retrieval is deliberately plain: hybrid vector + FTS fused with library-default RRF k=60, no tuning, no learned reranker, no feedback loop.
+- The most novel mechanism (surprisal sampling) ships default-disabled with no shipped ablation — a research feature, not a proven win.
+- The "Pareto Frontier of Agent Memory" banner is unbacked in-repo; the headline LoCoMo rests on a lenient gpt-4o-mini judge.
+
+**What's interesting for us**: Surprisal-based consolidation targeting is the keeper — `sleep_nrem.py` currently picks targets by recency and priority; novelty-targeting would spend the LLM budget where the store is genuinely surprised, and it is offline-testable against existing edges (do surprisal-picked anchors yield more accepted edges per call?). The `times_derived` reinforcement pattern would give `remember()` a write-path quality gate and the reranker a cheap salience feature — a write-side cousin of our Hebbian co-retrieval PMI. Honcho is a clean case study in the write-path-quality thesis: heavy investment on what gets written, plain RRF on retrieval, the opposite of where Somnigraph invests.
+
 ---
 
 ## What we borrowed
@@ -514,6 +568,8 @@ Most systems accept whatever they're given. Mem0's InformationContent() gating i
 
 The result for most systems: low-value memories accumulate over time. Consolidation (where it exists) can clean up afterward, but preventing low-quality writes in the first place would be more efficient. LightMem demonstrates a complementary approach: entropy-based token filtering drops low-information tokens before extraction, reducing noise at the input level rather than the storage level.
 
+The 2026-06-30 carsteneu survey added three more independent votes for this thesis: m_flow's tiered write-time worth-gate, Honcho's cosine-0.95 dedup with a `times_derived` reinforcement counter, and EverOS's atomic-fact decomposition all invest on the write side while leaving retrieval plain (see [Systems from the carsteneu survey](#systems-from-the-carsteneu-survey) above, and `ideas-considered.md` § Recurring themes for the full convergence).
+
 ### Consolidation evaluation
 
 No benchmark exists for evaluating whether consolidation improved the memory store. GraphRAG's community reports have no ground truth for comparison. Generative Agents' reflections are evaluated by human judgment only. Somnigraph's sleep pipeline is evaluated manually. Kumiho's Dream State is the most carefully engineered consolidation system (safety guards, circuit breakers, audit reports), but the paper is honest that proving compositional preservation of AGM postulates under batch consolidation is an open problem — and no evaluation of whether consolidation actually improved retrieval quality is provided.
@@ -528,4 +584,32 @@ memv makes the strongest attempt: write-time temporal normalization resolves rel
 
 ---
 
-*For the full research corpus of 93 source analyses, see `research/sources/`. Each analysis extracts architecture, key claims with evidence, relevance to this project, and ideas worth borrowing.*
+## Practitioner signal
+
+What people running similar systems in the wild have corroborated about Somnigraph's design choices, filtered from public mid-2026 discussion (Karpathy's "LLM Wiki" pattern, r/AIMemory, r/ObsidianMD, r/ClaudeAI). Most of that discourse is philosophy or self-promotion; this is the residue that bears on our actual design, with single-anecdote claims flagged.
+
+### Corroborations
+
+Each maps to an existing decision — the value is independent convergence, not a new idea.
+
+- **Deterministic checks beat prose for anything load-bearing.** "A deterministic check you run every loop beats a sentence you hope is still in the context window" (rapter200, r/ClaudeAI). This is why `recall()` returns the feedback IDs in its output footer rather than trusting the model to remember to rate — the brake is coded into the tool surface.
+- **Instruction decay over long context is real.** "2-3 hard rules repeated beat 5 nuanced ones." The reason the CLAUDE.md snippet stays ~30 front-loaded lines rather than inlining the whole judgment layer (recorded as a failure mode in `claude-md-guide.md`).
+- **Confident-but-stale is the binding failure mode, not capacity.** From someone running a ~1.8k-file store: "past ~day 60 the real failure mode is confident-but-stale memory making the agent worse, not better." Independent support for the decay-floor + dormancy design; argues against pure-accumulation memory. *(Single anecdote, flagged.)*
+- **Contradiction handling wants tiered severity + scoped checking.** Classify each new claim soft / scope-mismatch / hard at ingest, block only on hard, and run the expensive reasoning lint only over the changed node plus its 1st/2nd-degree neighbors, never the whole store. Bears on our graded contradiction detection and on keeping consolidation cost bounded.
+- **Linting/consolidation is the token sink at scale.** Multiple reports that whole-store contradiction passes become slow and expensive as the graph grows — corroborates keeping consolidation offline (sleep) and scoped, never per-turn.
+
+### Write-path is the lever (2026-06-28 source scan)
+
+The two LoCoMo/LongMemEval leaders win on the write side: ByteRover hits LoCoMo 96.1% BM25-only via LLM curation at capture; MemPalace hits LongMemEval 96.6% storing conversation verbatim. Somnigraph's retrieval is stronger than both; its write side (flat content strings, connections deferred to sleep) is the liability. This converges with the AMemGym finding and the carsteneu survey's write-path theme. The genuine fork: verbatim retention wins these benchmarks, but extraction is what enables decay, graph, and feedback — and recall benchmarks don't test contradiction or long-horizon staleness, which is where extraction earns its cost.
+
+**Confidence math deferred; contradiction/currency handling kept.** The benchmark leaders model no confidence at all and win, so elaborate confidence math (tanh saturation, calibration discount) over-invests where the wins aren't. Kept instead is the cheap non-scoring half: the evidence-vs-currency action split (weak evidence → find evidence; stale → re-verify) and *annotate-not-suppress* (surface a stale-but-true fact with a flag rather than decay it below the retrieval budget), which serves the contradiction differentiator the saturating benchmarks don't measure.
+
+**Concrete adopts flagged for evaluation:** separation vectors (keep the primary semantic embedding pure, add a context-only channel), structural-loss-safe `update()` (union-merge when an update drops fields), an explicit OOD recall gate below a score floor, MemPalace's dual-layer index, and staleness×centrality probe weighting. Also from the practitioner scan: Zep's *completeness ≠ accuracy* (a reranker tuned on answer-correctness is rewarded for lucky guesses — 23.8% of correct LoCoMo answers had insufficient retrieved context; add a context-sufficiency metric alongside NDCG/recall), and bi-temporal validity (`valid_at`/`invalid_at`) as an axis distinct from age/usage decay.
+
+### Sources & flags
+
+Karpathy LLM-Wiki gist + r/ObsidianMD/r/ClaudeAI threads; the r/AIMemory push-vs-pull threads are vendor-authored (substance mined, illustrative constants discarded). The *document-KB* side of this discourse (a separate agent vault, a `hot.md` boot cache, `qmd` local search) is a sibling problem tracked in the vault, not reproduced here — Somnigraph is a conversational-memory system. Benchmark receipts are community claims, not independently reproduced: MemPalace's 100% LongMemEval was teaching-to-the-test (retracted after issue #875; trustworthy figures 96.6% raw / 98.4% held-out); ByteRover 96.1 (paper) vs 92.2 (v2 blog) is judge-strength plus version. Treat any single cross-vendor number as marketing.
+
+---
+
+*For the full research corpus of 184 source analyses, see `research/sources/`. Each analysis extracts architecture, key claims with evidence, relevance to this project, and ideas worth borrowing.*
