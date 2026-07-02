@@ -326,4 +326,4 @@ What we can't measure yet and would need to build.
 
 ---
 
-*This document describes the research agenda as of March 2026. It should be updated as experiments complete and new questions emerge.*
+*This document describes the research agenda as of July 2026. It should be updated as experiments complete and new questions emerge.*

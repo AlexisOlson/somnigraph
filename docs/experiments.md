@@ -414,4 +414,96 @@ The feature also has practical costs: 175s extraction time (vs 2.4s without) due
 
 ---
 
+## The V3→V5+3b retraining arc (May 2026)
+
+The 18-feature reranker described in [architecture.md § The reranker](architecture.md#the-reranker) grew to **31 features** and was retrained through a structured arc in May 2026. The 31-feature batch added `query_length`, `candidate_pool_size`, `fts_bm25_norm`, `vec_dist_norm`, and `decay_rate` on top of the 26-feature production model. Getting those features to train correctly first required a day of encoding-bug fixes (the `-1.0`/`0.0` sentinel cascade and the always-zero `fts_bm25_norm` bug) — those are canonized in [architecture.md § What didn't work](architecture.md#what-didnt-work) and not repeated here.
+
+This section is the *methodology* arc, not a per-trial log: how a training set built from a live memory store was hardened into something that measures ranking quality rather than the store's own habits. The throughline is two-part — **build adversarial training signal that actually generalizes, and learn to tell a model regression from ground-truth noise.**
+
+### The measurement problem this arc solves
+
+The reranker trains on ground truth built from real feedback (`build_gt_from_feedback.py`) plus two synthetic sources: self-anchors (each memory's summary → itself) and *probe* queries (LLM-crafted queries with a known pinned target, from `probe_recall.py`). Probes exist to manufacture training signal for memories that real recall under-serves. The arc is the story of making that manufactured signal trustworthy.
+
+Two metrics carry the arc. **Aggregate reranker NDCG** (5-fold CV over the whole GT) is the apples-to-apples cross-time number. **Held-out probe-hard NDCG / R@10** is the generalization probe: a slice of deliberately hard probe queries the trainer never sees. A third, **live per-mode NDCG/R@10**, measures the reranker on real recall events specifically — the actual production bottleneck, and the cleanest out-of-distribution test when live composition doesn't change between retrains.
+
+### V3–V5: pinned-boost calibration and deployment
+
+The first move was **per-(query, memory) up-weighting**: the pinned target of a probe query carries the highest-confidence label in the row, but sat at the same sample weight as its LLM-rated neighbors. A `--pinned-boost` multiplier on pinned rows (schema-v2 sidecar) let the boost be swept without re-extracting features.
+
+**V3** swept the boost across four trainer runs on a 1,273-query GT:
+
+| Pinned boost | Held-out probe-hard NDCG | R@10 |
+|--------------|--------------------------|------|
+| 1.0 (no-op reference) | 0.9138 | 0.9755 |
+| 2.0 | 0.9226 | 0.9687 |
+| 3.0 | 0.9187 | 0.9721 |
+| 5.0 (locked) | 0.9302 | 0.9821 |
+
+Note that boost=3.0 scored *below* boost=2.0 on NDCG. The fold-variance noise floor on the 87-query holdout is ~±0.005, so adjacent boost values aren't reliably ordered — the 1→5 trend (+0.0164) is real, but the right shape to expect was "rises eventually, with sub-step noise," not monotonic. Boost=5.0 was locked (`DEFAULT_PINNED_BOOST`). Its cost: live NDCG drifted −0.0075, a designed trade-off (live has no pinned targets, so the boost only touches it by trading "fit fuzzy live labels" for "fit clean pinned labels harder"), and the RMSE-destabilization tripwire never fired, so the ceiling above 5 was left unsearched.
+
+**V4** was an 8-query smoke that exercised the bundled-crafting path end-to-end (2/2 targets crafted, 0 fallbacks). **V5** re-emitted the GT to capture the probes and retrained at the locked boost, deploying the model (aggregate NDCG 0.8691, +0.0821 vs RRF; held-out hard 0.9197/0.9842 on 89 queries).
+
+### V5+1: bundled-orthogonal probing and the pin cap
+
+Two structural changes landed together.
+
+**Bundled-orthogonal crafting.** Instead of three separate LLM calls per target, a single call produces four mode-tagged queries (1 natural + 2 mild + 1 hard) attacking the same target from explicitly different angles (mechanism-vs-symptom, cause-vs-workaround). Mild is the highest-EV training signal (in-distribution, sample-weight 1.2, distinctive IDs preserved), so the prompt leans hardest on *mild-vs-mild* orthogonality — the place the LLM is most tempted to emit paraphrases of one query as another. A 200-query mixed probe crafted 50/50 groups with 0 fallbacks.
+
+**Per-memory pin cap.** The old `MAX_PROBE_RATIO = 2.0` heuristic (skip a memory when its probe-feedback rows exceed 2× its real-feedback rows) was backwards: a memory rich in real recall could absorb 100 probe pins, while a dark memory with no real recall got skipped after one — inverting which memories most need probing. It was replaced with an explicit `MAX_PINS_PER_MEMORY = 4` (8 for pathology-flagged memories), counting `probe_target` events directly and treating every memory equally.
+
+V5+1b landed aggregate NDCG 0.8763 (+0.0849 vs RRF, +0.0072 over V5). But held-out hard NDCG *dropped* to 0.9026 (R@10 0.9540) on 139 queries — and this is the arc's first lesson in reading a metric correctly. The drop was **composition, not regression**: the Phase-1 miss rate rose to 9/139 (6.5%), and misses score NDCG=0 mechanically. Excluding misses, non-miss hard NDCG actually *improved* +0.0133. This prompted a new **non-miss NDCG/R@10 metric** (a Phase-1 miss = a query with positive-label memories where none appear in the ranked candidates), so miss-inclusive NDCG could be read as a candidate-pool diagnostic separately from ranking quality.
+
+### V5+2: the GT cleanup and the adversarial pivot
+
+The 6.5% miss rate looked like a candidate-pool problem (targets retrieval couldn't surface). It was actually **ground-truth pollution**: **5.9% of feedback rows in the GT referenced inactive memories** — deleted or superseded memories that can't be retrieved, so they register as Phase-1 misses regardless of model quality. Filtering feedback rows whose `memory_id` isn't in the active set drove the held-out hard miss rate **6.5% → 0.0%** (0/189). All of V5+1b's miss noise was inactive-memory pollution. V5+2b landed aggregate NDCG 0.8816 (+0.0885 vs RRF) on the larger, cleaner GT.
+
+The second V5+2 move was the **adversarial pivot** — a genuine mid-course correction. The plan had been to mine adversarial probe targets from an *audit* (`audit_reranker_pathology.py`): memories the reranker buries relative to their best channel rank. But feeding an audit-flagged memory's content to the crafter produced queries the model handled *fine* (target ranked 1–2). The diagnosis: the audit queries with content-residual (content tokens minus summary tokens), and since FTS indexes summary + themes, the residual is *guaranteed* to be weak in the target's own FTS index while leaving every other memory's FTS intact. **The audit isn't an out-of-distribution test — it's an FTS-handicap-target test** (fully worked out in architecture.md § What didn't work § The audit's ceiling).
+
+Real adversarial signal lives in **real-recall pathologies**: high-utility memories (feedback ≥ 0.7) that ranked *low in actual production retrieval*. `scripts/select_real_pathology_targets.py` mines `memory_events`, joining feedback rows to their nearest `recall_meta` and sampling by severity (utility × worst rank). A key finding bounds the whole adversarial program: real-recall supply is **structurally tight** — 16 pathologies at rank ≥ 5, 40 at rank ≥ 3, 5 at rank ≥ 7, and **0 at rank ≥ 10**. The reranker never buries a useful memory past position 10, which is healthy on its own but means adversarial passes must reach down to rank ≥ 3 to find enough signal to measure.
+
+(A side fix during V5+2 gave the trainer's PPR cache a ~100× speedup by computing only the production damping instead of the full 103-damping `tune_gt` sweep grid, and closed a latent silent-failure where queries added after the cache was built got empty PPR scores.)
+
+### V5+3: the first real-recall adversarial retrain
+
+V5+3 ran the real-recall miner in anger: `--adversarial-source real --adversarial-rank-threshold 3`, bundling 25 adversarial groups (memories the model had buried in production) with 25 coverage groups, 200 queries total, on an 1,885-query GT.
+
+The result is the arc's headline. Held-out probe-hard NDCG was **flat** (0.8785/0.9321 on 239 queries, within the ±0.01 noise floor) — but the **live** queries, whose composition didn't change between retrains, jumped:
+
+| Signal | V5+2b | V5+3b | Δ |
+|--------|-------|-------|---|
+| Aggregate reranker NDCG | 0.8816 | **0.8954** | +0.0138 |
+| Live NDCG | 0.7309 | 0.7606 | **+0.0297** |
+| Live R@10 | 0.8218 | 0.8873 | **+0.0655** |
+
+Because live composition was near-flat (554 → 540 queries) while the training signal targeted memories the model had *buried*, the live gain is clean evidence that **adversarial training generalizes — it heals the weakness class, it doesn't just memorize the probe set.** The honest caveat: the +0.0138 aggregate gain partly reflects the model learning V5+3's own new probe labels (they're in the GT), so the live improvement is the trustworthy transfer signal, not the aggregate.
+
+### What session_recency importance revealed
+
+`session_recency` (how many queries ago a candidate was last co-retrieved in this session) had been the single most-important feature since Phase 2, and its trajectory across three retrains partially answers a standing "is this leakage or signal?" question — without a formal leave-one-feature-out audit:
+
+| Retrain | session_recency gain | GT composition change |
+|---------|---------------------|-----------------------|
+| Phase 2 (4e) | 188 | baseline |
+| V5+2b | 445 | after inactive-memory cleanup |
+| V5+3b | 356 | after real-recall adversarial probes |
+
+The cleanup *sharpened* it 2.4× (inactive-memory feedback had been noising the channel); the adversarial probes then *brought it back down* ~20%. Two opposite-direction shifts on the same feature across two retrains says its importance is **heavily composition-dependent, not a fixed architectural property** — which is roughly the answer "probably not pure leakage." When probes target buried memories (which by definition aren't recently touched), the model *can't* lean on session_recency for those rows and has to learn the channel signals instead. A formal LOFO audit would still close the question cleanly, but it is no longer load-bearing.
+
+### Worst-regressions are often GT noise, not model bugs
+
+The final methodological result changes how the live metric is read. `scripts/drill_query_scores.py` loads the trained booster and prints top-N predictions against GT labels for a single query. Run against the two persistent live worst-regressions:
+
+- **"claude.ai capacity two-tier KB chat attachments"** (worsening across three retrains): the reranker's top-2 are *both* positive memories. The "regression" is only that production ordered a gt=0.40 memory ahead of a gt=0.10 one while the reranker flipped them — a sub-0.15 score-range quibble, not a burial.
+- **"permissions settings.json allow deny Bash composite commands"** (new worst entry, R=0.0): the reranker's top-3 are obviously relevant on inspection ("No compound bash commands — use git -C", etc.), but **the GT labels them all 0.00**. The labeled "true positive" at rank 24 isn't actually about composite bash commands.
+
+**Root cause for both: it's the GT, not the model.** Live GT on short keyword-bag queries (median ~8 tokens) carries structural noise that probe GT (with intent text and pinned targets) doesn't. The broad implication: **cross-time live NDCG remains trustworthy in aggregate, but individual worst-regression entries are not reliable model-quality diagnostics** — reading them as bugs will send you chasing measurement artifacts. This motivates the deferred live-GT re-rate scaffolding (send suspicious worst-regressions to a judge with the candidate pool, surface where fresh labels disagree with stored GT).
+
+### Where the arc landed
+
+The production model is the **31-feature V5+3b** reranker: aggregate NDCG 0.8954 (+0.0921 vs RRF) on 1,885 queries, held-out probe-hard NDCG 0.8785 / R@10 0.9321 with a 0% miss rate, and a clean live transfer-learning gain from adversarial training. The negative results along the way — the audit's structural ceiling, the boost sub-step noise, the composition-driven "regressions," the GT-noise worst-regressions — are the load-bearing part: each one is a place where a plausible reading of a metric was wrong, and the fix was a sharper metric or a cleaner training set, not a bigger model.
+
+For the full per-session detail behind each step, see `docs/sessions/2026-05-08-*` and `docs/sessions/2026-05-09-*`.
+
+---
+
 *For per-study results, see the tuning studies log. For cross-study mechanism analysis, see architecture.md § Tuning.*

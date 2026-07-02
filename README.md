@@ -90,7 +90,7 @@ src/
 └── memory/
     ├── constants.py     # All tuning parameters, organized by validation tier
     ├── db.py            # SQLite connection, schema, migrations
-    ├── reranker.py      # LightGBM feature extraction and prediction (26 features)
+    ├── reranker.py      # LightGBM feature extraction and prediction (31 features)
     ├── scoring.py       # Post-RRF scoring pipeline (feedback, PPR, Hebbian) — formula fallback
     ├── write.py         # Memory creation with deduplication and privacy stripping
     ├── graph.py         # Edge creation, PPR graph expansion

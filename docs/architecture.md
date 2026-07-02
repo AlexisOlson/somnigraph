@@ -413,6 +413,8 @@ else:
 
 The formula code stays in `scoring.py` for research comparison and fallback.
 
+> **Current production model.** The 18-feature design above is the reranker *as first built* — the version that beat the formula and motivated the switch. The production model has since grown to **31 features** and been retrained through the V5+3b adversarial arc (aggregate NDCG 0.8954, +0.0921 vs RRF). The 18→26-feature growth and the live-scoring rewrite (`extract_live_features()` → `rerank()` taking pre-computed data) are documented in [migration-notes.md](migration-notes.md); the 26→31 batch and the May 2026 retraining arc are in [experiments.md § The V3→V5+3b retraining arc](experiments.md#the-v3v53b-retraining-arc-may-2026).
+
 ---
 
 ## What didn't work
@@ -569,4 +571,4 @@ Mitigation would require periodic re-embedding of high-drift memories (those who
 
 ---
 
-*This document describes the system as of March 2026. The architecture continues to evolve — see the git log and `CHANGELOG.md` for ongoing changes.*
+*This document describes the system as of July 2026. The architecture continues to evolve — see the git log for ongoing changes.*

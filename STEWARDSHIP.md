@@ -20,7 +20,20 @@ The "What didn't work" sections of `docs/architecture.md` and `docs/experiments.
 
 *Move this down when*: never. This is an invariant, not a work item — it applies to everything above and below it.
 
-### 2. Retrieval quality: reranker iteration
+### 2. Write-path quality
+
+The research program the evidence converged on. Phase 18 found that write-path quality — not retrieval — is what the LoCoMo/LME leaders win on (independent corroboration of the Phase 15 AMemGym finding), and the 59-system survey's three biggest recurring themes are all write-path moves: (1) move reconciliation to the write path, (2) write-path quality / salience / noise gating, (3) secret/PII redaction at ingest. See [`docs/ideas-considered.md`](docs/ideas-considered.md#recurring-themes-the-real-signal) § Recurring themes and [`docs/similar-systems.md`](docs/similar-systems.md#write-path-is-the-lever-2026-06-28-source-scan) § "Write-path is the lever." Somnigraph currently defers all dedup, typed-edge, and merge work to sleep and has no write-path quality gate — `remember()` will embed a near-duplicate or a leaked API key today.
+
+Inputs: the Tier 1 adopt candidates in [`docs/ideas-considered.md`](docs/ideas-considered.md#tier-1--adopt-candidates-17) — Write Guard (synchronous ADD/UPDATE/NOOP/DELETE dedup gate), write-time secret/PII redaction, grounding-based confidence gate, write-time dedup + reinforcement counter, and anticipated-queries prospective indexing.
+
+First planned steps (honest accounting first, following the survey's "measure before you threshold" theme):
+
+1. **Shadow-mode near-dup logging + secret redaction.** Log each incoming fact's nearest-neighbor cosine to a histogram without acting on it (mem9's pattern), and land the low-risk regex redaction pass. Redaction ships immediately (no threshold to tune); the near-dup histogram is the measurement that will set the later gate's thresholds from the observed production distribution rather than a guessed cutoff.
+2. **Prospective indexing + Write Guard gate.** Generate anticipated queries at write time (query-to-query matching, aimed at the multi-hop vocabulary gap), then add the Write Guard dedup/update/supersede gate with thresholds calibrated from step 1's distribution against known dup/non-dup pairs. Sleep stays the source of truth; the write-path gate is a pre-sleep floor that stops near-duplicates from ever landing.
+
+*Move this down when*: shadow-mode logging has produced a real production near-dup distribution and the Write Guard thresholds are set from it (not guessed), or the first gate ships to production and write-path quality settles into maintenance like retrieval.
+
+### 3. Retrieval quality: reranker iteration *(maintenance)*
 
 LightGBM pointwise reranker is live in production, running from repo code via directory junction. The hand-tuned scoring formula is preserved as fallback but no longer used.
 
@@ -28,11 +41,16 @@ Current state: **31-feature production model (V5+3b)** trained on 1885 real-data
 
 Adversarial probing infrastructure: real-recall pathology miner (`scripts/select_real_pathology_targets.py`) drives `probe_recall.py --mix` to bundle adversarial picks (high-utility memories the model buried in production) with coverage-fill picks. Audit-based selector kept as a fallback but no longer the primary path — synthetic audit pathologies were FTS-handicapped or Goodhart-correlated by construction (V5+2 group analysis). Worst-regression drill-down via `scripts/drill_query_scores.py` exposed that persistent live-NDCG regressions are sometimes GT noise rather than model bugs (V5+3 changelog detail).
 
-Remaining: V5+5 (next adversarial pass) — re-mine real-recall pathologies once post-V5+3b live activity accumulates, or extend supply at a different rank threshold; live-GT re-rate scaffolding to flag suspicious worst-regressions at scale; formal session_recency LOFO audit (no longer load-bearing but would close the question); counterfactual coverage check; sleep impact measurement; documentation pass into `docs/experiments.md` covering the V3→V5+3 retraining arc, the pin-cap rewrite, the GT-cleanup result, and the adversarial-source pivot.
+The V3→V5+3b retraining arc is now documented in [`docs/experiments.md` § The V3→V5+3b retraining arc](docs/experiments.md#the-v3v53b-retraining-arc-may-2026), which met this priority's move-down condition (2026-07-01). Two open directions were settled at that point:
 
-*Move this down when*: V5+3 retraining arc is documented in `docs/experiments.md` and the next-experiment direction (continued adversarial probing vs live-GT scaffolding vs LOFO) is settled.
+- **V5+5 (next adversarial pass) is deferred** until months of post-V5+3b live activity accumulate. Real-recall adversarial supply is structurally tight (0 pathologies at rank ≥ 10; only 40 at rank ≥ 3), and the buried-memory pathologies that feed a probe pass only regenerate through real usage. Re-mining now would find little the V5+3b model hasn't already healed.
+- **The formal session_recency LOFO audit is deprioritized.** V5+3 evidence (importance 188 → 445 → 356 across three retrains) showed the feature's dominance is composition-dependent, not pure leakage — so it is no longer load-bearing. A LOFO would close the question cleanly but earns a session only if session_recency starts distorting a future retrain.
 
-### 3. Documentation quality *(maintenance)*
+Remaining maintenance items, none blocking: live-GT re-rate scaffolding to flag suspicious worst-regressions at scale (the GT-noise finding motivates it), counterfactual coverage check, and sleep impact measurement.
+
+*Move this back up when*: a retrain regresses live metrics without a GT-noise explanation, adversarial supply regenerates enough for a measurable V5+5, or session_recency destabilizes a future model.
+
+### 4. Documentation quality *(maintenance)*
 
 The docs are the product. A feature without documentation is half-finished; documentation without code is still valuable. The README's CLAUDE.md snippet is the front door — it determines whether people's first experience is good.
 
@@ -42,11 +60,11 @@ This was Priority 1 during creation. Reorder condition met (2026-03-14): snippet
 
 *Move this back up when*: real users surface snippet gaps, or a system change invalidates the current docs.
 
-### 4. End-to-end LoCoMo QA benchmark
+### 5. End-to-end LoCoMo QA benchmark
 
 LoCoMo end-to-end QA pipeline is built and producing results. **85.1% overall accuracy** (Opus judge), beating Mem0 (66.88 J), Mem0g (68.44 J), and full-context baseline (72.90 J) on the same benchmark. See `docs/benchmarks.md` for full results.
 
-Current state: Level 5b graph-augmented 15-feature reranker with synthetic coverage scoring (Config K, distinct from 26-feature production model in P2), GPT-4.1-mini reader. **Level 5b expanded: OVERALL R@10=95.4%, MRR=0.882, R@20=96.9%. Multi-hop R@10=88.8%.** All metrics improved substantially over Level 4: MRR +0.169, R@1 +22.4pp, R@10 +6.7pp, multi-hop R@10 +13.5pp. BM25-damped IDF keyword expansion. Corrected GT vendored from locomo-audit (6.4% ceiling). 3 of 6 expansion methods dead (rocchio 0%, multi_query 2%, entity_focus 4%) -- ablation pending.
+Current state: Level 5b graph-augmented 15-feature reranker with synthetic coverage scoring (Config K, distinct from the 31-feature production model in P3), GPT-4.1-mini reader. **Level 5b expanded: OVERALL R@10=95.4%, MRR=0.882, R@20=96.9%. Multi-hop R@10=88.8%.** All metrics improved substantially over Level 4: MRR +0.169, R@1 +22.4pp, R@10 +6.7pp, multi-hop R@10 +13.5pp. BM25-damped IDF keyword expansion. Corrected GT vendored from locomo-audit (6.4% ceiling). 3 of 6 expansion methods dead (rocchio 0%, multi_query 2%, entity_focus 4%) -- ablation pending.
 
 Key findings: Synthetic vocabulary bridges close the multi-hop vocabulary gap when allowed through Phase 2. L5 filtered synthetics before scoring, wasting their contribution and causing a 6.8pp multi-hop regression. L5b keeps synthetics in results, retrains the reranker with coverage-based labels, and scores using an LLM-judged coverage table (Sonnet, 87.5% agreement with Opus ground truth). Feature selection must match search configuration at eval time (initial Level 5 used features selected at 200-limit, produced 3.5pp regression; re-selecting at 4000-limit recovered it). R@10 and NDCG@10 select structurally different feature sets. See `docs/benchmarks.md` § Multi-hop vocabulary gap for the vocabulary gap analysis that motivated L5b.
 
@@ -56,7 +74,7 @@ Remaining: expansion method ablation, sleep pass ablation, feedback loop ablatio
 
 *Move this down when*: ablations are complete and findings documented. Move up if external interest in comparative numbers increases.
 
-### 5. PERMA personalization benchmark
+### 6. PERMA personalization benchmark
 
 PERMA (arXiv:2603.23231, March 2026) is a fresh benchmark evaluating preference-state maintenance across event-driven, multi-session, multi-domain interactions. 10 synthetic users, 20 domains, 2,166 preferences, 1.8M tokens. Decoupled evaluation separates memory fidelity from task performance. See `research/sources/perma.md` for full analysis, `docs/benchmarks.md` § PERMA for SOTA targets.
 
@@ -141,7 +159,8 @@ Recent entries. When this section grows past ~10-15 entries, migrate the oldest 
 
 Earlier entries: see [`docs/stewardship-history.md`](docs/stewardship-history.md).
 
-- 2026-07-01: Documentation IA overhaul — restructured the docs toward one canonical home per fact. New `docs/benchmarks.md` consolidates LoCoMo retrieval, multi-hop analysis, and comparative benchmarking; `docs/README.md` rewritten as a cluster map; `roadmap.md` thinned to forward-only. Per Alexis, dropped all redirect stubs and repointed ~35 references directly to canonical homes. The broken-link sweep caught a substring-swap collision (a session filename), fixed and re-swept clean. All local on `docs/overhaul`; not pushed. See [`docs/sessions/2026-07-01-docs-overhaul.md`](docs/sessions/2026-07-01-docs-overhaul.md).
+- 2026-07-01: Reranker arc documentation + STEWARDSHIP restructure. Docs-only. Wrote the V3→V5+3b retraining arc into `docs/experiments.md` (headline: aggregate NDCG 0.8954; live transfer-learning gain +0.0297 NDCG / +6.55pp R@10 from adversarial training that generalizes). Fixed current-state version skew (reranker is the 31-feature V5+3b model). Made **write-path quality** the new Priority 2 and moved reranker iteration to maintenance (Priority 3), settling V5+5 (deferred) and the session_recency LOFO (deprioritized). See [`docs/sessions/2026-07-01-reranker-arc-docs.md`](docs/sessions/2026-07-01-reranker-arc-docs.md).
+- 2026-07-01: Documentation IA overhaul — restructured the docs toward one canonical home per fact. New `docs/benchmarks.md` consolidates LoCoMo retrieval, multi-hop analysis, and comparative benchmarking; `docs/README.md` rewritten as a cluster map; `roadmap.md` thinned to forward-only. Per Alexis, dropped all redirect stubs and repointed ~35 references directly to canonical homes. The broken-link sweep caught a substring-swap collision (a session filename), fixed and re-swept clean. Merged to `main` (ad91e37) and pushed. See [`docs/sessions/2026-07-01-docs-overhaul.md`](docs/sessions/2026-07-01-docs-overhaul.md).
 - 2026-06-29: Proactive recall design — new `docs/proposals/proactive-injection.md` for the system's main missing capability: floor-gated ultra-compact hints via a `UserPromptSubmit` hook, with a session cooldown (anti-repetition) and stochastic Thompson gating (anti-starvation) that together flatten the exposure distribution to contain feedback self-reinforcement. Core assumption (a coarse surface floor carries signal the cliff's fine-grained cutoff didn't, R²<0) is offline-testable against existing feedback logs before any code. Design-only, no code. Review caught and fixed two honest-accounting overclaims (live calibrated score, maintained Beta posterior). See [`docs/sessions/2026-06-29-proactive-injection-design.md`](docs/sessions/2026-06-29-proactive-injection-design.md).
 - 2026-06-28: Phase 18 source sweep — added 7 source analyses (TrueMemory, ByteRover, knowledge-worker, ai-memory-comparison, Recall, agentmemory, MIRIX) from r/AIMemory + the carsteneu leaderboard. Headline: write-path quality, not retrieval, is what the LoCoMo/LME leaders win on (ByteRover BM25-only, MemPalace verbatim, agentmemory write-time grounding) — independent corroboration of the Phase 15 AMemGym finding. Corrected carsteneu errors (agentmemory 96.2% not 95.2%, no RRF; MIRIX 85.38 is gpt-4.1-mini-judged ≈82% Opus-equiv). Recommends write-path discipline over a three-axis confidence build. Also: `sleep.py` defensive fix for malformed REM taxonomy items. Branch also carries the parallel session's practitioner-signal docs. See [`docs/sessions/2026-06-28-phase18-source-sweep.md`](docs/sessions/2026-06-28-phase18-source-sweep.md).
 - 2026-05-09: V5+3 — first real-recall adversarial probe + retrain. Verdict: experiment supported. Aggregate NDCG +0.0138 (→0.8954) and live transfer-learning gain +0.0297 NDCG / +6.55pp R@10 on unchanged live composition — clean evidence that adversarial signal generalizes beyond the probe set. session_recency feature importance dropped 445→356, partially answering Phase 3 priority C without a formal LOFO. Worst-regression drill-down revealed persistent live regressions are often GT noise, not model bugs. See [`docs/sessions/2026-05-09-v5-3-real-recall-adversarial.md`](docs/sessions/2026-05-09-v5-3-real-recall-adversarial.md).
