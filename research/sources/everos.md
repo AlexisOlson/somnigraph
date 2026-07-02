@@ -64,9 +64,9 @@ Note: the learned/cross-encoder rerank is a *cross-encoder API* (or LLM listwise
 ## Relevance to Somnigraph
 
 ### What EverOS does that Somnigraph doesn't
-- **Atomic-fact child decomposition + MaxSim fact eviction** — directly attacks the exact ceiling Somnigraph named in `docs/multihop-failure-analysis.md` (the ~88% vocabulary gap). Somnigraph has detail/summary/gestalt *layers* but scores at the memory level in `scoring.py`; it has no per-child ANN + max-pool-to-parent + fact-replaces-parent eviction. This is a real gap.
+- **Atomic-fact child decomposition + MaxSim fact eviction** — directly attacks the exact ceiling Somnigraph named in `docs/benchmarks.md` (the ~88% vocabulary gap). Somnigraph has detail/summary/gestalt *layers* but scores at the memory level in `scoring.py`; it has no per-child ANN + max-pool-to-parent + fact-replaces-parent eviction. This is a real gap.
 - **Markdown as source of truth with a reconciling cascade daemon** — Somnigraph's source of truth is SQLite (`db.py`); no human-editable/Git-diffable representation, no `content_sha256`-gated re-embed skip.
-- **Foresight / forward-looking memory type** — Somnigraph has no anticipatory category; connects to the unrealized `docs/proactive-injection.md` work.
+- **Foresight / forward-looking memory type** — Somnigraph has no anticipatory category; connects to the unrealized `docs/proposals/proactive-injection.md` work.
 - **Iterative agentic retrieval (LLM sufficiency + multi-query + round-2)** — Somnigraph does single-shot retrieve→rerank.
 - **Orthogonal multi-tenant scoping** (user/agent/app/project/session) and a separate agent-memory track (cases/skills) — Somnigraph is single-user.
 
@@ -88,7 +88,7 @@ Note: the learned/cross-encoder rerank is a *cross-encoder API* (or LLM listwise
 
 ### 2. Foresight — a forward-looking memory type (Medium)
 **What**: A distinct memory category capturing predictions/anticipated needs, with an `evidence` field and a time window (`start/end/duration_days`).
-**Why**: Feeds directly into the stalled `docs/proactive-injection.md` design — a stored "the user will likely need X around date Y" is exactly the signal a proactive-recall hint could surface, and it's evaluable against use/ignore labels.
+**Why**: Feeds directly into the stalled `docs/proposals/proactive-injection.md` design — a stored "the user will likely need X around date Y" is exactly the signal a proactive-recall hint could surface, and it's evaluable against use/ignore labels.
 **How**: Add a `foresight` category (or a `valid_from`-anchored reflection subtype) written during REM gap-analysis in `sleep_rem.py`; the proactive-injection floor study could include foresight items as candidates.
 
 ### 3. Cosine→probability calibration for fusion (`cosine_to_lr_score`) (Medium, consider)

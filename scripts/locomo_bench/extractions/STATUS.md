@@ -113,7 +113,7 @@ recovered without ≥3 regressions.
 - `scripts/locomo_bench/extraction_prompt.md` — v6 prompt (final)
 - `scripts/locomo_bench/extractions/conv{0-9}_v6.json` — raw extractions
 - `scripts/locomo_bench/extractions/archive_v1/` — prior iteration outputs
-- `docs/multihop-failure-analysis.md` — the 18 hard failures we're targeting
+- `docs/benchmarks.md` — the 18 hard failures we're targeting
 - `docs/extraction-consultation.md` — original problem statement
 - `docs/extraction-consultation-v3.md` — v3 review round
 - `docs/extraction-consultation-v4.md` — v4 review round

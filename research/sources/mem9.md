@@ -105,7 +105,7 @@ Contrary to the evidence file's DESIGN.md summary (naive "vector wins, keyword=0
 
 - **Mem0 lineage**: the ADD/UPDATE/DELETE/NOOP reconcile prompt is nearly identical in shape to Mem0's (see mem0-related analyses) — mem9 is essentially Mem0's write path re-implemented in Go on TiDB. The `old_memory` field, entity/attribute-slot rules, and age-tiebreaker all match.
 - **Write-path-over-retrieval thesis**: independent corroboration of the Phase 18 sweep finding (agentmemory.md, byterover) — mem9's only real "intelligence" is at the write path; its retrieval is plain RRF with no reranker/feedback and it still ships. The LoCoMo adversarial category (96.19%) vs multi-hop (22.60%) split mirrors our own multi-hop vocabulary-gap ceiling.
-- **Adversarial gating convergence**: `secondHopGateScore = 0.5` (don't expand on weak matches) is the same instinct as Somnigraph's proactive-injection **floor gate** (`docs/proactive-injection.md`) and adversarial-probe defense — a coarse similarity floor used to suppress low-confidence expansion.
+- **Adversarial gating convergence**: `secondHopGateScore = 0.5` (don't expand on weak matches) is the same instinct as Somnigraph's proactive-injection **floor gate** (`docs/proposals/proactive-injection.md`) and adversarial-probe defense — a coarse similarity floor used to suppress low-confidence expansion.
 
 ---
 

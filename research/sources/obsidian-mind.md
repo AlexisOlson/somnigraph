@@ -63,7 +63,7 @@ None. No decay, no versioning, no archival logic (moving a file to `work/archive
 
 ### 1. Signal-classifier proactive-capture hook (Low effort, note-only)
 **What**: `classify-message.ts`/`signals.ts` — a `UserPromptSubmit` hook with a small data-driven table of regex signal patterns (DECISION, INCIDENT, ...) that, on match, injects a one-line hint telling the agent to persist the right kind of note.
-**Why**: It is the *capture-side mirror* of Somnigraph's in-progress `docs/proactive-injection.md` (which is proactive-*recall*). A deterministic, near-zero-cost nudge to *store* — "the cost of a false-positive hint is ~0, a false negative is a missed memory" (their own comment) is exactly the asymmetry Somnigraph's write path ignores today.
+**Why**: It is the *capture-side mirror* of Somnigraph's in-progress `docs/proposals/proactive-injection.md` (which is proactive-*recall*). A deterministic, near-zero-cost nudge to *store* — "the cost of a false-positive hint is ~0, a false negative is a missed memory" (their own comment) is exactly the asymmetry Somnigraph's write path ignores today.
 **How**: A `UserPromptSubmit` hook that, on strong capture signals, hints "consider remember() with category=decision". But: Somnigraph already stores generously and has a sleep pass to reconcile; adding a capture nudge risks noise. **Note-only** — worth remembering as convergent design, not adopting now.
 
 ---
@@ -85,7 +85,7 @@ Product-scaffold features for an engineer's work vault, orthogonal to memory res
 
 - **Packaging-over-upstream-engine** pattern: same shape flagged in the Phase 18 sweep (ByteRover, TrueMemory) — the repo's headline "features" are an upstream engine's; the value-add is glue and UX. QMD here is the analogue of what those wrap.
 - **Write-path over retrieval**: reinforces the Phase 18 / AMemGym finding that leaders win on the write path. obsidian-mind's only *original* memory logic is on the write side (capture hints, hygiene validation), not retrieval — consistent, though its write path is shallow (no dedup/salience).
-- **Proactive-capture vs proactive-recall**: complements `docs/proactive-injection.md`. Their `classify-message` hook is the capture-direction instance of the same "deterministic hook injects a hint the agent's reflex skipped" seam.
+- **Proactive-capture vs proactive-recall**: complements `docs/proposals/proactive-injection.md`. Their `classify-message` hook is the capture-direction instance of the same "deterministic hook injects a hint the agent's reflex skipped" seam.
 
 ---
 

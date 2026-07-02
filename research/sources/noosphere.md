@@ -57,7 +57,7 @@ Soft delete (`deletedAt` + trash UI, restore), per-article revision history, `PA
 
 ### What Noosphere does that Somnigraph doesn't
 - **Write-path quality gating** — Somnigraph's `tools.py:impl_remember` accepts whatever it's given; Noosphere's `api/save.ts` rejects secrets, transient chatter, and too-short content before write. This is exactly the gap named in `STEWARDSHIP.md` ("write-path quality gating") and corroborated by the Phase 18 finding that write-path discipline, not retrieval, is what LoCoMo leaders win on.
-- **Recall-injection strip guard** — prevents an agent's recall output from being re-saved as new memory. Somnigraph has no analog; its `docs/proactive-injection.md` design injects recall hints into prompts, so the same self-ingestion risk exists if that content ever loops back into `remember()`/sleep ingestion.
+- **Recall-injection strip guard** — prevents an agent's recall output from being re-saved as new memory. Somnigraph has no analog; its `docs/proposals/proactive-injection.md` design injects recall hints into prompts, so the same self-ingestion risk exists if that content ever loops back into `remember()`/sleep ingestion.
 - **Human-in-the-loop curation ladder** (draft→reviewed→published with a web UI, revision history, trash/restore, scoped ACL). Somnigraph is single-user autonomous with no review surface.
 - **Multi-provider recall orchestration** — concurrent fan-out + provenance across heterogeneous backends. Somnigraph is single-store.
 
@@ -73,7 +73,7 @@ Soft delete (`deletedAt` + trash UI, restore), per-article revision history, `PA
 
 ### 1. Recall-injection strip guard on the write path (Low)
 **What**: Before persisting any user/agent-supplied content, strip previously-injected recall blocks (Noosphere strips `<recall>…</recall>` etc. with nested-depth balancing) so the store never re-ingests its own retrieval output.
-**Why**: Somnigraph's `docs/proactive-injection.md` plan surfaces recall hints in prompts. If any downstream path (a save, or sleep ingesting a transcript/journal) captures that text, the feedback loop self-reinforces — the exact self-ingestion pathology the strip guard blocks. Cheap insurance for a capability Somnigraph is about to add.
+**Why**: Somnigraph's `docs/proposals/proactive-injection.md` plan surfaces recall hints in prompts. If any downstream path (a save, or sleep ingesting a transcript/journal) captures that text, the feedback loop self-reinforces — the exact self-ingestion pathology the strip guard blocks. Cheap insurance for a capability Somnigraph is about to add.
 **How**: A small sanitizer in `tools.py:impl_remember` (and any sleep content-ingest in `scripts/sleep_*.py`) that removes Somnigraph's own recall-block delimiters before storing. ~30 lines, matching `noosphere-injected-memory/src/index.ts`.
 
 ### 2. Write-time transient/secret rejection (Low)

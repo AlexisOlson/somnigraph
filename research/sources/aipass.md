@@ -66,7 +66,7 @@ Age-based FIFO only. `learnings/manager.py:get_entry_age()` computes day-age; un
 ### What AIPass does that Somnigraph doesn't
 - **Multi-agent workspace + mailboxes** — per-agent identity (`passport.json`) and local file mailboxes for agent-to-agent handoff. Somnigraph is single-user by design; this is out of scope, not a gap.
 - **Synchronous write-time AUDN reconciliation** — Somnigraph's `remember()` dedups at 0.9 cosine similarity but defers *merge/supersede* to offline NREM sleep (`sleep_nrem.py`). AIPass applies Add/Update/Delete/Noop synchronously at write. Different timing, same intent.
-- **Proactive associative surfacing already shipped** — the "reminds me of…" hook is exactly the shape of Somnigraph's *design-stage* `docs/proactive-injection.md` (UserPromptSubmit hint, session cooldown, anti-repetition). AIPass has a working reference implementation with concrete default parameters.
+- **Proactive associative surfacing already shipped** — the "reminds me of…" hook is exactly the shape of Somnigraph's *design-stage* `docs/proposals/proactive-injection.md` (UserPromptSubmit hint, session cooldown, anti-repetition). AIPass has a working reference implementation with concrete default parameters.
 
 ### What Somnigraph does better
 Essentially everything on the retrieval/quality axis: hybrid BM25+vector with **RRF fusion** (`fts.py`+`scoring.py`) vs AIPass's single-channel vector or additive `+0.1` bonus; a **26-feature learned reranker** (`reranker.py`) vs a 0.40 threshold; **PPR graph expansion** with typed edges vs no graph; **explicit feedback loop** with measured r=0.70 GT correlation vs none; **LLM-mediated sleep consolidation** (NREM/REM) vs FIFO eviction; **per-category exponential decay with reheat** vs age-FIFO; a real **LoCoMo QA benchmark (85.1%)** vs no benchmarks at all.
@@ -82,7 +82,7 @@ Essentially everything on the retrieval/quality axis: hybrid BM25+vector with **
 
 ### 2. Proactive "reminds me of…" hook as a reference implementation (Low)
 **What**: `handlers/symbolic/hook.py` — a working proactive-surfacing gate with `threshold`, `max_fragments_per_session`, `min_messages_between`, `cooldown_seconds`, and a `surfaced_ids` anti-repetition set.
-**Why**: This is **convergent validation** of `docs/proactive-injection.md`. An independent project arrived at the same control surface (session cap + cooldown + anti-repetition) Somnigraph designed on paper — evidence the design shape is right. Its concrete defaults (0.3 threshold, 5/session, 10 messages between, 300s cooldown) are a useful sanity anchor when picking Somnigraph's operating point.
+**Why**: This is **convergent validation** of `docs/proposals/proactive-injection.md`. An independent project arrived at the same control surface (session cap + cooldown + anti-repetition) Somnigraph designed on paper — evidence the design shape is right. Its concrete defaults (0.3 threshold, 5/session, 10 messages between, 300s cooldown) are a useful sanity anchor when picking Somnigraph's operating point.
 **How**: No code to port — cite it in the proactive-injection design doc as prior art and use its parameters as a starting reference for the floor sweep.
 
 ---
@@ -103,7 +103,7 @@ Strictly inferior to RRF + learned reranker. Do not adopt.
 ## Connections
 
 - **Write-path discipline theme**: The Phase 18 sweep (see `docs/sessions/2026-06-28-phase18-source-sweep.md`, `agentmemory.md`, `byterover`) found that LoCoMo/LME leaders win on *write-path quality*, not retrieval. AIPass is a counter-example that quietly corroborates it: its retrieval is trivial (vector + 0.40 floor), yet its *only* content-quality mechanism is the write-time AUDN dedup — the same "reconcile at write" instinct, just without any benchmark to show it helps.
-- **Proactive injection**: direct convergence with `docs/proactive-injection.md` — same cooldown/anti-repetition/session-cap control surface, independently invented.
+- **Proactive injection**: direct convergence with `docs/proposals/proactive-injection.md` — same cooldown/anti-repetition/session-cap control surface, independently invented.
 - **AUDN vs supersession**: the ADD/UPDATE/DELETE/NOOP taxonomy echoes the supersession/versioning patterns catalogued in other sources (cf. `memv`, MemOS-style updates); AIPass's contribution is naming it as a 4-way LLM decision applied synchronously.
 
 ---

@@ -61,7 +61,7 @@ Note: `getRelevantSentences()` (a *keyword*-based sentence trimmer) is defined b
 
 ### What ArcRift does that Somnigraph doesn't
 - **Sentence-granular retrieval ("small-to-big")**: indexes and vector-searches at sentence level, returns only matching sentences with the chunk as anchor. Somnigraph returns whole memory rows (`tools.py` recall). For Somnigraph's already-atomic memories this is low-value, but the pattern matters for any future long-form/document memory.
-- **HyDE query expansion** (`hyde.ts`): hallucinate an answer, embed query+answer. Somnigraph's recall path (`embeddings.py`/`tools.py`) embeds the bare query. This directly targets the vocabulary gap Somnigraph documented as its multi-hop ceiling (`docs/multihop-failure-analysis.md`, ~88%).
+- **HyDE query expansion** (`hyde.ts`): hallucinate an answer, embed query+answer. Somnigraph's recall path (`embeddings.py`/`tools.py`) embeds the bare query. This directly targets the vocabulary gap Somnigraph documented as its multi-hop ceiling (`docs/benchmarks.md`, ~88%).
 - **In-browser PII scrubbing before persistence** (`privacy.ts`) — Somnigraph has no write-path redaction (single-user, less critical, but still a gap).
 - **Write-time FNV-1a fingerprint dedup** at scrape time — cheap exact-dup suppression before any embedding.
 
@@ -74,7 +74,7 @@ Nearly everything on the retrieval-science axis. Somnigraph has a **26-feature L
 
 ### 1. HyDE query expansion for the multi-hop vocabulary gap (Medium)
 **What**: Before embedding a recall query, generate a short hypothetical answer with a cheap LLM and embed `query + hypothetical` (ArcRift `hyde.ts`, used in `retrieveRelevantChunks`).
-**Why**: Somnigraph's own `docs/multihop-failure-analysis.md` names an ~88% vocabulary-gap ceiling as the retrieval limit. HyDE is the query-time analog of Somnigraph's *write-time* synthetic vocabulary bridges (L5b synthetic nodes) — it manufactures answer-vocabulary at read time to bridge query↔memory lexical mismatch. Convergent evidence: two independent systems attacking the same gap from opposite ends of the pipeline.
+**Why**: Somnigraph's own `docs/benchmarks.md` names an ~88% vocabulary-gap ceiling as the retrieval limit. HyDE is the query-time analog of Somnigraph's *write-time* synthetic vocabulary bridges (L5b synthetic nodes) — it manufactures answer-vocabulary at read time to bridge query↔memory lexical mismatch. Convergent evidence: two independent systems attacking the same gap from opposite ends of the pipeline.
 **How**: Add an optional HyDE step in the recall path (`tools.py`/`embeddings.py`): one small local/cheap LLM call → embed the concatenation → feed into existing RRF+reranker. Gate behind a flag; the cost is one extra LLM call + latency on a currently non-LLM recall path, so measure the recall@k lift on the multi-hop slice before making it default. Its write-time cousin (synthetic bridges) already works, which makes the query-time version worth an ablation rather than a leap of faith.
 
 ### 2. Sentence-level "small-to-big" trim as a future long-document primitive (Low, note-only)

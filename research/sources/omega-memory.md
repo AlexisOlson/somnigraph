@@ -115,7 +115,7 @@ Per-event-type exponential decay (`_DECAY_LAMBDAS`: permanent for constraint/pre
 ## Not Useful For Us
 
 ### Auto-"helpful" feedback on surfaced memories
-`session_stop.py` auto-rates every surfaced memory "helpful" — a self-reinforcing exposure bias that inflates whatever the ranker already favored. This is precisely the feedback-loop pathology Somnigraph's `docs/proactive-injection.md` was designed against (cooldown + Thompson gating to flatten exposure). Adopt the *warning*, not the mechanism.
+`session_stop.py` auto-rates every surfaced memory "helpful" — a self-reinforcing exposure bias that inflates whatever the ranker already favored. This is precisely the feedback-loop pathology Somnigraph's `docs/proposals/proactive-injection.md` was designed against (cooldown + Thompson gating to flatten exposure). Adopt the *warning*, not the mechanism.
 
 ### Multi-agent coordination, entity registry, LLM router, knowledge base
 Pro-tier modules for team/corporate coding-agent fleets (file claims, branch guards, entity hierarchies, multi-provider routing). Out of scope for single-user Somnigraph.

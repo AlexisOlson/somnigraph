@@ -104,7 +104,7 @@ There is **no RRF fusion, no learned reranker, no score blending, no graph-condi
 
 ### 1. Write-time fact decomposition before embedding (Medium) — *consider, likely redundant*
 **What**: Decompose a raw memory into atomic, self-contained facts (LLM, JSON-array prompt) and embed the facts, not the blob.
-**Why**: Directly targets Somnigraph's multi-hop vocabulary gap (the ~88% retrieval ceiling in `docs/multihop-failure-analysis.md`) — the same intuition as Somnigraph's L5b synthetic vocabulary bridges, but applied at *write* time instead of during sleep.
+**Why**: Directly targets Somnigraph's multi-hop vocabulary gap (the ~88% retrieval ceiling in `docs/benchmarks.md`) — the same intuition as Somnigraph's L5b synthetic vocabulary bridges, but applied at *write* time instead of during sleep.
 **How**: A pre-embedding step in the write path / `embeddings.py`, or a sleep-phase fact-splitter. **Caveat**: this is the mem0/agentmemory pattern already covered in `research/sources/` — additive corroboration, not a new idea, and Somnigraph deliberately defers graph/enrichment to sleep. File under "another data point for the write-path thesis," not a new adoption.
 
 ### 2. `recall_write` / version-churn detector as a redundancy signal (Low) — *note-only*
@@ -127,7 +127,7 @@ There is **no RRF fusion, no learned reranker, no score blending, no graph-condi
 
 - **Write-path-quality thesis**: reinforces the Phase 18 finding (`docs/sessions/2026-06-28-phase18-source-sweep.md`) and the `agentmemory`/`byterover`/mem0 cluster — LoCoMo/LME leaders win on *write-time grounding*, not retrieval cleverness. Octopoda's fact-decomposition + entity extraction is the same move; its retrieval is deliberately thin.
 - **Convergent with the "packaging over an engine" pattern** seen in other repos: Octopoda markets a name over the `synrix` engine, and the headline "engine" binary (`synrix-server-evaluation`) is a closed download, not in this repo — the open code is the SDK + platform shell.
-- **Loop detection** is a genuinely orthogonal capability not present in any other system in the corpus; adjacent to Somnigraph's concern about feedback-loop self-reinforcement (`docs/proactive-injection.md`), though solved for a different problem (agent runtime cost, not retrieval feedback).
+- **Loop detection** is a genuinely orthogonal capability not present in any other system in the corpus; adjacent to Somnigraph's concern about feedback-loop self-reinforcement (`docs/proposals/proactive-injection.md`), though solved for a different problem (agent runtime cost, not retrieval feedback).
 
 ---
 

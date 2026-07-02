@@ -103,7 +103,7 @@ None. No decay, no supersession, no contradiction handling, no TTL, no forget/de
 
 - **Convergent with the Phase 18 write-path finding** (see `ai-memory-comparison.md`, `byterover.md`, `agentmemory.md`): Memori is another data point that **write-path extraction quality, not retrieval machinery, is what wins LoCoMo** — its open retrieval is a plain linear BM25+dense blend, yet the cloud extractor scores 81.95. Independent corroboration that our reranker sophistication is over-indexed relative to write-time quality.
 - **Contrast with graph systems** (see `memos.md`, `mirix.md`): Memori stores S-P-O triples like a graph system but, unlike them, never traverses the graph at recall — a cautionary example of graph-as-decoration.
-- **Same "flatten triples into embedded text" shortcut** seen in several profiled systems; convergent evidence that write-time triples mostly serve as a vocabulary bridge for dense retrieval, echoing our L5b synthetic-node finding in `docs/multihop-failure-analysis.md`.
+- **Same "flatten triples into embedded text" shortcut** seen in several profiled systems; convergent evidence that write-time triples mostly serve as a vocabulary bridge for dense retrieval, echoing our L5b synthetic-node finding in `docs/benchmarks.md`.
 
 ---
 

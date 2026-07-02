@@ -68,7 +68,7 @@ Nearly everything on the retrieval/consolidation axis. Somnigraph has hybrid BM2
 
 ### 1. Promotion into an always-loaded tier, gated on durability + cross-context verification (Medium)
 **What**: A distinct "graduated" memory tier that is loaded into every session's context (not retrieved), populated only by memories that clear a "general across contexts + verified multiple times" bar during offline consolidation.
-**Why**: Somnigraph currently makes even its most durable, universally-relevant memories win a retrieval competition every query. context-infra's insight is that a small curated set earns unconditional presence. This is adjacent to — and a possible complement to — `docs/proactive-injection.md`: instead of (or alongside) floor-gated hints, a tiny always-on tier for the highest-durability items.
+**Why**: Somnigraph currently makes even its most durable, universally-relevant memories win a retrieval competition every query. context-infra's insight is that a small curated set earns unconditional presence. This is adjacent to — and a possible complement to — `docs/proposals/proactive-injection.md`: instead of (or alongside) floor-gated hints, a tiny always-on tier for the highest-durability items.
 **How**: Sleep (`sleep_rem.py`) already computes taxonomy/gestalt; add a promotion pass that flags memories with high durability + high cross-session retrieval breadth into a `gestalt`/`always_load` set, surfaced by the proactive-injection hook without a floor gate. Bounded size to control token cost. Note the risk Somnigraph already respects: an always-loaded tier can re-bloat (the core.md re-bloat dynamic) — cap it hard.
 
 ---
@@ -89,7 +89,7 @@ Redundant with Somnigraph's priority 1-10 + per-category decay, which is finer-g
 ## Connections
 
 - **Convergent with the Phase 18 write-path finding** (ByteRover, agentmemory, MemPalace): the corpus keeps concluding that *write-time discipline* beats retrieval sophistication. context-infra is another data point — its only genuinely differentiated mechanic is write-time noise filtering, and its retrieval is deliberately trivial.
-- **Contrasts with `docs/proactive-injection.md`**: both address "get the important thing in front of the agent without it asking," but context-infra answers with a static always-loaded rules tier (promotion) rather than a gated per-turn hint.
+- **Contrasts with `docs/proposals/proactive-injection.md`**: both address "get the important thing in front of the agent without it asking," but context-infra answers with a static always-loaded rules tier (promotion) rather than a gated per-turn hint.
 - **Same family as other markdown-log/prompt-SOP systems** in the sweep (append-only observation logs promoted to rules) — the L2→L3 promote-and-GC cadence is a poor-man's sleep consolidation.
 
 ---
