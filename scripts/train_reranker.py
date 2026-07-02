@@ -26,6 +26,7 @@ Usage:
 """
 
 import argparse
+import gc
 import json
 import math
 import pickle
@@ -800,6 +801,14 @@ def train_and_evaluate(feature_data: dict, n_folds: int = 5,
               f"best_iter={model.best_iteration_} "
               f"val_samples={len(val_idx)} val_pos={n_val_pos}")
 
+        # Free this fold's array copies before the next fold allocates its
+        # own — fancy indexing copies, and at millions of rows the train
+        # copy alone is ~460MB. Two folds' worth held simultaneously OOM'd
+        # the V6 retrain (2026-07-01); the RHS of the next fold's slice
+        # assignment is evaluated while these are still referenced.
+        del X_train, X_val, y_train, y_val, w_train, w_val, model, preds
+        gc.collect()
+
     importances /= n_folds
 
     mean_rmse = np.mean([r["rmse"] for r in fold_results])
@@ -1259,6 +1268,11 @@ def evaluate_reranker_ranking(feature_data: dict, full_data: dict,
         print(f"    Production: NDCG={prod_ndcg:.4f}  Recall={prod_recall:.4f}")
         print(f"    Delta:      NDCG={reranker_ndcg-prod_ndcg:+.4f}  "
               f"Recall={reranker_recall-prod_recall:+.4f}")
+
+        # Same per-fold memory hygiene as train_and_evaluate — these copies
+        # are fold-sized and the next iteration re-allocates before rebinding.
+        del X_train, X_val_tr, X_val_full, w_train, w_val, model, preds
+        gc.collect()
 
     # Summary
     mean_reranker_ndcg = np.mean([m["reranker_ndcg"] for m in all_fold_metrics])
@@ -1738,9 +1752,10 @@ def main():
             print("Run without --train-only first to extract features.")
             sys.exit(1)
         print(f"Loading features from {FEATURES_PATH}...")
+        # pickle.load streams from the file — read()+loads held the raw
+        # bytes AND the reconstructed objects simultaneously (~2x peak).
         with open(FEATURES_PATH, "rb") as f:
-            feature_data = f.read()
-        feature_data = pickle.loads(feature_data)
+            feature_data = pickle.load(f)
 
         # Still need full_data for ranking evaluation
         full_data, ground_truth, _ = load_tuning_data(
