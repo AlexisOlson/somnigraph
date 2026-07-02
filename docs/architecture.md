@@ -606,6 +606,8 @@ No benchmark exists for evaluating whether consolidation improved or degraded th
 
 Building a consolidation benchmark requires: (a) a memory store with known quality issues (redundancy, contradictions, stale information), (b) a ground-truth consolidation (what should be merged, archived, etc.), and (c) metrics that capture both compression (did it reduce redundancy?) and fidelity (did it preserve important information?). None of these exist in the published literature.
 
+**First measurement (2026-07-02), retrieval axis only:** a four-arm counterfactual fork (frozen vs slept copies of the live store, 1,032 GT queries, paired bootstrap CIs) found consolidation **statistically inert on retrieval in the steady-state regime** — both a standard cycle (probe-stripped) and a full `--deep` pass produced null deltas, and the deep pass did zero merges/dormancy/archival because the regularly-slept store had nothing left to consolidate. This measures the *retrieval* effect on a *saturated* store, not consolidation quality in general; the accumulation-regime re-run (a two-week sleep-abstinence window, registered in `roadmap.md` § "Does sleep improve retrieval?") is the condition where consolidation has real work. Full analysis: [`experiments/sleep-fork/findings-sleep-fork.md`](../experiments/sleep-fork/findings-sleep-fork.md).
+
 ### Feedback loop self-reinforcement
 
 Four independent external reviewers converged on this finding: the feedback loop may optimize for retrieval habits rather than retrieval needs. The concern has several facets:
@@ -617,6 +619,8 @@ Four independent external reviewers converged on this finding: the feedback loop
 - **Channel entanglement.** Enriched embeddings concatenate content + category + themes + summary. FTS indexes summary + themes. Both retrieval channels depend on the same LLM-generated summary and sleep-enriched themes. Weight-insensitivity between vector and keyword channels (documented in tuning studies) may reflect shared dependency rather than genuine robustness — the channels may be "multiple faces of the same exposure history" rather than independent evidential sources.
 
 No fix is proposed here. The first step is measurement: the utility calibration study (see `roadmap.md`) tests whether feedback utility correlates with independently-judged relevance.
+
+**One facet now has a direct measurement (2026-07-02).** The sleep pipeline's retrieval probe is a controlled instance of the loop: it selects high-utility memories, issues synthetic queries targeting them, and logs feedback — synthetic exposure feeding the scorer's dominant signal. The sleep counterfactual fork isolated this injection as its own experimental arm (a verified three-channel strip: feedback events, the Hebbian co-retrieval window, edge weights) and measured its per-cycle retrieval effect at **+0.0009 NDCG@5k [+0.0000, +0.0018]** — real in direction, borderline in significance, negligible in size, and partly self-fulfilling by construction (probe targets correlate with GT relevance, so the scorer is being handed the answer key). The loop's per-cycle contribution is thus small enough that a single sleep's probe does not meaningfully distort retrieval; whether it compounds across many cycles remains open. See [`experiments/sleep-fork/findings-sleep-fork.md`](../experiments/sleep-fork/findings-sleep-fork.md).
 
 ### Representation bifurcation
 

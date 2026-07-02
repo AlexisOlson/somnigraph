@@ -1,11 +1,11 @@
-# Findings — Sleep Counterfactual Fork (DRAFT, for human review)
+# Findings — Sleep Counterfactual Fork
 
-> **⚠️ FOR REVIEW — autonomously produced.** This is an unsupervised overnight draft
-> (Opus, worktree `exp/sleep-fork`, 2026-07-02). The numbers are machine-checked, but
-> every *interpretation* below is a claim for `experiments.md` / `architecture.md` and
-> must be ratified by a human before merge. Nothing here was merged or pushed. The live
-> store (`~/.claude/data`) was never written — all work was on copies under
-> `D:\somnigraph-exp\sleepfork-<run>\`.
+> **Reviewed and ratified 2026-07-02 (orchestrator).** Produced by an unsupervised
+> session (Opus, worktree `exp/sleep-fork`, 2026-07-02); numbers machine-checked,
+> interpretation reviewed against the per-arm decomposition before merge. The live store
+> (`~/.claude/data`) was never written — all work was on copies under
+> `D:\somnigraph-exp\sleepfork-<run>\`. Deep-full (a fifth arm) was declined at review:
+> attributing a practically-nil effect more precisely was not worth another arm.
 
 ## Question
 
@@ -82,6 +82,12 @@ Bold = 95 % CI excludes zero. Everything else is null.
   MRR is null. So the full cycle's marginal significance is the *sum of two individually
   non-significant components* (consolidation ≈ +0.0013, probe ≈ +0.0009). Neither can be
   isolated as "the" driver at this effect size.
+- **A mid-experiment hypothesis was tested and NOT confirmed.** After the deep arm's null,
+  the orchestrator hypothesized the probe's feedback injection was "the active ingredient"
+  behind the standard-full positive. The corrected strip refuted the strong form: the
+  decomposition is two individually-null halves, not consolidation-null + probe-positive.
+  Recorded because the wrong hypothesis shaped the arm design and the correction is part
+  of the result.
 
 ## NREM-vs-REM attribution
 
