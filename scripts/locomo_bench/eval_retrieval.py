@@ -64,6 +64,11 @@ _n_seeds: int = 10
 _graph_resolve: bool = False
 _synthetic_coverage: dict | None = None  # {qkey: {synth_id: [covered_turn_ids]}}
 
+# Measurement-only per-method expansion fire-rate accumulator (exp/locomo-expansion-ablation).
+# Populated only when SOMNIGRAPH_FIRE_STATS names an output path; never affects scoring.
+_fire_stats: dict = {"n_queries": 0, "fired": defaultdict(int), "yield_total": defaultdict(int),
+                     "present": defaultdict(int)}
+
 # Per-conversation cache for reranker (avoids reloading metadata per query)
 _conv_cache: dict = {}  # keys: memories, all_speakers, ordinal_map, syn_to_turns, db_path
 
@@ -484,8 +489,11 @@ def _install_locomo_reranker():
 
         # (Graph resolution already done pre-feature-extraction above)
 
-        # If no expansion flags, return phase 1 results directly
-        if not any(_expansion_flags.values()):
+        # If no expansion flags, return phase 1 results directly.
+        # SOMNIGRAPH_FORCE_PHASE2 (measurement-only, exp/locomo-expansion-ablation): force the
+        # Phase-2 rerank pass to run even with zero expansion methods enabled, to isolate the
+        # rerank's contribution from candidate expansion. Never set in production.
+        if not any(_expansion_flags.values()) and not os.environ.get("SOMNIGRAPH_FORCE_PHASE2"):
             scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
             scores_dict = {mid: float(s) for mid, s in scored}
             sorted_ids = [mid for mid, _ in scored]
@@ -528,6 +536,21 @@ def _install_locomo_reranker():
             memories=memories,
         )
         exp_result = run_expansions(exp_ctx, _expansion_flags)
+        if os.environ.get("SOMNIGRAPH_FIRE_STATS"):
+            _fire_stats["n_queries"] += 1
+            _all_new = exp_result.all_new_ids
+            if _all_new:
+                _fire_stats["queries_with_any_new"] = _fire_stats.get("queries_with_any_new", 0) + 1
+            _fire_stats["total_new_ids"] = _fire_stats.get("total_new_ids", 0) + len(_all_new)
+            for _m, _ids in exp_result.per_method.items():
+                _fire_stats["present"][_m] += 1
+                if _ids:
+                    _fire_stats["fired"][_m] += 1
+                    _fire_stats["yield_total"][_m] += len(_ids)
+            if _fire_stats["n_queries"] <= 3:
+                import sys as _sys
+                _sys.stderr.write(f"[FIREDBG] q#{_fire_stats['n_queries']} cand={len(candidate_ids)} "
+                                  f"all_new={len(_all_new)} per_method={{{', '.join(f'{k}:{len(v)}' for k,v in exp_result.per_method.items())}}}\n")
         exp_method_counts = exp_result.method_counts()
         expanded_ids = candidate_ids | exp_result.all_new_ids
 
@@ -1670,6 +1693,28 @@ def main():
 
     out_file.close()
     logger.info("Results saved to %s (%d records)", out_path, len(all_records))
+
+    # Fire-rate stats dump (measurement-only; path from SOMNIGRAPH_FIRE_STATS)
+    fire_path = os.environ.get("SOMNIGRAPH_FIRE_STATS")
+    if fire_path and _fire_stats["n_queries"]:
+        n = _fire_stats["n_queries"]
+        methods = ["entity_focus", "multi_query", "keyword", "session", "entity_bridge", "rocchio"]
+        summary = {
+            "n_queries": n,
+            "queries_with_any_net_new_candidate": _fire_stats.get("queries_with_any_new", 0),
+            "total_net_new_candidates": _fire_stats.get("total_new_ids", 0),
+            "note": ("fire_rate = fraction of queries where the method added >=1 NET-NEW "
+                     "candidate (not already in the Phase-1 pool)."),
+            "present_rate": {m: _fire_stats["present"].get(m, 0) / n for m in methods},
+            "fire_rate": {m: _fire_stats["fired"].get(m, 0) / n for m in methods},
+            "fired_count": {m: _fire_stats["fired"].get(m, 0) for m in methods},
+            "mean_yield_when_fired": {
+                m: _fire_stats["yield_total"][m] / _fire_stats["fired"][m]
+                for m in methods if _fire_stats["fired"].get(m)
+            },
+        }
+        Path(fire_path).write_text(json.dumps(summary, indent=2))
+        logger.info("Fire-rate stats written to %s", fire_path)
 
     # Report
     if args.dataset == "locomo":

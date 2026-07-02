@@ -1,0 +1,31 @@
+{
+  "n_queries": 1977,
+  "queries_with_any_net_new_candidate": 0,
+  "total_net_new_candidates": 0,
+  "note": "fire_rate = fraction of queries where the method added >=1 NET-NEW candidate (not already in the Phase-1 pool).",
+  "present_rate": {
+    "entity_focus": 1.0,
+    "multi_query": 1.0,
+    "keyword": 1.0,
+    "session": 1.0,
+    "entity_bridge": 1.0,
+    "rocchio": 1.0
+  },
+  "fire_rate": {
+    "entity_focus": 0.0,
+    "multi_query": 0.0,
+    "keyword": 0.0,
+    "session": 0.0,
+    "entity_bridge": 0.0,
+    "rocchio": 0.0
+  },
+  "fired_count": {
+    "entity_focus": 0,
+    "multi_query": 0,
+    "keyword": 0,
+    "session": 0,
+    "entity_bridge": 0,
+    "rocchio": 0
+  },
+  "mean_yield_when_fired": {}
+}

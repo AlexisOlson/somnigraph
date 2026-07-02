@@ -26,7 +26,7 @@ Level 5b complete. Synthetic coverage scoring recovers multi-hop regression and 
 
 ### What's next
 
-1. **Expansion method ablation:** 3 of 6 methods are dead (rocchio 0%, multi_query 2%, entity_focus 4%). Remove them and measure impact.
+1. **Expansion method ablation:** DONE (2026-07-02). ⚠️ The fire rates below (rocchio 0%, multi_query 2%, entity_focus 4%) are a **stale ≤200-search-limit instrument** — at the current 4000 limit the Phase-1 pool holds the whole benchmark DB, so all six methods add 0 net-new candidates and the `--expand-all` lift is entirely the Phase-2 rerank. Removability is not settleable on this benchmark. See [`experiments/expansion-ablation/findings-expansion-ablation.md`](../../experiments/expansion-ablation/findings-expansion-ablation.md) and `docs/benchmarks.md` § Expansion-method ablation.
 
 2. **Sleep pass ablation:** Run with sleep consolidation enabled. Measure impact on retrieval.
 
