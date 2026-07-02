@@ -1,13 +1,16 @@
-# Proactive-Injection Offline Floor Study — Findings (DRAFT, for review)
+# Proactive-Injection Offline Floor Study — Findings
 
 **Arc step 3 / autonomous-experiments #2.** Deterministic replay over the existing
 event log. No writes to the live store, no paid API calls, deterministic floor only
 (stochastic gating out of scope by design).
 
-> **FOR REVIEW — not a decision.** The F-beta operating point and the β=2 weight
-> encode a miss-vs-noise value judgment that is Alexis's call. Whether any of this
-> graduates to a `UserPromptSubmit` hook build is a stewardship decision. This draft
-> proposes and measures; it does not decide. Do not merge.
+> **Reviewed and ratified 2026-07-01** (orchestrator review; join gate passed — pinned
+> 60s window, 91.8% match, 1 collision). Decision: **the injection hook is not built on
+> offline evidence**; outcome recorded in `docs/proposals/proactive-injection.md` and
+> `docs/roadmap.md`. Review addition: the β=2 choice does not change the verdict —
+> precision-weighted F₀.₅ on the population-A curve also loses to always-inject
+> (best floor ≈0.80 vs 0.82), so the operating-point rejection is β-robust, not an
+> artifact of the recall-weighted value judgment.
 
 ---
 
@@ -245,8 +248,10 @@ python sweep_floor.py                             # writes floor_sweep.json
 ```
 
 `floor_labels_beyond.jsonl` (~667k rows) is regenerable and intentionally **not committed**.
-Committed artifacts: the two scripts, `floor_labels.json` (kept rows + meta), `floor_sweep.json`
-(all metrics), and this file.
+Committed artifacts: the two scripts and this file. `floor_labels.json` (kept rows + meta) and
+`floor_sweep.json` (all metrics) are **local-only** (gitignored at review): regenerable from the
+event log, and they carry live-usage telemetry (per-turn timestamps, per-memory utility
+histories) that doesn't belong in a public repo. All decision-relevant numbers are quoted above.
 
 Environment of record: store copy `~/.somnigraph-exp/floor-5900abd-*`, worktree at commit
 `5900abd` (branch `exp/floor-study`, off `main`). Python 3.14, sqlite3 stdlib only (no
