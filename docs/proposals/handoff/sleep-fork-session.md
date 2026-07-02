@@ -42,29 +42,13 @@ cp -r "$HOME/.claude/data" "$B"
 export SOMNIGRAPH_EMBEDDING_BACKEND=fastembed
 ```
 
-Before anything else, **make the learned reranker loadable on both copies** — this is known-broken on the live store as of this handoff. The loader (`reranker.py`) needs `tuning_studies/reranker_model.txt` + `reranker_features.json`, but the live `~/.claude/data/tuning_studies/` ships only `reranker_model.pkl` + `reranker_features.pkl`. If you skip this, `--configs reranker` silently measures the **formula**, not V5+3b, and the whole experiment is about the wrong scorer.
+Before anything else, **verify the learned reranker is loadable on both copies**. The loader (`reranker.py`) needs `tuning_studies/reranker_model.txt` + `reranker_features.json`. A restore session (stewardship arc step 2.5, 2026-07-01) retrains and deploys these to the live store — after it lands, your copies inherit them and this check just passes. If you skip this check and the files are absent, `--configs reranker` silently measures the **formula**, not V5+3b, and the whole experiment is about the wrong scorer.
 
 ```sh
-ls -la "$A/tuning_studies/"reranker_model.* "$A/tuning_studies/"reranker_features.* 2>/dev/null
+ls -la "$A/tuning_studies/"reranker_model.txt "$A/tuning_studies/"reranker_features.json 2>/dev/null
 ```
-If `reranker_model.txt` is absent but `reranker_model.pkl` is present, **export the `.txt`/`.json` from the pkl on each copy** (do NOT touch the live store):
-```sh
-for D in "$A" "$B"; do
-  SOMNIGRAPH_DATA_DIR="$D" SOMNIGRAPH_EMBEDDING_BACKEND=fastembed python - <<'PY'
-import os, json, pickle, pathlib
-d = pathlib.Path(os.environ["SOMNIGRAPH_DATA_DIR"]) / "tuning_studies"
-pkl = pickle.load(open(d / "reranker_model.pkl", "rb"))
-# pkl is a dict saved by train_reranker.py; find the sklearn model / booster
-model = pkl.get("model", pkl) if isinstance(pkl, dict) else pkl
-booster = getattr(model, "booster_", None) or model
-booster.save_model(str(d / "reranker_model.txt"))
-feats = pkl.get("feature_names") or pkl.get("features")
-if feats: json.dump(list(feats), open(d / "reranker_features.json", "w"))
-print("exported", d)
-PY
-done
-```
-Inspect the `.pkl` structure first on a scratch print if the keys differ (`python -c "import pickle;print(type(pickle.load(open('$A/tuning_studies/reranker_model.pkl','rb'))))"`). If you cannot produce a loadable `.txt`, run the eval anyway but **record loudly in the findings that both A and B fell back to formula scoring** — the delta is then a valid sleep-vs-formula measurement, just not a sleep-vs-reranker one. Never proceed as if the reranker ran when it didn't.
+
+If `reranker_model.txt` is absent: **HARD STOP — do NOT convert the on-disk `reranker_model.pkl` to `.txt`.** That pkl is the stale 2026-03-20 **26-feature** model; the live extractor builds **31 features**, so a converted booster is feature-misaligned with every feature matrix this eval would hand it. (An earlier version of this artifact contained a pkl→txt converter snippet — it was wrong and has been removed.) Your two valid options: (a) report that the restore hasn't landed yet and stop, or (b) run the eval anyway and **record loudly in the findings that both A and B used formula scoring** — the delta is then a valid sleep-vs-formula measurement, just not a sleep-vs-reranker one. Never proceed as if the reranker ran when it didn't.
 
 ### Step 1 — Baseline on the frozen copy (A)
 
