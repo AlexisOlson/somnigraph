@@ -73,15 +73,26 @@ def _openai_embed_text(text: str) -> list[float]:
     return _retry(_call)
 
 
+# OpenAI rejects embedding requests with more than 2048 inputs. Chunk well
+# below that so large batches — e.g. a fresh-GT training run embedding
+# thousands of new query texts at once — don't 400. Bit for real 2026-07-01
+# (V6 retrain: 3335 texts in one call). Each chunk retries independently.
+_OPENAI_EMBED_CHUNK = 1000
+
+
 def _openai_embed_batch(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     client = get_openai_client()
-    def _call():
-        response = client.embeddings.create(input=texts, model=EMBEDDING_MODEL)
-        sorted_data = sorted(response.data, key=lambda d: d.index)
-        return [d.embedding for d in sorted_data]
-    return _retry(_call)
+    embeddings: list[list[float]] = []
+    for start in range(0, len(texts), _OPENAI_EMBED_CHUNK):
+        chunk = texts[start:start + _OPENAI_EMBED_CHUNK]
+        def _call(chunk=chunk):
+            response = client.embeddings.create(input=chunk, model=EMBEDDING_MODEL)
+            sorted_data = sorted(response.data, key=lambda d: d.index)
+            return [d.embedding for d in sorted_data]
+        embeddings.extend(_retry(_call))
+    return embeddings
 
 
 # ---------------------------------------------------------------------------

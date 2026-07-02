@@ -529,6 +529,18 @@ alongside it is a number you can cite but not rebuild. Future deploys should sna
 full recipe (GT, sidecars, probe-event export, feature spec) next to every
 `reranker_model.txt`. See [`docs/sessions/2026-07-01-reranker-restore.md`](sessions/2026-07-01-reranker-restore.md).
 
+**Restore landed (2026-07-02): V6.** The dedicated retrain session rebuilt the GT fresh
+from the live event log (4,316 queries — including 270 probe-hard holdout queries whose
+`probe_target` events had survived in the live store), trained the 31-feature pointwise
+model, and passed every sanity gate: **+8.42pp NDCG@5k over the formula on the same
+fresh GT** (0.8997 vs 0.8155), held-out probe-hard NDCG 0.9048 with 0/270 misses, no
+dead features, and a reranker-scored smoke recall through the real loader. V6 is **not
+comparable to V5+3b** — different GT; its baseline is the formula on its own GT. The
+lesson above became mechanism, not advice: the complete recipe (model, feature spec, GT,
+both sidecars, training log, exact command + repo SHA) is archived as one durable bundle
+(`~/.claude/data/tuning_studies/v6_bundle/`) **before** deployment, so V6 is never one
+file-loss from V5+3b's fate. See [`docs/sessions/2026-07-02-v6-retrain.md`](sessions/2026-07-02-v6-retrain.md).
+
 ### The audit's ceiling (acknowledged 2026-05-08)
 
 `scripts/audit_reranker_pathology.py` was a sharp tool for catching the three sentinel-bug classes. After all three were fixed, the residual 37 content-residual pathologies turned out to be a structural artifact of the audit's construction, not a model bug. Per-case SHAP analysis: the dominant culprit features are `fts_rank` (mean delta -0.28) and `fts_bm25_norm` (-0.18) — *not* the self-reinforcement features (`age_days`, `fb_count`, `session_recency` are all -0.006 or smaller).
