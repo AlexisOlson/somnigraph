@@ -309,6 +309,24 @@ def impl_remember(
         enriched = build_enriched_text(content, category, themes_list, summary)
         embedding = embed_text(enriched)
 
+        # --- Shadow-mode write instrumentation (measurement-only, gates nothing) ---
+        # Reuse the dedup KNN pass below to capture this write's nearest same-category
+        # neighbors, then log exactly one 'write_shadow' event per write attempt. Weeks
+        # of these accumulate the production near-duplicate similarity distribution that
+        # will later set the Write Guard thresholds empirically instead of by guess
+        # (the mem9 pattern; STEWARDSHIP P2 step 1). This changes neither retrieval nor
+        # what gets stored. It is invisible to every existing memory_events consumer:
+        # all of them filter by event_type, and 'write_shadow' matches none. See
+        # docs/architecture.md § Shadow-mode write instrumentation.
+        shadow_neighbors = []  # up to 3 nearest same-category neighbors, nearest first
+
+        def _log_write_shadow(outcome, new_memory_id=None, extra=None):
+            ctx = {"outcome": outcome, "new_id": new_memory_id, "neighbors": shadow_neighbors}
+            if extra:
+                ctx.update(extra)
+            top_sim = shadow_neighbors[0]["sim"] if shadow_neighbors else None
+            _log_event(db, "_write", "write_shadow", context=ctx, similarity_score=top_sim)
+
         # Dedup check: cosine distance < threshold against same-category active+pending
         existing_ids = db.execute(
             "SELECT memory_id FROM memory_rowid_map WHERE memory_id IN "
@@ -317,12 +335,14 @@ def impl_remember(
         ).fetchall()
 
         if existing_ids:
-            rowids = [
-                db.execute(
+            rowids = []
+            rowid_to_mid = {}
+            for r in existing_ids:
+                rid = db.execute(
                     "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?", (r["memory_id"],)
                 ).fetchone()["rowid"]
-                for r in existing_ids
-            ]
+                rowids.append(rid)
+                rowid_to_mid[rid] = r["memory_id"]
 
             # Check against each existing memory for near-duplicates
             dupes = db.execute(
@@ -333,6 +353,22 @@ def impl_remember(
                 """,
                 (serialize_f32(embedding), min(len(rowids), 20)),
             ).fetchall()
+
+            # Capture up to 3 nearest same-category neighbors for the shadow log. dupes
+            # is a global KNN capped at same-category count, so filter to same-category
+            # rowids — the logged distribution then matches the same-category decision
+            # the dedup gate actually makes. distance is cosine distance; sim = 1 - dist.
+            same_cat_rowids = set(rowids)
+            for d in dupes:
+                if d["rowid"] in same_cat_rowids:
+                    dist = d["distance"]
+                    shadow_neighbors.append({
+                        "id": rowid_to_mid.get(d["rowid"]),
+                        "distance": round(dist, 6),
+                        "sim": round(1.0 - dist, 6),
+                    })
+                    if len(shadow_neighbors) >= 3:
+                        break
 
             for dupe in dupes:
                 if dupe["distance"] < DEDUP_THRESHOLD:
@@ -364,6 +400,10 @@ def impl_remember(
                                 )
                                 _log_event(db, new_id, "created", context={"source": source, "superseded": dup_mem["id"]})
                                 _log_event(db, dup_mem["id"], "superseded", context={"superseded_by": new_id})
+                                _log_write_shadow("superseded", new_id, {
+                                    "superseded": dup_mem["id"],
+                                    "distance": round(dupe["distance"], 6),
+                                })
                                 db.commit()
                                 return (
                                     f"Stored (superseded existing similar memory {dup_mem['id'][:8]}...).\n"
@@ -375,6 +415,10 @@ def impl_remember(
                                     "distance": round(dupe["distance"], 4),
                                     "new_priority": priority,
                                     "existing_priority": dup_mem["base_priority"],
+                                })
+                                _log_write_shadow("dedup_rejected", None, {
+                                    "matched": dup_mem["id"],
+                                    "distance": round(dupe["distance"], 6),
                                 })
                                 db.commit()
                                 dup_summary = dup_mem["summary"] or dup_mem["content"][:80]
@@ -396,6 +440,7 @@ def impl_remember(
             session_id=get_session_id(),
         )
         _log_event(db, new_id, "created", context={"source": source, "category": category})
+        _log_write_shadow("inserted", new_id)
         db.commit()
         invalidate_reranker_cache()
 
