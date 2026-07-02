@@ -489,8 +489,11 @@ def _install_locomo_reranker():
 
         # (Graph resolution already done pre-feature-extraction above)
 
-        # If no expansion flags, return phase 1 results directly
-        if not any(_expansion_flags.values()):
+        # If no expansion flags, return phase 1 results directly.
+        # SOMNIGRAPH_FORCE_PHASE2 (measurement-only, exp/locomo-expansion-ablation): force the
+        # Phase-2 rerank pass to run even with zero expansion methods enabled, to isolate the
+        # rerank's contribution from candidate expansion. Never set in production.
+        if not any(_expansion_flags.values()) and not os.environ.get("SOMNIGRAPH_FORCE_PHASE2"):
             scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
             scores_dict = {mid: float(s) for mid, s in scored}
             sorted_ids = [mid for mid, _ in scored]

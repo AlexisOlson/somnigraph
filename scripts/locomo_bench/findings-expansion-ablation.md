@@ -46,9 +46,11 @@ python scripts/locomo_bench/eval_retrieval.py \
 | d | `--expand-keyword --expand-entity-bridge` | trio minus session |
 | e | `--expand-session --expand-entity-bridge` | trio minus keyword |
 | f | `--expand-session --expand-keyword` | trio minus entity_bridge |
+| g | *(no flags)* + `SOMNIGRAPH_FORCE_PHASE2=1` | no methods, Phase-2 rerank forced on (added in review) |
 
 Arms d/e/f are the three leave-one-out arms over the active trio (each is also a *pair*
-of active methods).
+of active methods). Arm g (added during orchestrator review) forces the Phase-2 rerank with
+zero expansion methods, to isolate the rerank's contribution from candidate expansion.
 
 **Read-only isolation.** The eval's schema-init opens each conversation DB in write mode
 (`CREATE ... IF NOT EXISTS`, idempotent but a write lock). To keep the canonical benchmark
@@ -105,17 +107,32 @@ multi-hop 89, open-domain 841, OVERALL 1531.
 
 ## Headline results
 
-**1. Every leave-one-out and subset arm reproduces all-six exactly.** Active-trio (c) and
-each leave-one-out (d/e/f) match all-six (b) to 0.00pp on every OVERALL and multi-hop recall
-metric. The only movement anywhere is a single question's R@1 (84.193% → 84.259%) and 2–3
-questions shuffling in first-hit rank.
+**1. Every subset arm is indistinguishable from all-six within the pipeline's own
+non-determinism floor.** Active-trio (c) and each leave-one-out (d/e/f) match all-six (b) to
+0.00pp on every OVERALL and multi-hop recall metric (MRR to 3 dp, R@1/5/10/20).
 
-| Arm vs b | OVERALL R@10 Δ | multi-hop R@10 Δ | # questions R@10 differs (of 1,519) |
-|----------|----------------|------------------|-------------------------------------|
-| c (trio, drop 3 dead) | +0.0pp | +0.0pp | 0 |
-| d (−session) | +0.0pp | +0.0pp | 0 |
-| e (−keyword) | +0.0pp | +0.0pp | 0 |
-| f (−entity_bridge) | +0.0pp | +0.0pp | 0 |
+Arms are **not** bit-identical, but the correction matters: the differences between arms are
+*smaller than run-to-run non-determinism of a fixed config*. Comparing arms **positionally**
+(same conversation/question at each record — the earlier `(conv_id, question)`-keyed count was
+an artifact of duplicate question strings collapsing):
+
+| Comparison | records differing on any metric (of 1,977) |
+|------------|--------------------------------------------|
+| between arms (b vs c/d/e/f; c/d/e/f pairwise) | 1–7 |
+| **same config, three independent `--expand-all` runs** | **5–9** |
+
+Three identical `--expand-all` runs disagree with each other on 5–9 questions — *more* than
+any between-arm difference. So the inter-arm movement is within the noise floor; no expansion
+method has a detectable effect on ranking beyond it. The likely non-determinism source is
+approximate vec-ANN k-NN ordering / tie-breaking in Phase-1 retrieval; it never crosses the
+R@10/R@20 thresholds, which is why aggregate recall is stable to the decimal.
+
+| Arm vs b | OVERALL R@10 Δ | multi-hop R@10 Δ |
+|----------|----------------|------------------|
+| c (trio, drop 3 dead) | +0.0pp | +0.0pp |
+| d (−session) | +0.0pp | +0.0pp |
+| e (−keyword) | +0.0pp | +0.0pp |
+| f (−entity_bridge) | +0.0pp | +0.0pp |
 
 **2. Expansion *collectively* is highly valuable — but the value is not candidate
 expansion.** No-expansion (a) → any expansion config: OVERALL R@10 +4.9pp (90.5→95.4), R@1
@@ -137,15 +154,32 @@ arms b–f:
   is *not* selected; nor are `entity_fts_rank` (25), `sub_query_hits` (26), or
   `seed_keyword_overlap` (27). The only expansion-touched selected feature is
   `graph_coref_hits` (34), computed as `len(coref_nbrs & expanded_ids)` — and `expanded_ids`
-  is the full DB regardless of which methods run, so it too is invariant. **The reranker
-  literally cannot distinguish which expansion methods fired**, which is why arms b/c/d/e/f
-  are mathematically identical, not merely close.
+  is the full DB regardless of which methods run, so it too is invariant. **No selected feature
+  varies with which expansion methods fired.** (The one method that *does* mutate a Phase-2
+  score input — `expand_rocchio`, which writes `vec_distances`/`vec_ranked` at
+  `expansion.py:546` — gates that write on `not in existing_ids`, i.e. net-new only, which is
+  always empty here, so even rocchio changes nothing.) This is why the between-arm differences
+  collapse into the non-determinism floor: the reranker has no method-identity signal to act on.
 
 The +4.9pp a→b gain is therefore the **Phase-2 second-rerank pass** itself: no-expansion
 returns Phase-1 predictions directly (`eval_retrieval.py:497`), while any non-empty expansion
 flag set triggers Phase 2, which recomputes the selected features over the expanded RRF and
 re-predicts (`preds2`, `eval_retrieval.py:855`). The gate is `any(_expansion_flags.values())`
 (line 492) — *which* methods are on is irrelevant to the outcome.
+
+**Decisive confirmation — arm g (Phase 2 forced on, zero expansion methods).** A
+measurement-only toggle (`SOMNIGRAPH_FORCE_PHASE2`) runs the Phase-2 rerank with *no*
+expansion method enabled:
+
+| Arm | MRR | R@1 | R@10 | R@20 | positional diff |
+|-----|-----|-----|------|------|-----------------|
+| a — no expansion, Phase-1 only | 0.710 | 60.3% | 90.5% | 93.7% | vs g: **827 records** |
+| g — no methods, **Phase-2 forced** | 0.882 | 84.2% | 95.4% | 96.9% | vs b: **3 records** (within noise floor) |
+| b — all six methods, Phase-2 | 0.882 | 84.2% | 95.4% | 96.9% | — |
+
+Arm g reproduces all-six (b) exactly and diverges from Phase-1-only (a) on 827 questions. The
+entire measured "expansion" benefit is the Phase-2 rerank; the expansion methods themselves
+contribute nothing on this benchmark.
 
 ## Per-method fire rates
 
@@ -165,13 +199,20 @@ Measured as the fraction of queries where a method contributed ≥1 **net-new** 
 All six are candidate-addition no-ops on this benchmark, for the structural reason above
 (pool ⊇ DB). Full machine-readable counts in `fire_stats_full.json`.
 
-**This does not match the fire rates in `HANDOFF.md`** (session 100%, keyword ~95%,
-entity_bridge ~96%, rocchio 0%, multi_query ~2%, entity_focus ~4%). Those numbers cannot have
-come from this benchmark config with net-new semantics — they must reflect a different
-measurement point: raw method yield *before* the `existing_ids` dedup filter, and/or a
-production-scale DB where the candidate pool does *not* already contain the whole database.
-Flagging this as an honest-accounting discrepancy for the orchestrator to resolve; I did not
-reconcile it (the original measurement code/conditions are not in this tree).
+**Reconciled with the `HANDOFF.md` fire rates** (session 100%, keyword ~95%, entity_bridge
+~96%, rocchio 0%, multi_query ~2%, entity_focus ~4%). Those numbers date from the **≤200
+search-limit era**, before Level 5. Per `docs/benchmarks.md` § Level 5 (2026-03-27): *"Phase 1
+retrieval expanded from 200 to 4000 … with the old 200-limit, synthetic nodes consumed ~100 of
+~400 retrieval slots."* At limit 200 the candidate pool was ~200–400 entries — **smaller than
+the DB** (535–861 memories) — so expansion methods genuinely pulled in net-new candidates, and
+fire rates of 95–100% are plausible. The Level 5 increase to 4000 made the pool ⊇ the entire
+benchmark DB, driving net-new fire rate to 0% for every method. The L5b `HANDOFF.md`
+(2026-03-28) carried the old fire rates forward into its forward-looking "what's next" note
+without re-measuring under the new limit.
+
+**Sharper finding:** the 200→4000 search-limit increase (Level 5) **silently obsoleted
+candidate expansion on benchmark-sized DBs.** The three "dead" methods were not dead by design
+— the limit change made *all six* inert on this data, and the stale fire-rate note masked it.
 
 ## Interpretation
 
@@ -192,29 +233,34 @@ reconcile it (the original measurement code/conditions are not in this tree).
 
 - **This is a benchmark-scale artifact, not a production measurement.** The whole result is
   conditioned on DBs (≤861 memories) far smaller than the 4000-candidate Phase-1 pool. On a
-  production-scale corpus the conclusions could differ entirely.
-- **Exact-match on one fixed config.** L5b reranker (fixed 15-feature model), corrected GT,
-  synthetic coverage, recall-limit 800. A retrained reranker that *selected* a method-identity
-  feature (e.g. `exp_method_counts`, `entity_fts_rank`) would break the b=c=d=e=f identity.
+  production-scale corpus (pool < corpus) the methods would add candidates and the conclusions
+  could differ entirely.
+- **Arms are indistinguishable, not identical.** Between-arm differences (1–7 of 1,977 records)
+  sit below the fixed-config non-determinism floor (5–9 records). Recall metrics match to the
+  decimal because the shuffles never cross a rank threshold. A retrained reranker that
+  *selected* a method-identity feature (e.g. `exp_method_counts`, `entity_fts_rank`) could
+  surface a real between-arm difference.
 - **Singletons not run.** Arms cover no-expansion, all-six, trio, and the three pairs
   (leave-one-out). Singleton arms (session-only, etc.) were not run — though given the
-  mechanism (0 net-new + no method-identity feature), they would also be expected to match b.
-- **Fire-rate discrepancy unreconciled** (see above) — a real open item, not a settled fact.
+  mechanism (0 net-new + no method-identity feature), they too would be expected to sit within
+  the noise floor.
 
 ## Recommended next steps (not done here — measurement-only scope)
 
-1. **Reconcile the fire-rate discrepancy** with `HANDOFF.md` before acting on removability:
-   determine whether the original fire rates were raw pre-dedup yield or production-scale.
-   The removal decision for the 3 dead methods should rest on *that* evidence, since this
-   benchmark shows all six are inert for a structural reason.
+1. **The removability decision cannot be made on this benchmark.** It shows all six methods are
+   inert here for a structural reason (pool ⊇ DB after the 200→4000 change), not that the three
+   "dead" methods are worthless in production. Decide removal on production-scale evidence
+   (pool < corpus), where the methods actually add candidates.
 2. If a benchmark test of expansion is wanted, **shrink the candidate pool below the DB size**
-   (or grow the DB) so methods can actually add net-new candidates — otherwise the benchmark
-   only measures the Phase-2 rerank.
+   (e.g. revert Phase-1 to a ~200 limit for this measurement only) so methods can add net-new
+   candidates — otherwise the benchmark only measures the Phase-2 rerank.
 3. Any code change (removing methods) remains a separate session.
 
 ## Artifacts (in scratch unless noted)
 
-- Per-arm per-question JSONL: `arm_{a,b,c,d_drop_session,e_drop_keyword,f_drop_entitybridge}.jsonl`
+- Per-arm per-question JSONL: `arm_{a,b,c,d_drop_session,e_drop_keyword,f_drop_entitybridge}.jsonl`,
+  plus `arm_g_forcephase2.jsonl` (Phase-2 forced, no methods)
 - Machine-readable aggregate (committed alongside this file): `ablation_results.json`
 - Fire-rate counts: `fire_stats_full.json`
+- Non-determinism check: three independent `--expand-all` runs differ by 5–9 of 1,977 records
 - This file: `findings-expansion-ablation.md`
