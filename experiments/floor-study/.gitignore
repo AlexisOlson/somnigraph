@@ -1,0 +1,6 @@
+# Large, regenerable intermediate (build_floor_labels.py --emit-beyond)
+floor_labels_beyond.jsonl
+__pycache__/
+# Local-only telemetry-derived artifacts (regenerable; contain live-usage timestamps/utilities)
+floor_labels.json
+floor_sweep.json
