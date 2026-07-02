@@ -1,10 +1,10 @@
-# LoCoMo Expansion-Method Ablation — Findings (DRAFT)
+# LoCoMo Expansion-Method Ablation — Findings
 
-**Status:** Draft for orchestrator review. Measurement only — no expansion method was
-removed from the code. The claim that lands in `experiments.md` / `benchmarks.md` gets
-written after review, not by this session.
+**Status:** Reviewed and ratified 2026-07-02 (orchestrator). Measurement only — no expansion
+method was removed from the code. Corrected findings landed in `docs/benchmarks.md` (§ Level 5b
+expansion-method ablation), `STEWARDSHIP.md` P5, and `docs/roadmap.md` #21.
 
-**Date:** 2026-07-01
+**Dates:** ablation 2026-07-01; review-pass corrections + ratification 2026-07-02
 **Branch:** `exp/locomo-expansion-ablation` (worktree off `main`)
 **Roadmap item:** experiment #21 (expansion-method ablation)
 
@@ -258,9 +258,9 @@ candidate expansion on benchmark-sized DBs.** The three "dead" methods were not 
 
 ## Artifacts (in scratch unless noted)
 
-- Per-arm per-question JSONL: `arm_{a,b,c,d_drop_session,e_drop_keyword,f_drop_entitybridge}.jsonl`,
-  plus `arm_g_forcephase2.jsonl` (Phase-2 forced, no methods)
-- Machine-readable aggregate (committed alongside this file): `ablation_results.json`
-- Fire-rate counts: `fire_stats_full.json`
-- Non-determinism check: three independent `--expand-all` runs differ by 5–9 of 1,977 records
-- This file: `findings-expansion-ablation.md`
+Committed in this directory: `findings-expansion-ablation.md`, `ablation_results.json`
+(6-arm aggregate), `fire_stats_full.json` (net-new fire rates), `arm_g_forcephase2.jsonl`
+(decisive Phase-2-forced arm). The six per-arm JSONLs
+(`arm_{a,b,c,d_drop_session,e_drop_keyword,f_drop_entitybridge}.jsonl`) remain in the session
+scratch dir — re-derivable from the base command above. Non-determinism check: three
+independent `--expand-all` runs differ by 5–9 of 1,977 records.

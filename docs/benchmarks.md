@@ -574,6 +574,16 @@ OVERALL          1531   0.882   84.3%   91.0%   93.1%   95.4%   96.9%   98.3%
 
 **Caveat:** The improvement is partly definitional — synthetics now count as evidence hits via coverage scoring. But this is the fair comparison: in production, a user seeing a synthetic that carries the same evidence as the original turn would have the same information available. The coverage table ensures only synthetics that actually carry the relevant information get credit.
 
+### Expansion-method ablation (2026-07-02) — the lift is the Phase-2 rerank, not expansion
+
+Six candidate-expansion methods run in the L5b pipeline. `HANDOFF.md` and roadmap #21 cite per-method fire rates that flagged three as dead — session 100%, keyword 95%, entity_bridge 96%; rocchio 0%, multi_query 2%, entity_focus 4% — and called for an ablation to confirm removability. A 6-arm ablation (no-expansion / all-six / active-trio / three leave-one-out, all 10 conversations, `--expand-all` reproduced the L5b reference above exactly) settled it differently than expected. Full detail: [`experiments/expansion-ablation/findings-expansion-ablation.md`](../experiments/expansion-ablation/findings-expansion-ablation.md).
+
+**Those fire rates are a stale instrument.** They date from the **≤200 Phase-1 search-limit era** (pre-Level-5), when the candidate pool held ~200–400 entries — smaller than the DB (see the Level 5 "Search size increase" note above). The Level 5 change to a 4000 limit made the pool contain the **entire** benchmark DB (max 861 memories). Re-measured at the 4000 limit, **all six methods add zero net-new candidates** — net-new fire rate 0% across all 1,977 queries (`fire_stats_full.json`). The historical numbers are kept for provenance but no longer describe the pipeline.
+
+**The `--expand-all` retrieval lift is entirely the Phase-2 rerank pass, not candidate expansion.** No-expansion returns Phase-1 predictions directly; any non-empty expansion flag triggers a Phase-2 second rerank (`preds2`). Because no method adds candidates and the reranker's 15 selected features include no method-identity signal, all expansion configs are indistinguishable within the pipeline's own non-determinism floor (three identical `--expand-all` runs differ by 5–9 of 1,977 records; between-arm differences are 1–7). A decisive control — **arm g**, Phase-2 forced on with *zero* expansion methods — reproduces `--expand-all` exactly (R@10 95.4%, positional diff 3, within noise) and diverges from Phase-1-only on **827 records**, confirming the +4.9pp R@10 / +12.4pp multi-hop "expansion" gain is the second rerank.
+
+**Consequences.** (1) Removability of the three "dead" methods **cannot be settled on this benchmark** — it structurally cannot exercise candidate expansion (pool ⊇ corpus), so all six are equally inert here; decide on production-scale evidence (pool < corpus). (2) Honest-accounting note: the 200→4000 limit increase silently obsoleted candidate expansion on benchmark DBs, and nobody re-measured until now. The methods stay in code; this machinery is bench-harness-only, not the production recall path.
+
 ## End-to-End QA Results
 
 ### Run 1 — GPT-4.1-mini reader (2026-03-21)
