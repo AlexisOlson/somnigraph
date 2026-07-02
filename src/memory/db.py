@@ -417,4 +417,26 @@ def _init_schema(db: sqlite3.Connection):
             )
         logger.info(f"Migrated FTS5: removed content column, repopulated {len(rows)} rows")
 
+    # Search-index hygiene backfill (idempotent). Prune rowid_map/vec/FTS rows
+    # whose memory is deleted or missing. The remember() supersede path
+    # historically flipped status to 'deleted' without dropping these rows (now
+    # fixed in tools.py via _drop_search_rows), leaving superseded phantoms in the
+    # reranker candidate pool. This runs on every start and self-heals such rows
+    # regardless of which path created them; it is a no-op on a clean store.
+    # Mirrors consolidate()'s orphan prune so the live store self-heals on the
+    # first post-merge server start. Pending memories are indexed by design and
+    # are left untouched (only status='deleted' or missing rows are pruned).
+    orphan_rows = db.execute("""
+        SELECT mrm.rowid
+        FROM memory_rowid_map mrm
+        LEFT JOIN memories m ON mrm.memory_id = m.id
+        WHERE m.id IS NULL OR m.status = 'deleted'
+    """).fetchall()
+    if orphan_rows:
+        for o in orphan_rows:
+            db.execute("DELETE FROM memory_vec WHERE rowid = ?", (o[0],))
+            db.execute("DELETE FROM memory_fts WHERE rowid = ?", (o[0],))
+            db.execute("DELETE FROM memory_rowid_map WHERE rowid = ?", (o[0],))
+        logger.info("Startup index hygiene: pruned %d orphaned search row(s)", len(orphan_rows))
+
     db.commit()

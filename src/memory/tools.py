@@ -41,6 +41,23 @@ from memory.reranker import rerank as reranker_rerank, invalidate_cache as inval
 from memory.stats import compute_stats
 
 
+def _drop_search_rows(db, memory_id):
+    """Delete a memory's vec/FTS/rowid-map rows so it leaves the search tables.
+
+    Shared by forget() and the remember() supersede path. When a memory's status
+    flips to 'deleted' it must also lose its index rows; otherwise it lingers as a
+    phantom candidate in the reranker pool (recall() filters final results to
+    active, which masks the effect but still wastes scoring compute — see
+    architecture.md § the silent fallback correction)."""
+    vec_map = db.execute(
+        "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?", (memory_id,)
+    ).fetchone()
+    if vec_map:
+        db.execute("DELETE FROM memory_vec WHERE rowid = ?", (vec_map["rowid"],))
+        db.execute("DELETE FROM memory_fts WHERE rowid = ?", (vec_map["rowid"],))
+        db.execute("DELETE FROM memory_rowid_map WHERE rowid = ?", (vec_map["rowid"],))
+
+
 def impl_startup_load(budget: int = 3000) -> str:
     # Detect and cache the current session ID from JSONL transcript
     detect_session_id()
@@ -398,6 +415,12 @@ def impl_remember(
                                     "UPDATE memories SET superseded_by = ?, status = 'deleted' WHERE id = ?",
                                     (new_id, dup_mem["id"]),
                                 )
+                                # Clean up vec/FTS/rowid for the superseded memory, matching
+                                # forget(). Without this the superseded row lingers in the
+                                # search tables and re-enters the reranker candidate pool as a
+                                # status='deleted' phantom (see architecture.md § the silent
+                                # fallback / masquerading-defaults correction).
+                                _drop_search_rows(db, dup_mem["id"])
                                 _log_event(db, new_id, "created", context={"source": source, "superseded": dup_mem["id"]})
                                 _log_event(db, dup_mem["id"], "superseded", context={"superseded_by": new_id})
                                 _log_write_shadow("superseded", new_id, {
@@ -1453,13 +1476,7 @@ def impl_forget(memory_id: str) -> str:
     )
 
     # Clean up vector, FTS, and rowid mapping for deleted memory
-    vec_map = db.execute(
-        "SELECT rowid FROM memory_rowid_map WHERE memory_id = ?", (memory_id,)
-    ).fetchone()
-    if vec_map:
-        db.execute("DELETE FROM memory_vec WHERE rowid = ?", (vec_map["rowid"],))
-        db.execute("DELETE FROM memory_fts WHERE rowid = ?", (vec_map["rowid"],))
-        db.execute("DELETE FROM memory_rowid_map WHERE rowid = ?", (vec_map["rowid"],))
+    _drop_search_rows(db, memory_id)
 
     _log_event(db, memory_id, "updated", context={"action": "deleted"})
     db.commit()

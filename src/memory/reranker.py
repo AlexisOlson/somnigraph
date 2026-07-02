@@ -397,6 +397,18 @@ def rerank(
         ppr_scores = ppr_cache.get((d_key, query), {})
         candidate_ids |= set(ppr_scores.keys())
 
+    # Filter the candidate pool to active memories before scoring. Non-active
+    # memories (pending, or superseded rows that lingered in the search tables)
+    # can enter the pool via the unfiltered channel-rank dicts / PPR neighbors;
+    # scoring them wastes compute and fires the memory_meta-missing branch.
+    # recall() already discards non-active from final results, so this only drops
+    # never-surfaced candidates and makes the missing-meta branch truly dead for
+    # live scoring. memory_meta is the active-only precompute (its non-sentinel
+    # keys are exactly the active memory ids), so membership is the active test —
+    # no extra query, no SQL-variable limit. See architecture.md § the silent
+    # fallback correction.
+    candidate_ids = {mid for mid in candidate_ids if mid in memory_meta}
+
     if not candidate_ids:
         return []
 
