@@ -4,6 +4,7 @@ import json
 
 from memory.decay import effective_priority
 from memory.events import _row_get
+from memory.reranker import scorer_status
 
 
 def compute_stats(db) -> str:
@@ -203,5 +204,10 @@ def compute_stats(db) -> str:
         lines.append(f"Oldest: {oldest['created_at'][:10]}")
     if newest:
         lines.append(f"Newest: {newest['created_at'][:10]}")
+
+    # Active retrieval scorer — makes the reranker-vs-formula-fallback state
+    # visible (the silent fallback was invisible for ~3 months without this).
+    lines.append(f"\n### Retrieval Scorer")
+    lines.append(scorer_status())
 
     return "\n".join(lines)

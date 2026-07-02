@@ -89,7 +89,10 @@ def _load_model():
         return _cache["model"]
 
     if not MODEL_PATH.exists():
-        logger.info("No reranker model at %s — using formula scoring", MODEL_PATH)
+        logger.warning(
+            "RERANKER DISABLED -- no model at %s; retrieval is on FORMULA FALLBACK. "
+            "Deploy reranker_model.txt + reranker_features.json to restore learned "
+            "scoring (see architecture.md, the silent fallback section).", MODEL_PATH)
         _cache["failed"] = True
         return None
 
@@ -628,6 +631,20 @@ def rerank(
     scored = sorted(zip(candidate_list, preds), key=lambda x: -x[1])
     scores_dict = {mid: float(s) for mid, s in scored}
     return [mid for mid, _ in scored], scores_dict
+
+
+def scorer_status() -> str:
+    """One-line description of the active retrieval scorer, for memory_stats().
+
+    Surfaces the reranker-vs-formula choice that graceful fallback otherwise
+    hides. The April–July 2026 silent fallback went unnoticed for ~3 months
+    because nothing reported which scorer was live (see architecture.md § the
+    silent fallback)."""
+    model = _load_model()
+    if model is None:
+        return f"formula fallback (no model at {MODEL_PATH})"
+    n = len(_cache.get("feature_names") or []) or model.num_feature()
+    return f"reranker: {n} features, loaded from {MODEL_PATH}"
 
 
 def warmup(db):
