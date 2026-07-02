@@ -488,9 +488,46 @@ Audit of the remaining feature missing-encodings revealed five more bug-shape se
 
 All seven NaN-encoded in one pass. Pathologies dropped 108 → 37 (-66%). Cumulative: 239 → 37 (-85%) across the day's three sentinel fixes.
 
-Codified policy in both `src/memory/reranker.py` and `scripts/train_reranker.py`: any feature whose missing value would masquerade as a real measurement uses `float("nan")` so LightGBM learns an explicit missing-branch split. Features whose `0` has a legitimate meaning (no overlap, no PMI, zero count) keep `0`. The `memory_meta`-missing default block (category=1, priority=5, ...) still uses masquerading defaults.
+Codified policy in both `src/memory/reranker.py` and `scripts/train_reranker.py`: any feature whose missing value would masquerade as a real measurement uses `float("nan")` so LightGBM learns an explicit missing-branch split. Features whose `0` has a legitimate meaning (no overlap, no PMI, zero count) keep `0`. The `memory_meta`-missing default block (category=1, priority=5, ...) was the last holdout on masquerading defaults; it was **NaN-encoded 2026-07-01** in the same session that filtered the candidate pool to active memories (see the next paragraph), bringing the whole feature set under the policy.
 
-A 2026-07-01 audit corrected an earlier claim that this block is "dead-code in practice." It is **not** dead — it executes under the deployed model via two paths. `_load_memory_meta()` loads only `status='active'` memories, but the reranker candidate pool is built from the unfiltered vector/FTS result dicts, and two kinds of non-active memory carry live vector/FTS rows: (1) **pending** memories (`_insert_memory` writes their embedding + FTS entry regardless of status), and (2) **superseded** memories (the `remember()` supersede path flips status to `deleted` without the vector/FTS/rowid cleanup that `forget()` performs, so they linger in the search tables). Either kind can surface in a query's nearest neighbors, enter the candidate pool, and hit `memory_meta.get(mid) → None`, firing the masquerading defaults. The effect is *masked* in production because `recall()` filters final results to `status='active'`, so these candidates' scores are computed and then discarded — they never reorder active results. But because the branch genuinely runs, NaN-encoding it was left untouched (it would alter live feature computation for a deployed model). The clean fix is to filter the candidate pool to active memories before scoring — which makes the block truly dead *and* stops wasting compute scoring discarded candidates — but that changes the live candidate set and belongs in its own session. See [`docs/sessions/2026-07-01-write-path-instruments.md`](sessions/2026-07-01-write-path-instruments.md).
+A 2026-07-01 audit corrected an earlier claim that this block is "dead-code in practice." It is **not** dead — it executes under the deployed model via two paths. `_load_memory_meta()` loads only `status='active'` memories, but the reranker candidate pool is built from the unfiltered vector/FTS result dicts, and two kinds of non-active memory carry live vector/FTS rows: (1) **pending** memories (`_insert_memory` writes their embedding + FTS entry regardless of status), and (2) **superseded** memories (the `remember()` supersede path flips status to `deleted` without the vector/FTS/rowid cleanup that `forget()` performs, so they linger in the search tables). Either kind can surface in a query's nearest neighbors, enter the candidate pool, and hit `memory_meta.get(mid) → None`, firing the masquerading defaults. The effect is *masked* in production because `recall()` filters final results to `status='active'`, so these candidates' scores are computed and then discarded — they never reorder active results.
+
+**Fixed 2026-07-01** (`fix/reranker-restore`). Both halves landed: (1) `rerank()` now filters the candidate pool to active memories before scoring — via membership in the active-only `memory_meta` precompute, no extra query — which makes the missing-meta branch genuinely dead for live scoring *and* stops wasting compute on discarded candidates; and (2) the missing-meta branch was NaN-encoded anyway, in both extractors, as defense-in-depth and policy compliance. The upstream cause was closed too: the `remember()` supersede path now drops the superseded memory's vec/FTS/rowid rows (shared `_drop_search_rows`, matching `forget()`), and a `db.py` startup backfill prunes any that lingered. Because the reranker was on formula fallback the whole time (see § the silent fallback), none of this changed a live ranking on merge — it is correctness banked ahead of the model restore. See [`docs/sessions/2026-07-01-reranker-restore.md`](sessions/2026-07-01-reranker-restore.md) and [`docs/sessions/2026-07-01-write-path-instruments.md`](sessions/2026-07-01-write-path-instruments.md).
+
+### The silent fallback (April–July 2026)
+
+The learned reranker ran in production only until **2026-04-07**. Commit `de6613f`
+switched the model loader from pickle to native LightGBM text format —
+`constants.py` now expects `DATA_DIR/tuning_studies/reranker_model.txt` +
+`reranker_features.json`. Those artifacts never landed: the live
+`tuning_studies/` held only the March `reranker_model.pkl` + `reranker_features.pkl`
+(the 26-feature era), and the May V5 retrain outputs had been written to a scratch
+`DATA_DIR` that no longer exists. So from 2026-04-07 until the 2026-07-01 audit,
+`_load_model()` found no `.txt`, returned `None`, and **retrieval silently ran on the
+hand-tuned formula for ~3 months** — through the entire V5 documentation arc, which
+describes offline eval numbers for a model that was not the one serving live queries.
+
+Why it stayed invisible: graceful fallback is *designed* to be silent (a missing model
+should degrade, not crash), and nothing surfaced the scorer's identity — no startup
+warning, no `memory_stats()` field. The fallback did exactly what it was built to do; the
+gap was that "working" and "working as intended" were indistinguishable from the outside.
+
+The fix (`fix/reranker-restore`, 2026-07-01) was in two registers. **Mechanism:** the
+no-model path now logs a prominent `WARNING`, and `memory_stats()` reports the active
+scorer (`scorer_status()`) — the fallback can no longer hide. **Correctness banked ahead
+of the restore:** index hygiene (supersede cleanup + backfill), the active candidate-pool
+filter, and the NaN-encoded missing-meta block all merged while the reranker was dormant,
+so they changed no live ranking — they are ready for whenever a model is redeployed.
+
+**The deeper finding — and the lesson.** V5+3b is not merely undeployed; it is
+**unreproducible**. Its training inputs — the cleaned 1885-query GT, the sample-weight
+sidecars, and the 200 real-recall probe events — no longer exist on disk. The model now
+survives *only as reported numbers* in [`experiments.md`](experiments.md#the-v3v53b-retraining-arc-may-2026);
+it cannot be regenerated, only re-derived from a fresh GT. **Training inputs are part of
+the deployed artifact.** A model file without its GT + sidecars + probe events archived
+alongside it is a number you can cite but not rebuild. Future deploys should snapshot the
+full recipe (GT, sidecars, probe-event export, feature spec) next to every
+`reranker_model.txt`. See [`docs/sessions/2026-07-01-reranker-restore.md`](sessions/2026-07-01-reranker-restore.md).
 
 ### The audit's ceiling (acknowledged 2026-05-08)
 

@@ -504,6 +504,12 @@ The production model is the **31-feature V5+3b** reranker: aggregate NDCG 0.8954
 
 For the full per-session detail behind each step, see `docs/sessions/2026-05-08-*` and `docs/sessions/2026-05-09-*`.
 
+### Postscript (2026-07-01): the arc's model was never actually serving
+
+A later audit found that the learned reranker stopped serving production on **2026-04-07** — a loader format change (pickle → native `.txt`) whose artifacts never landed, so live retrieval silently ran on the hand-tuned formula from then on (see [architecture.md § the silent fallback](architecture.md#the-silent-fallback-apriljuly-2026)). This does **not** invalidate the arc's numbers, but it footnotes one framing: every "live per-mode NDCG/R@10" and "live composition" figure above is an **offline evaluation** of the trained model against real recall events — and those recall/feedback events between 2026-04-07 and the restore were themselves produced under **formula ranking**, not under the reranker. The offline eval numbers stand as measured; the "unchanged live composition" transfer-learning argument holds *as an offline comparison*, but the live traffic it was measured on was formula-ranked.
+
+And the harder finding: **V5+3b is unreproducible.** Its training inputs — the cleaned 1885-query GT, the sample-weight sidecars, and the 200 real-recall probe events — no longer exist on disk (they were written to a scratch `DATA_DIR` that is gone). The model now survives *only as the numbers reported in this section*; it cannot be regenerated, only re-derived from a fresh GT. The lesson, now recorded in the silent-fallback entry: **training inputs are part of the deployed artifact** — archive the GT, sidecars, and probe-event export alongside every deployed `reranker_model.txt`.
+
 ---
 
 *For per-study results, see the tuning studies log. For cross-study mechanism analysis, see architecture.md § Tuning.*
