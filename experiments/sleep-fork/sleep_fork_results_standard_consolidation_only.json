@@ -1,0 +1,141 @@
+{
+  "config": "formula",
+  "reranker_loaded": false,
+  "scorer_note": "FORMULA scoring on BOTH sides (reranker_model.txt absent since 2026-04-07). This is a sleep-vs-formula delta, not sleep-vs-reranker.",
+  "gt_file": "D:/somnigraph-exp/sleepfork-92fdacb-1782966620/A-frozen/tuning_studies/gt_calibrated.json",
+  "n_queries_joined": 1032,
+  "n_gt_queries": 1032,
+  "queries_missing_from_baseline": 0,
+  "queries_missing_from_slept": 0,
+  "seed": 1729,
+  "n_boot": 10000,
+  "baseline": {
+    "ndcg@5k": {
+      "n": 1032,
+      "mean": 0.6494337311845544
+    },
+    "r@10": {
+      "n": 1021,
+      "mean": 0.5403493071993046
+    },
+    "mrr": {
+      "n": 1021,
+      "mean": 0.9225736093267924
+    }
+  },
+  "slept": {
+    "ndcg@5k": {
+      "n": 1032,
+      "mean": 0.6507249384231513
+    },
+    "r@10": {
+      "n": 1021,
+      "mean": 0.5411057531407987
+    },
+    "mrr": {
+      "n": 1021,
+      "mean": 0.9272123394264318
+    }
+  },
+  "paired_delta": {
+    "ndcg@5k": {
+      "n": 1032,
+      "mean": 0.0012912072385968618,
+      "ci_low": -0.00013428633194792906,
+      "ci_high": 0.002795661736004697,
+      "frac_positive": 0.3498062015503876,
+      "frac_negative": 0.3323643410852713,
+      "frac_zero": 0.3178294573643411
+    },
+    "r@10": {
+      "n": 1021,
+      "mean": 0.0007564459414939163,
+      "ci_low": -0.0018014104015361186,
+      "ci_high": 0.0031876024593373185,
+      "frac_positive": 0.030362389813907934,
+      "frac_negative": 0.03232125367286973,
+      "frac_zero": 0.9373163565132223
+    },
+    "mrr": {
+      "n": 1021,
+      "mean": 0.004638730099639244,
+      "ci_low": -0.0004102222834938745,
+      "ci_high": 0.009784799765859272,
+      "frac_positive": 0.025465230166503428,
+      "frac_negative": 0.015670910871694418,
+      "frac_zero": 0.9588638589618022
+    }
+  },
+  "sleep_attribution": {
+    "frozen_A": {
+      "memories_by_status": {
+        "active": 1165,
+        "deleted": 9,
+        "dormant": 16,
+        "superseded": 5
+      },
+      "memories_total": 1195,
+      "memories_source_sleep": 32,
+      "edges_total": 14948,
+      "edges_by_type": {
+        "": 9886,
+        "supports": 3125,
+        "derived_from": 1345,
+        "evolved_from": 293,
+        "related": 175,
+        "contextual": 81,
+        "soft_contradiction": 41,
+        "hard_contradiction": 2
+      },
+      "edges_by_creator": {
+        "sleep": 8577,
+        "co_retrieval": 4178,
+        "recall_feedback": 1152,
+        "sleep_rem": 753,
+        "journal-import": 247,
+        "session": 41
+      },
+      "sleep_log_rows": 205
+    },
+    "slept_B": {
+      "memories_by_status": {
+        "active": 1165,
+        "deleted": 9,
+        "dormant": 16,
+        "superseded": 5
+      },
+      "memories_total": 1195,
+      "memories_source_sleep": 32,
+      "edges_total": 15054,
+      "edges_by_type": {
+        "": 9977,
+        "supports": 3132,
+        "derived_from": 1351,
+        "evolved_from": 295,
+        "related": 175,
+        "contextual": 81,
+        "soft_contradiction": 41,
+        "hard_contradiction": 2
+      },
+      "edges_by_creator": {
+        "sleep": 8621,
+        "co_retrieval": 4178,
+        "recall_feedback": 1152,
+        "sleep_rem": 815,
+        "journal-import": 247,
+        "session": 41
+      },
+      "sleep_log_rows": 207
+    },
+    "diff_B_minus_A": {
+      "active_delta": 0,
+      "dormant_delta": 0,
+      "superseded_delta": 0,
+      "deleted_delta": 0,
+      "total_delta": 0,
+      "source_sleep_delta": 0,
+      "edges_total_delta": 106,
+      "sleep_log_rows_delta": 2
+    }
+  }
+}

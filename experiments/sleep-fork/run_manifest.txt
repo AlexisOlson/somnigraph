@@ -1,0 +1,12 @@
+RUN=92fdacb-1782966620
+A_BASH=/d/somnigraph-exp/sleepfork-92fdacb-1782966620/A-frozen
+B_BASH=/d/somnigraph-exp/sleepfork-92fdacb-1782966620/B-slept
+BASE_BASH=/d/somnigraph-exp/sleepfork-92fdacb-1782966620
+A_FWD=D:/somnigraph-exp/sleepfork-92fdacb-1782966620/A-frozen
+B_FWD=D:/somnigraph-exp/sleepfork-92fdacb-1782966620/B-slept
+SRC_FWD=C:/Users/Alexis/.claude/data
+SNAP_BASH=/c/Users/Alexis/.somnigraph/benchmark/production_snapshot.db
+B2_BASH=/d/somnigraph-exp/sleepfork-92fdacb-1782966620/B2-deep
+B2_FWD=D:/somnigraph-exp/sleepfork-92fdacb-1782966620/B2-deep
+BN_BASH=/d/somnigraph-exp/sleepfork-92fdacb-1782966620/B-noprobe
+BN_FWD=D:/somnigraph-exp/sleepfork-92fdacb-1782966620/B-noprobe
