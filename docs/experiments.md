@@ -510,6 +510,10 @@ A later audit found that the learned reranker stopped serving production on **20
 
 And the harder finding: **V5+3b is unreproducible.** Its training inputs — the cleaned 1885-query GT, the sample-weight sidecars, and the 200 real-recall probe events — no longer exist on disk (they were written to a scratch `DATA_DIR` that is gone). The model now survives *only as the numbers reported in this section*; it cannot be regenerated, only re-derived from a fresh GT. The lesson, now recorded in the silent-fallback entry: **training inputs are part of the deployed artifact** — archive the GT, sidecars, and probe-event export alongside every deployed `reranker_model.txt`.
 
+### Postscript (2026-07-02): the restore landed as V6
+
+The re-derivation happened: a fresh 4,316-query GT from the current event log (same pipeline, inactive-memory filter applied at build time, real `recall_meta` contexts recovered for the vec channel), same 31-feature pointwise recipe, `--pinned-boost 5.0`. **V6's numbers are not comparable to the arc's** — different GT, so 0.8997 aggregate NDCG vs V5+3b's 0.8954 is a coincidence of scale, not an improvement claim. The comparisons that are valid: V6 vs the formula on the same fresh GT (**+8.42pp NDCG@5k**, 0.8997 vs 0.8155 — consistent with the arc's +5–9pp learned-vs-formula band), and held-out probe-hard at 0.9048 NDCG / 0.9190 R@10 with 0/270 Phase-1 misses (the arc's 0% miss property held). Two trajectory notes for the next iteration: `session_recency` is again the top importance (924.6 gain — magnitude not cross-comparable, gain sums scale with the 4.9M-row matrix), and the worst per-query regressions cluster on broad session-reflection queries — the natural seed list for a V6+1 real-recall adversarial pass, and plausibly the same GT-noise shape as the V5+3 worst-regression finding. Training inputs archived durably this time (`~/.claude/data/tuning_studies/v6_bundle/`). See [`docs/sessions/2026-07-02-v6-retrain.md`](sessions/2026-07-02-v6-retrain.md).
+
 ---
 
 *For per-study results, see the tuning studies log. For cross-study mechanism analysis, see architecture.md § Tuning.*
