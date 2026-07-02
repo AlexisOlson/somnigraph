@@ -419,7 +419,13 @@ def extract_features_for_query(
         # Graph signals
         features[i, 10] = hebbian_pmi_map.get(mid, 0.0)                     # hebbian_pmi
 
-        # Memory metadata
+        # Memory metadata. memory_meta is active-only; a missing entry means a
+        # non-active candidate (pending/superseded). Post-hygiene the candidate
+        # pool is active-only so this branch is dead, but NaN-encode it per the
+        # codified policy and to keep feature parity with reranker.py — the old
+        # masquerading defaults (category=1, priority=5, ...) read as a real
+        # mid-priority semantic memory. Feature parity between live and training
+        # extraction is a hard invariant (see experiments.md § Feature parity).
         meta = memory_meta.get(mid)
         if meta:
             features[i, 11] = meta["category"]                               # category
@@ -430,23 +436,29 @@ def extract_features_for_query(
             features[i, 16] = meta["theme_count"]                             # theme_count
             features[i, 17] = meta["confidence"]                              # confidence
         else:
-            features[i, 11] = 1   # semantic default
-            features[i, 12] = 5
-            features[i, 13] = 0.0
-            features[i, 14] = 200
-            features[i, 15] = 0
-            features[i, 16] = 0
-            features[i, 17] = 0.5
+            features[i, 11] = nan   # missing memory (non-active candidate)
+            features[i, 12] = nan
+            features[i, 13] = nan
+            features[i, 14] = nan
+            features[i, 15] = nan
+            features[i, 16] = nan
+            features[i, 17] = nan
 
-        # Extended features (Tier 1)
-        if meta and query_terms:
+        # Extended features (Tier 1). Missing memory → NaN; memory present with no
+        # usable query terms keeps the legitimate 0.0 (coverage/proximity genuinely
+        # zero, not missing).
+        if meta is None:
+            features[i, 18] = nan                                            # query_coverage
+        elif query_terms:
             content_set = set(meta.get("content_tokens", []))
             matched = sum(1 for t in query_terms if t in content_set)
             features[i, 18] = matched / len(query_terms)                     # query_coverage
         else:
             features[i, 18] = 0.0
 
-        if meta and len(query_terms) > 1:
+        if meta is None:
+            features[i, 19] = nan                                            # proximity
+        elif len(query_terms) > 1:
             features[i, 19] = _compute_proximity(query_terms, meta.get("content_tokens", []))
         else:
             features[i, 19] = 0.0
@@ -456,15 +468,15 @@ def extract_features_for_query(
         if meta:
             features[i, 21] = meta.get("burstiness", 0.0)                   # burstiness
         else:
-            features[i, 21] = 0.0
+            features[i, 21] = nan
 
         # Extended features (Tier 2)
         if meta:
             features[i, 22] = meta.get("betweenness", 0.0)                  # betweenness
             features[i, 23] = meta.get("diversity_score", 0.5)              # diversity_score
         else:
-            features[i, 22] = 0.0
-            features[i, 23] = 0.5
+            features[i, 22] = nan
+            features[i, 23] = nan
 
         if meta:
             fb_ts = meta.get("fb_timestamps", [])
@@ -501,7 +513,7 @@ def extract_features_for_query(
             features[i, 29] = vec_score_map[mid] / max_vec_score
         else:
             features[i, 29] = nan                                            # vec_dist_norm
-        features[i, 30] = meta.get("decay_rate", DEFAULT_DECAY_RATE) if meta else DEFAULT_DECAY_RATE  # decay_rate
+        features[i, 30] = meta.get("decay_rate", DEFAULT_DECAY_RATE) if meta else nan  # decay_rate (NaN for missing memory)
 
         # Label
         labels[i] = ground_truth_for_query.get(mid, 0.0)

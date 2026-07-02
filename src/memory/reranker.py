@@ -534,6 +534,11 @@ def rerank(
 
         f[10] = hebbian_pmi_map.get(mid, 0.0)              # hebbian_pmi
 
+        # memory_meta is active-only; a missing entry means a non-active candidate
+        # (pending/superseded). After the active-pool filter above this branch is
+        # dead for live scoring, but NaN-encode it anyway per the codified policy —
+        # the old masquerading defaults (category=1, priority=5, ...) read as a real
+        # mid-priority semantic memory. NaN lets LightGBM route missing explicitly.
         m = memory_meta.get(mid)
         if m:
             f[11] = m["category"]                            # category
@@ -544,18 +549,23 @@ def rerank(
             f[16] = m["theme_count"]                         # theme_count
             f[17] = m["confidence"]                          # confidence
         else:
-            f[11] = 1; f[12] = 5; f[13] = 0.0; f[14] = 200
-            f[15] = 0; f[16] = 0; f[17] = 0.5
+            f[11] = nan; f[12] = nan; f[13] = nan; f[14] = nan
+            f[15] = nan; f[16] = nan; f[17] = nan
 
-        # Tier 1
-        if m and query_terms:
+        # Tier 1. Missing memory → NaN; memory present with no usable query terms
+        # keeps the legitimate 0.0 (coverage/proximity genuinely zero, not missing).
+        if m is None:
+            f[18] = nan                                      # query_coverage
+        elif query_terms:
             content_set = set(m.get("content_tokens", []))
             matched = sum(1 for t in query_terms if t in content_set)
             f[18] = matched / len(query_terms)               # query_coverage
         else:
             f[18] = 0.0
 
-        if m and len(query_terms) > 1:
+        if m is None:
+            f[19] = nan                                      # proximity
+        elif len(query_terms) > 1:
             f[19] = _compute_proximity(query_terms, m.get("content_tokens", []))
         else:
             f[19] = 0.0
@@ -565,14 +575,14 @@ def rerank(
         if m:
             f[21] = m.get("burstiness", 0.0)                # burstiness
         else:
-            f[21] = 0.0
+            f[21] = nan
 
         # Tier 2
         if m:
             f[22] = m.get("betweenness", 0.0)               # betweenness
             f[23] = m.get("diversity_score", 0.5)            # diversity_score
         else:
-            f[22] = 0.0; f[23] = 0.5
+            f[22] = nan; f[23] = nan
 
         if m:
             fb_ts = m.get("fb_timestamps", [])
@@ -609,7 +619,7 @@ def rerank(
             f[29] = vec_distances[mid] / max_vec
         else:
             f[29] = nan                                                  # vec_dist_norm
-        f[30] = m.get("decay_rate", DEFAULT_DECAY_RATE) if m else DEFAULT_DECAY_RATE  # decay_rate
+        f[30] = m.get("decay_rate", DEFAULT_DECAY_RATE) if m else nan  # decay_rate (NaN for missing memory)
 
     # Predict using Booster (list-of-lists input, no numpy needed)
     preds = model.predict(features)
