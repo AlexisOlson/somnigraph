@@ -16,7 +16,7 @@ The settled lessons from 184 source analyses and 20+ tuning studies are canonize
 | **Metric choice drives parameter values** — AUC/MRR/miss_rate optimize to different constants; MRR trades off harshly with miss_rate (r=−0.517). You choose what "good retrieval" means. | `experiments.md` §§ Metrics: why AUC over single-threshold, Multi-objective optimization |
 | **Intuitive scoring signals can be counterproductive** — quality floor (optimal ratio 0.0), shadow penalty, and confidence weight were all implemented, tested, and removed. | `architecture.md` § What didn't work |
 | **Contradiction detection is universally catastrophic** — 0.025–0.037 F1 across all systems; a representation problem, not a tuning one. | `architecture.md` § Open problems |
-| **Offline consolidation is viable but unmeasured** — the sleep pipeline runs and looks reasonable, but no metric proves it improves retrieval. The central open question. | `architecture.md` § Open problems; [Open questions](#open-questions) below |
+| **Offline consolidation is measurably inert at steady state** — the first counterfactual measurement (2026-07-02, four-arm fork) found consolidation statistically null on retrieval for a regularly-deep-slept store; a full `--deep` pass had nothing left to do. The accumulation regime (does consolidation help a store with a backlog?) is the registered follow-up. | [`experiments/sleep-fork/findings-sleep-fork.md`](../experiments/sleep-fork/findings-sleep-fork.md); [Open questions](#open-questions) below |
 
 The condensed advice version — the wrong turns you can skip — is [What we'd tell someone starting from scratch](#what-wed-tell-someone-starting-from-scratch) below.
 
@@ -52,13 +52,11 @@ The 2026-06-30 carsteneu code-level survey produced a ranked ledger of external 
 
 Research-grade questions with hypotheses and proposed experiments. Ordered by information value per effort.
 
-### Does sleep improve retrieval?
+### Does sleep improve retrieval? *(Answered for the steady-state regime — 2026-07-02)*
 
-**What we know:** Sleep runs, produces edges, summaries, archives. Manual inspection looks reasonable.
-**What we don't know:** Whether retrieval metrics (AUC, MRR) are better after sleep than before.
-**Experiment:** Snapshot GT metrics → run sleep → re-judge same queries → compare deltas.
-**Effort:** 1–2 sessions once GT is complete.
-**Hypothesis:** NREM edge detection helps (gives adjacency expansion real edges to walk). REM summary generation may hurt (summaries compete with detail memories for token budget). Net effect is positive but small.
+**Result:** At steady state on a regularly-deep-slept store, **no practically meaningful effect**. Four-arm counterfactual fork (frozen vs slept copies of the live store, 1,032 GT queries, paired bootstrap CIs, formula-scored both sides): the consolidation-only arms (standard with probe stripped, and `--deep --probes 0`) are statistically null on NDCG@5k / R@10 / MRR; only the full standard cycle clears zero (+0.0022 NDCG — a 0.34% relative change), and it decomposes into two individually-null halves (consolidation ≈ +0.0013, probe feedback ≈ +0.0009). The original hypothesis (NREM edges help, REM summaries may hurt, net small positive) was not separable at this effect size — both phases together are inert. The strongest single fact: a full `--deep` pass changed ~108 edges and did **zero** merges/dormancy/archival — the store is saturated; steady-state consolidation has nothing to do because prior nights already did the work. Full analysis: [`experiments/sleep-fork/findings-sleep-fork.md`](../experiments/sleep-fork/findings-sleep-fork.md).
+
+**Still open — the accumulation regime (registered follow-up):** suspend sleep for ~2 weeks so unconsolidated memories accumulate, then fork and re-run the identical protocol (old GT + a window-slice GT built from the abstinence period's own feedback), scored by the deployed V6 reranker (primary) and the formula (secondary), with the same probe-isolation treatment. This is the only condition where consolidation has real work to do, and it doubles as the first sleep-vs-reranker measurement. Window started 2026-07-01; fork due ~2026-07-15.
 
 ### Do the LocoMo-tuned constants transfer to real data?
 
@@ -220,7 +218,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 2. **Feedback loop health check.** *(Complete — answered by utility calibration study.)* Per-query Spearman r = 0.70 confirms feedback tracks relevance. See experiment #4 and `experiments.md` § Utility calibration study.
 
-3. **Sleep impact measurement.** Snapshot GT metrics on 100-query subset → run sleep → re-judge → compare. Accept if: delta measured with confidence intervals.
+3. **Sleep impact measurement.** *(Complete for the steady-state regime — 2026-07-02.)* Delta measured with bootstrap CIs on 1,032 queries via the counterfactual fork (#14): consolidation statistically null; full-cycle effect +0.0022 NDCG (0.34% relative). See § "Does sleep improve retrieval?" above and [`experiments/sleep-fork/findings-sleep-fork.md`](../experiments/sleep-fork/findings-sleep-fork.md). The accumulation-regime re-run (abstinence window) is the registered follow-up.
 
 4. **Utility calibration study.** *(Complete.)* Compared 13,396 feedback events against 13,317 GT judgments across 715 overlapping memories. Per-query Spearman r = 0.70 (feedback tracks relevance in context); per-memory r = 0.14 (aggregation destroys context signal). The empirical Bayes prior operates at the weak-correlation level. 16.4% of memories show inflated feedback (context-dependent, not self-reinforcing); 7.0% are coverage gaps. See `experiments.md` § Utility calibration study.
 
@@ -254,7 +252,7 @@ Ordered by information value per effort, with concrete acceptance criteria.
 
 13. **Corpus scaling sensitivity.** Evaluate on 25%, 50%, 75%, 100% of memories, plot scaling curve. Accept if: curve plotted, PPR threshold identified.
 
-14. **Counterfactual sleep evaluation.** Fork the DB, run one copy through sleep, keep the other frozen, compare retrieval metrics on the same query set. Isolates sleep's causal effect on retrieval quality. Accept if: delta measured with confidence intervals.
+14. **Counterfactual sleep evaluation.** *(Complete — 2026-07-02.)* Four-arm fork (frozen / standard-full / standard-consolidation-only / deep-consolidation-only) with paired bootstrap CIs; probe feedback isolated as its own arm via a verified three-channel strip (feedback events, hebbian retrieval window, edge weights). Verdict: steady-state consolidation inert; see § "Does sleep improve retrieval?" above. Method notes for reproduction (the `--snapshot` trap, the strip scripts) in [`experiments/sleep-fork/findings-sleep-fork.md`](../experiments/sleep-fork/findings-sleep-fork.md).
 
 15. **Paraphrase robustness test.** Run GT queries through systematic paraphrasing (different abstraction levels, different vocabulary). Measures vocabulary co-adaptation — does the system only work well for habitual phrasings? Accept if: NDCG delta under paraphrase computed.
 

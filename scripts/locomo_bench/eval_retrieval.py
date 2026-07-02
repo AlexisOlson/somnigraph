@@ -1245,8 +1245,11 @@ def eval_production(
             "dataset": "production",
             "query": query,
             "ndcg": ndcg,
+            "retrieved": retrieved,  # sleep-fork: ranked full-id list for R@10 / MRR
             "retrieved_count": len(retrieved),
             "relevant_count": sum(1 for s in gt_scores.values() if s >= 0.5),
+            "recall_budget": recall_budget,  # sleep-fork: NDCG budget provenance
+            "recall_limit": recall_limit,    # sleep-fork: rank cutoff provenance
         })
 
         if (qi + 1) % 20 == 0:
