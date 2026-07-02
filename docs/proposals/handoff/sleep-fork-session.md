@@ -20,7 +20,7 @@ Primary metric: **NDCG@5k, R@10, MRR** on the production GT, paired per query, w
 
 1. **Never touch the live store.** The live store is `~/.claude/data/`. You operate only on copies.
 2. **Work in a git worktree** off the current branch, feature branch `exp/sleep-fork`. Commit results there. **Never merge, never push.**
-3. **Cost ceiling:** metered API $ ≈ 0 (sleep uses the `claude` CLI = subscription; eval uses local fastembed). If any step tries to call a metered OpenAI reader/judge, stop — that's a bug in this design. **Wall-clock cap: 12 hours.** If sleep hasn't finished by then, kill it, checkpoint, and write up the partial.
+3. **Cost ceiling:** sleep's LLM calls use the `claude` CLI = subscription. Embeddings follow the store's backend: $0 on a fastembed store (work machine); on the home OpenAI-1536d store, eval query embeds + sleep-generated summary embeds cost cents — **budget ceiling $2**, stop if projected above. If any step tries to call a metered OpenAI *reader/judge*, stop — that's a bug in this design. **Wall-clock cap: 12 hours.** If sleep hasn't finished by then, kill it, checkpoint, and write up the partial.
 4. **Machine-readable output + findings markdown**, with exact repro commands.
 
 ### Setup
@@ -38,8 +38,11 @@ mkdir -p "$(dirname "$A")"
 cp -r "$HOME/.claude/data" "$A"      # includes memory.db + tuning_studies/ (GT + reranker .txt)
 cp -r "$HOME/.claude/data" "$B"
 
-# 3. Backend rails — production is fastembed 384d; db.py hard-fails on dim mismatch
-export SOMNIGRAPH_EMBEDDING_BACKEND=fastembed
+# 3. Backend rails — match the store you copied; db.py hard-fails on dim mismatch.
+#    HOME machine: the store is OpenAI 1536d — leave SOMNIGRAPH_EMBEDDING_BACKEND
+#    unset (defaults to openai; key file is inside the copied data dir).
+#    WORK machine: the store is fastembed 384d — export SOMNIGRAPH_EMBEDDING_BACKEND=fastembed
+# Verify before proceeding: a float[1536] memory_vec schema means OpenAI backend.
 ```
 
 Before anything else, **verify the learned reranker is loadable on both copies**. The loader (`reranker.py`) needs `tuning_studies/reranker_model.txt` + `reranker_features.json`. A restore session (stewardship arc step 2.5, 2026-07-01) retrains and deploys these to the live store — after it lands, your copies inherit them and this check just passes. If you skip this check and the files are absent, `--configs reranker` silently measures the **formula**, not V5+3b, and the whole experiment is about the wrong scorer.
@@ -63,7 +66,7 @@ If `gt_calibrated.json` is absent, fall back to `$A/ground_truth.json` and **log
 ### Step 2 — Sleep the other copy (B)
 
 ```sh
-SOMNIGRAPH_DATA_DIR="$B" SOMNIGRAPH_EMBEDDING_BACKEND=fastembed \
+SOMNIGRAPH_DATA_DIR="$B" \
   uv run scripts/sleep.py 2>&1 | tee "$B/sleep.log"
 ```
 Sleep shells out to the `claude` CLI and mutates `$B` only. Capture from `sleep.log` and/or the DB: **how many memories were archived, merged, edited, and how many edges/summaries were created.** These counts are needed to attribute the delta. If sleep stalls (auth/rate-limit) or exceeds the wall-clock cap, kill it and note where it stopped.
