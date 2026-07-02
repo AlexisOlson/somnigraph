@@ -1,7 +1,15 @@
 """Benchmark configuration."""
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# Expansion-ablation session (exp/locomo-expansion-ablation): allow redirecting the
+# per-conversation DB dir to a scratch copy so read-only eval never opens the canonical
+# benchmark DBs in write mode (schema-init runs CREATE ... IF NOT EXISTS). Defaults to
+# the canonical location when the env var is unset.
+_DEFAULT_BENCH_DIR = Path(os.environ.get(
+    "SOMNIGRAPH_BENCH_DIR", str(Path.home() / ".somnigraph" / "benchmark")))
 
 
 @dataclass
@@ -33,7 +41,7 @@ class BenchConfig:
 
     # Paths
     locomo_data: Path = Path.home() / ".claude" / "repos" / "locomo" / "data" / "locomo10.json"
-    base_dir: Path = Path.home() / ".somnigraph" / "benchmark"
+    base_dir: Path = _DEFAULT_BENCH_DIR
     embed_cache: Path = Path.home() / ".claude" / "data" / "bench_locomo_embeddings.pkl"
 
     # Scope
