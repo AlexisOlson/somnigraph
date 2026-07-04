@@ -36,12 +36,19 @@ def recall_with_scores(
     context: str,
     budget: int,
     limit: int,
+    expand: bool = True,
 ) -> tuple[list[str], dict[str, float], float]:
     """Returns (ranked_short_ids, {short_id: score}, top_score).
 
     ranked_short_ids is exactly the order impl_recall would have returned
     (the `kept` list in its recall_meta -- already filtered to `limit`
     results and budget-truncated within the formatting loop).
+
+    expand=False forces impl_recall's raw-RRF path (no Hebbian, no PPR
+    graph-expansion) -- the sleep-bench `rrf` scorer's decomposition floor.
+    Only takes effect on the legacy/formula path (reranker disabled); with a
+    learned model loaded the expand flag is moot, so callers pair expand=
+    False with the formula-fallback cache state (see scorers.apply_scorer).
     """
     captured: dict = {}
 
@@ -61,7 +68,7 @@ def recall_with_scores(
     try:
         tools_mod.impl_recall(
             query=query, context=context, budget=budget, limit=limit,
-            internal=False,
+            internal=False, expand=expand,
         )
     finally:
         tools_mod._log_event = original_log_event

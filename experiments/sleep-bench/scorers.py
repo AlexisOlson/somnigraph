@@ -16,7 +16,20 @@ from pathlib import Path
 import memory.constants as constants
 import memory.reranker as reranker
 
-SCORER_NAMES = ("formula", "v6", "l5b")
+SCORER_NAMES = ("rrf", "formula", "v6", "l5b")
+
+# Scorers that force the raw-RRF retrieval path (impl_recall(expand=False):
+# rrf_fuse only, no Hebbian, no PPR graph-expansion). The rig pairs these with
+# the formula-fallback cache state so the reranker is also off. `rrf` isolates
+# the content/index effect of sleep; `formula` (expand=True) adds the graph/edge
+# effect via PPR over memory_edges. Their difference decomposes the two.
+NO_EXPAND_SCORERS = frozenset({"rrf"})
+
+
+def wants_expansion(name: str) -> bool:
+    """Whether this scorer runs the Hebbian+PPR expansion (True) or the raw-RRF
+    floor (False). Callers pass the result as impl_recall(expand=...)."""
+    return name not in NO_EXPAND_SCORERS
 
 # Known real V6 model locations, .txt ONLY. A stale reranker_model.pkl must
 # never shadow the deployed .txt -- that shadowing (LightGBM's .txt-native
@@ -53,15 +66,21 @@ def apply_scorer(name: str) -> str:
     Raises NotImplementedError for l5b (see module note below) -- this is a
     loud, explicit stub, not a silent skip.
     """
-    if name == "formula":
+    if name in ("formula", "rrf"):
         _reset_cache()
-        reranker._cache["failed"] = True   # force formula fallback
+        reranker._cache["failed"] = True   # force formula fallback (reranker off)
         reranker._cache["loaded"] = True
         status = reranker.scorer_status()
         if not status.startswith("formula fallback"):
             raise RuntimeError(
-                f"formula scorer did not disable the reranker: {status!r}"
+                f"{name} scorer did not disable the reranker: {status!r}"
             )
+        # rrf additionally suppresses Hebbian+PPR via impl_recall(expand=False);
+        # the cache state is identical to formula, the difference is the expand
+        # flag the caller threads from wants_expansion(). Label the status so a
+        # run's provenance shows which of the two legacy paths it took.
+        if name == "rrf":
+            return f"rrf (raw rrf_fuse, no hebbian/ppr) [{status}]"
         return status
 
     if name == "v6":
