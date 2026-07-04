@@ -1,6 +1,14 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["sqlite-vec>=0.1.6", "openai>=2.0.0", "tiktoken>=0.7.0", "mcp[cli]>=1.2.0"]
+# dependencies = [
+#     "sqlite-vec>=0.1.6",
+#     "openai>=2.0.0",
+#     "tiktoken>=0.7.0",
+#     "mcp[cli]>=1.2.0",
+#     "numpy>=1.26",
+#     "lightgbm>=4.0",
+#     "fastembed>=0.4.0",
+# ]
 # ///
 """
 Sleep Consolidate — thematic cluster consolidation.
@@ -745,10 +753,11 @@ def tag_formation(db, memory_id: str):
 
 def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
                     verbose: bool = False) -> dict:
-    """Apply keep/archive/merge_into/rewrite per memory.
-    Returns stats {archived, merged, rewritten, formations, kept, skipped}."""
-    stats = {"archived": 0, "merged": 0, "rewritten": 0, "formations": 0,
-             "kept": 0, "rejected": 0, "blocked": 0, "details": []}
+    """Apply keep/archive/merge_into/rewrite/annotate per memory.
+    Returns stats {archived, merged, rewritten, annotated, formations, kept,
+    rejected, blocked, details}."""
+    stats = {"archived": 0, "merged": 0, "rewritten": 0, "annotated": 0,
+             "formations": 0, "kept": 0, "rejected": 0, "blocked": 0, "details": []}
 
     mem_by_id = {m["id"]: m for m in cluster["memories"]}
     # Build prefix lookup: LLM often returns 8-char prefixes instead of full UUIDs
