@@ -666,9 +666,17 @@ def score_clusters(db, clusters: list[dict]) -> list[dict]:
         topic_id = cluster.get("topic_id")
         memory_ids = cluster["memory_ids"]
 
-        # Token floor: skip topics whose details are small enough to retrieve directly
-        cluster_tokens = sum(m["token_count"] or 0 for m in cluster["memories"])
-        if cluster_tokens < SUMMARY_MIN_DETAIL_TOKENS:
+        # Member-count floor: skip topics whose detail set fits inside a single
+        # recall. A summary earns its place only when the topic is too big to
+        # retrieve whole in one recall -- and recall budgets in ITEMS
+        # (impl_recall default limit=5), not tokens, so the floor is member
+        # count, not a token sum. The old absolute token floor was a
+        # corpus-fragile proxy that silently disabled REM on short-turn corpora
+        # (LoCoMo produced 0 summaries; phase0 Finding 1). generated_from below
+        # preserves this exact member list, so the H7 sweep subsets summaries by
+        # len(generated_from) without a new column.
+        cluster_members = len(memory_ids)
+        if cluster_members < SUMMARY_MIN_MEMBERS:
             continue
 
         # Match summary by topic_id (exact match only — no theme-overlap fallback)
@@ -1141,8 +1149,22 @@ def generate_parent_summaries(db) -> int:
 # Summary Maintenance Constants
 # ---------------------------------------------------------------------------
 
-SUMMARY_AUDIT_THRESHOLD = 100  # Trigger LLM audit when active summaries exceed this (relaxed — token floor gates creation)
-SUMMARY_MIN_DETAIL_TOKENS = 2000  # Don't create/refresh a summary unless topic details exceed this
+SUMMARY_AUDIT_THRESHOLD = 100  # Trigger LLM audit when active summaries exceed this (relaxed — member floor gates creation)
+
+# --- Summary creation floor (H7, sleep-bench 2026-07-04) --------------------
+# A summary earns its place only when its topic is too big to retrieve whole in
+# one recall. Recall budgets in ITEMS (impl_recall default limit=5), so the leaf
+# floor is member-count relative to that limit -- NOT an absolute token sum. The
+# old SUMMARY_MIN_DETAIL_TOKENS=2000 was a corpus-fragile proxy that silently
+# disabled REM on short-turn corpora (LoCoMo: 0 summaries; phase0 Finding 1).
+# Default = 1x the recall limit (f=1.0); the H7 sweep overrides via env to trace
+# summary-count -> retrieval and set the shipped multiple from evidence.
+RECALL_LIMIT_REF = 5  # impl_recall default `limit` (memory.tools) -- the "one recall" unit
+SUMMARY_MIN_MEMBERS = int(os.environ.get(
+    "SOMNIGRAPH_SUMMARY_MIN_MEMBERS", str(RECALL_LIMIT_REF)))
+SUMMARY_MIN_DETAIL_TOKENS = 2000  # DEPRECATED as the leaf floor (replaced by
+# SUMMARY_MIN_MEMBERS above); still gates parent-summary creation (~line 1023)
+# until H7's granularity A/B revisits the summary-of-summaries floor.
 SUMMARY_STUB_MIN_LENGTH = 50   # Summaries shorter than this are stubs (thin format ~600-800 chars)
 SUMMARY_DORMANCY_DAYS = 90     # No access in this many days → dormancy candidate
 MAX_SUPERSEDED_CHAIN = 2       # Keep this many deleted predecessors per topic
