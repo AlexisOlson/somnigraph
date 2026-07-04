@@ -105,17 +105,40 @@ judge *decided* to merge/rewrite/archive/annotate but didn't populate the payloa
 so ~18% of proposed non-keep actions executed (only the running-fitness cluster fully
 consolidated).
 
-**Two readings, not yet disambiguated:** (a) the judge prompt under-specifies the content
-requirement, or (b) the model proposes actions on trivially-short turns it then can't
-substantiate. Either way:
+**Root cause (2026-07-04 follow-up, confirmed against the raw judge log**
+`~/.somnigraph/benchmark/sleepbench-precheck/conv0/sleep_logs/consolidate_20260704_112323.log`**):
+neither of the two readings originally hypothesized. It is **not** prompt-vagueness in the
+diffuse sense, and **not** the model failing to substantiate — the judge's decisions were
+sound and its content was written. The pipeline discards well-formed, substantiated actions
+over **field-name and required-field-redundancy mismatches on the execute side.** Breakdown
+of the 22:
+
+| Rejection | Count | What the judge emitted | Cause |
+|---|---|---|---|
+| `merge_into` → no merge_content | **11** | `target_id` only, no content | Judge reads "merge A into B" as *fold A's existing content into B* (correct semantics); validator demanded a hand-typed `merge_content` duplicating the source memory that's about to be archived. |
+| `archive` → invalid superseded_by | **5** | `{action:"archive"}`, no superseder | Judge archives true-null filler ("near-duplicate pleasantries, no distinct content"); the `superseded_by = which memory captures its info` framing has no answer when nothing captures nothing. |
+| `rewrite` → no new_content | **4** | canonical text under `content`/`summary` | Pure key-name mismatch — validator reads `new_content`/`new_summary`. The judge did the work (e.g. wrote *"Started playing acoustic guitar about five years ago… her main way to express herself"*) and it was thrown away over a key prefix. |
+| `annotate` → no arc_context | **2** | action verb only | Same shape as merge; `arc_context` is genuinely new text, so no safe auto-default. |
+
+Consequences unchanged:
 - Consolidation throughput is far below the opportunity count.
 - **This blocks convergence.** A cluster proposed-then-rejected this pass is unchanged, so
   it is re-proposed and re-rejected next pass — the store cannot reach a fixed point until
   the rejection cause is resolved. This must be fixed before the multi-pass convergence
   experiment can converge.
 
-**Caveat:** may inflate on benchmark data (short, near-duplicate turns) vs the live store.
-Needs a judge-prompt read + a live-regime check before generalizing.
+**Fix (branch `fix/consolidate-schema-recovery`, execute-side only, no prompt change):**
+two conservative validator recoveries that only ever *execute more of what the judge already
+decided and substantiated* — (1) merge: default absent `merge_content` to the source
+memory's own content; (2) rewrite: accept `content`/`summary` as aliases for
+`new_content`/`new_summary`. Together these recover **15/22 (68%)** with zero new burden on
+the model. The `archive` superseded_by=null case (5) is genuinely judgment-laden and *dangerous*
+on a GT-evidence corpus (archiving unconditionally), so it is **deliberately left for Alexis's
+review** before 07-15; `annotate` (2) needs prompt-tightening or a retry, also deferred.
+
+**Caveat:** the *rate* may inflate on benchmark data (short, near-duplicate turns) vs the
+live store, but the *root cause* (field-name/redundant-field mismatch) is corpus-independent
+and the recovery fixes apply identically to the live 07-15 fork.
 
 ## Finding 4 — direct evidence for multi-pass convergence
 
