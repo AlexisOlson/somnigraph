@@ -117,10 +117,46 @@ Two consequences:
   is higher and the loss is unrecoverable.
 
 **This motivates a genuine content-absorbing merge** (fold the loser's distinctive content
-into the winner and re-embed) instead of keep-winner-verbatim + delete. See the proposal's
-NREM section for the design options and their cost/risk; it is measurable on this exact rig
-(A/B current-merge vs genuine-merge on the same fork). It is an NREM change that runs on the
-live 07-15 fork → Alexis's decision.
+into the winner and re-embed) instead of keep-winner-verbatim + delete. But a cheaper option
+turned out to win outright — see the next section.
+
+## Result 4 — don't merge at all: link duplicates instead (third arm)
+
+If index size is a non-concern, why collapse duplicates at all rather than **link and cluster**
+them? Tested directly with a third arm: `sleep_nrem.py deep --no-merge` (commit `759f484`, an
+opt-in, default-off flag) adds a **contextless duplicate link edge** on a `duplicate` pair —
+PPR-traversable at full weight, no embedding needed — and **keeps both memories active**.
+Everything else (supports/temporal edges) is identical. This isolates the delete-vs-link
+contrast. Same conv0, 21 duplicate pairs linked, all 419 memories retained.
+
+Three-way, all Δ vs frozen (n=196, paired bootstrap):
+
+| | **link (no-merge)** | **merge (delete)** |
+|---|---|---|
+| under RRF, all 6 metrics | **+0.0000 exactly** (byte-identical to frozen, CI-confirmed) | −0.03 to −0.036; CI-clear negative on 4/6 |
+| NDCG@5k under formula | −0.0002 (null, flat) | **−0.0292 ✱** |
+| MRR under formula | −0.0027 (null, flat) | **−0.0435 ✱** |
+| recall under formula | leans + (recall_any@effk **+0.0255**, CI `[0.0000, 0.0510]`) | recall-neutral (nulls) |
+
+**Link strictly dominates merge.** What's proven CI-solid: linking has **zero** content/index
+penalty (`nomerge.rrf` is byte-identical to frozen — nothing evicted, and RRF ignores the
+added edges) and carries **none** of merge's significant ranking damage (merge's NDCG −0.029✱
+/ MRR −0.044✱ collapse to −0.0002 / −0.0027, dead flat). What's suggested-not-proven: the
+recall upside from the links — recall_any@effk +0.0255 sits with its CI lower bound *exactly*
+on zero, so it's borderline, not CI-clear at n=196; the other recall metrics lean + but null.
+
+**The airtight claim is elimination of harm at zero cost, with a hint of upside.** Deletion was
+100% of the measured cost of NREM merge; linking captures the graph benefit without evicting
+anything, so the top ranks stay intact (no compensation-churn → no MRR crash). The
+genuinely-collapse-worthy cases (stale / contradicted info) are already separate edge types
+(`temporal_evolution`, `contradiction`), not `duplicate` — so dropping destructive
+duplicate-merge doesn't touch supersession-of-stale-facts.
+
+**Recommendation:** make link-not-delete the NREM `duplicate` behavior (the `--no-merge` path).
+The one case the benchmark doesn't stress — high-multiplicity *exact* re-ingested duplicates
+crowding a single result — is a **retrieval-time** concern (MMR / result-level near-dup dedup),
+still non-destructive. Flipping the NREM default runs on the live 07-15 fork → **Alexis's
+decision**; the flag ships now, the default flip is his call.
 
 ## Verdict
 
@@ -131,9 +167,15 @@ live 07-15 fork → Alexis's decision.
   and the alarming raw "sleep hurts recall" signal is ~5/7 a GT-id artifact, not information
   loss. The instrument is validated (frozen Δ = 0) and the merge vs graph channels are cleanly
   separated.
-- **n = 1 conversation.** conv0 only; treat magnitudes as indicative, not final. The pattern
-  (graph tradeoff; merge harm dominated by uncreditable-survivor artifact) is the transferable
-  claim.
+- **The actionable result (Result 4): link, don't merge.** A `--no-merge` third arm that links
+  duplicates instead of deleting them **strictly dominates** the merge arm — byte-identical to
+  frozen under RRF (zero eviction penalty, CI-confirmed) and free of merge's CI-clear ranking
+  damage (NDCG/MRR flat vs frozen), with a borderline recall gain. Deletion was 100% of the
+  measured cost; the graph benefit survives linking. Recommend flipping NREM `duplicate`
+  handling to link-and-cluster (default flip = Alexis's call, runs on the live 07-15 fork).
+- **n = 1 conversation.** conv0 only; treat magnitudes as indicative, not final. The patterns
+  (graph tradeoff; merge harm dominated by uncreditable-survivor artifact; link ⪰ merge) are
+  the transferable claims.
 
 ## Instrument hazard fixed en route
 
