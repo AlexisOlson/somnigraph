@@ -152,11 +152,19 @@ genuinely-collapse-worthy cases (stale / contradicted info) are already separate
 (`temporal_evolution`, `contradiction`), not `duplicate` — so dropping destructive
 duplicate-merge doesn't touch supersession-of-stale-facts.
 
-**Recommendation:** make link-not-delete the NREM `duplicate` behavior (the `--no-merge` path).
-The one case the benchmark doesn't stress — high-multiplicity *exact* re-ingested duplicates
-crowding a single result — is a **retrieval-time** concern (MMR / result-level near-dup dedup),
-still non-destructive. Flipping the NREM default runs on the live 07-15 fork → **Alexis's
-decision**; the flag ships now, the default flip is his call.
+**Decision (shipped 2026-07-04, commit `61f4511`):** link-not-delete is now the NREM
+`duplicate` **default**, flipped in `write_results` so the orchestrated `sleep.py` cycle
+inherits it; `--legacy-merge` restores the destructive path for research/ablation.
+
+**Scoped to LEAF (detail) duplicates only.** The H3 result was measured on detail memories (the
+store had zero summaries — REM is inert on LoCoMo, see `findings-phase0.md`). Summary/gestalt
+memories are the *deduplicated abstraction* layer — they should not hold two copies of the same
+summary — so a summary-involving duplicate falls through to verbatim collapse rather than
+linking. The better treatment is a genuine LLM **rewrite** that synthesizes duplicate summaries
+into one; that belongs in **consolidate** (which already has the `rewrite`/`merge_into`
+machinery), not NREM's cheap classifier. Left as a TODO. The one case the benchmark doesn't
+stress — high-multiplicity *exact* re-ingested detail duplicates crowding a single result — is a
+**retrieval-time** concern (MMR / result-level near-dup dedup), still non-destructive.
 
 ## Verdict
 
