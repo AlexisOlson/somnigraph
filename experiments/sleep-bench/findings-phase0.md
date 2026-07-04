@@ -136,6 +136,19 @@ the model. The `archive` superseded_by=null case (5) is genuinely judgment-laden
 on a GT-evidence corpus (archiving unconditionally), so it is **deliberately left for Alexis's
 review** before 07-15; `annotate` (2) needs prompt-tightening or a retry, also deferred.
 
+**Verified (re-run 2026-07-04, log `consolidate_20260704_125346.log`):** post-fix dry-run on
+the same post-REM store — **merged 0→11, rewritten 1→3, rejected 22→2**. Attribution is clean
+for the merges: every executed merge action in the raw JSON carries `target_id` *only, no
+`merge_content`* (e.g. `{"action":"merge_into","target_id":"..."}`), so the default-to-source
+path is exactly what let them through — without the fix all 11 would have re-rejected as in
+Phase 0. The 2 residual rejections are precisely the reserved case: `{"action":"archive"}`
+with no `superseded_by` (cluster 14). **Caveat on the headline:** the Opus judge is
+non-deterministic and re-decided several clusters this run (Phase-0 archives came back as
+merges/keeps; the annotate pair became keeps), so "22→2" over-credits the fix — the
+raw-JSON-backed claim is the 11-merge default firing and rewrite-alias taking its 4 rejections
+to 0. Convergence is now unblocked for 15/16 clusters; only the archive-as-worthless case still
+cannot fix-point (Path B).
+
 **Caveat:** the *rate* may inflate on benchmark data (short, near-duplicate turns) vs the
 live store, but the *root cause* (field-name/redundant-field mismatch) is corpus-independent
 and the recovery fixes apply identically to the live 07-15 fork.
