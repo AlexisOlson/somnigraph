@@ -403,10 +403,14 @@ def _rebuild_dia_map_from_turns(conv_dir: Path, conv_turns: list[dict]) -> dict:
     db = sqlite3.connect(str(db_path))
     db.row_factory = sqlite3.Row
 
-    # Build content -> memory_id lookup from DB
+    # Build content -> memory_id lookup from DB. Match over ALL statuses, not just
+    # active: sleep can merge a GT evidence turn away (status='deleted') or make it
+    # dormant, and dropping it here counts the query as a phantom miss even when the
+    # content is recoverable in the survivor. See
+    # experiments/sleep-bench/findings-phase0.md Finding 5.
     content_to_id = {}
     for row in db.execute(
-        "SELECT id, content FROM memories WHERE status = 'active' AND source != 'extraction'"
+        "SELECT id, content FROM memories WHERE source != 'extraction'"
     ):
         content_to_id[row["content"]] = row["id"]
     db.close()
