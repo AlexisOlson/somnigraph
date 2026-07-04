@@ -105,17 +105,53 @@ judge *decided* to merge/rewrite/archive/annotate but didn't populate the payloa
 so ~18% of proposed non-keep actions executed (only the running-fitness cluster fully
 consolidated).
 
-**Two readings, not yet disambiguated:** (a) the judge prompt under-specifies the content
-requirement, or (b) the model proposes actions on trivially-short turns it then can't
-substantiate. Either way:
+**Root cause (2026-07-04 follow-up, confirmed against the raw judge log**
+`~/.somnigraph/benchmark/sleepbench-precheck/conv0/sleep_logs/consolidate_20260704_112323.log`**):
+neither of the two readings originally hypothesized. It is **not** prompt-vagueness in the
+diffuse sense, and **not** the model failing to substantiate — the judge's decisions were
+sound and its content was written. The pipeline discards well-formed, substantiated actions
+over **field-name and required-field-redundancy mismatches on the execute side.** Breakdown
+of the 22:
+
+| Rejection | Count | What the judge emitted | Cause |
+|---|---|---|---|
+| `merge_into` → no merge_content | **11** | `target_id` only, no content | Judge reads "merge A into B" as *fold A's existing content into B* (correct semantics); validator demanded a hand-typed `merge_content` duplicating the source memory that's about to be archived. |
+| `archive` → invalid superseded_by | **5** | `{action:"archive"}`, no superseder | Judge archives true-null filler ("near-duplicate pleasantries, no distinct content"); the `superseded_by = which memory captures its info` framing has no answer when nothing captures nothing. |
+| `rewrite` → no new_content | **4** | canonical text under `content`/`summary` | Pure key-name mismatch — validator reads `new_content`/`new_summary`. The judge did the work (e.g. wrote *"Started playing acoustic guitar about five years ago… her main way to express herself"*) and it was thrown away over a key prefix. |
+| `annotate` → no arc_context | **2** | action verb only | Same shape as merge; `arc_context` is genuinely new text, so no safe auto-default. |
+
+Consequences unchanged:
 - Consolidation throughput is far below the opportunity count.
 - **This blocks convergence.** A cluster proposed-then-rejected this pass is unchanged, so
   it is re-proposed and re-rejected next pass — the store cannot reach a fixed point until
   the rejection cause is resolved. This must be fixed before the multi-pass convergence
   experiment can converge.
 
-**Caveat:** may inflate on benchmark data (short, near-duplicate turns) vs the live store.
-Needs a judge-prompt read + a live-regime check before generalizing.
+**Fix (branch `fix/consolidate-schema-recovery`, execute-side only, no prompt change):**
+two conservative validator recoveries that only ever *execute more of what the judge already
+decided and substantiated* — (1) merge: default absent `merge_content` to the source
+memory's own content; (2) rewrite: accept `content`/`summary` as aliases for
+`new_content`/`new_summary`. Together these recover **15/22 (68%)** with zero new burden on
+the model. The `archive` superseded_by=null case (5) is genuinely judgment-laden and *dangerous*
+on a GT-evidence corpus (archiving unconditionally), so it is **deliberately left for Alexis's
+review** before 07-15; `annotate` (2) needs prompt-tightening or a retry, also deferred.
+
+**Verified (re-run 2026-07-04, log `consolidate_20260704_125346.log`):** post-fix dry-run on
+the same post-REM store — **merged 0→11, rewritten 1→3, rejected 22→2**. Attribution is clean
+for the merges: every executed merge action in the raw JSON carries `target_id` *only, no
+`merge_content`* (e.g. `{"action":"merge_into","target_id":"..."}`), so the default-to-source
+path is exactly what let them through — without the fix all 11 would have re-rejected as in
+Phase 0. The 2 residual rejections are precisely the reserved case: `{"action":"archive"}`
+with no `superseded_by` (cluster 14). **Caveat on the headline:** the Opus judge is
+non-deterministic and re-decided several clusters this run (Phase-0 archives came back as
+merges/keeps; the annotate pair became keeps), so "22→2" over-credits the fix — the
+raw-JSON-backed claim is the 11-merge default firing and rewrite-alias taking its 4 rejections
+to 0. Convergence is now unblocked for 15/16 clusters; only the archive-as-worthless case still
+cannot fix-point (Path B).
+
+**Caveat:** the *rate* may inflate on benchmark data (short, near-duplicate turns) vs the
+live store, but the *root cause* (field-name/redundant-field mismatch) is corpus-independent
+and the recovery fixes apply identically to the live 07-15 fork.
 
 ## Finding 4 — direct evidence for multi-pass convergence
 

@@ -847,6 +847,13 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
         elif action == "merge_into":
             target_id = resolve_id(action_item.get("target_id", ""))
             merge_content = action_item.get("merge_content", "")
+            # The judge often reads "merge A into B" as "fold A's existing content
+            # into B" and emits only target_id (no merge_content). That IS the merge
+            # semantics, so default the payload to the source memory's own content
+            # rather than discarding a well-formed action. (sleep-bench Phase 0
+            # Finding 3: this was the largest single rejection class, 11/22.)
+            if not merge_content:
+                merge_content = mem["content"] or ""
             if not target_id or target_id not in mem_by_id:
                 stats["rejected"] += 1
                 stats["details"].append(f"  REJECTED merge {mid[:8]}: invalid target_id")
@@ -890,8 +897,13 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
             archive_count += 1
 
         elif action == "rewrite":
-            new_content = action_item.get("new_content", "")
-            new_summary = action_item.get("new_summary", "")
+            # The judge frequently populates the canonical text under "content"/
+            # "summary" (its natural keys) rather than the schema's "new_content"/
+            # "new_summary", so accept those as aliases before rejecting. The work
+            # is done and substantiated; only the key differs. (sleep-bench Phase 0
+            # Finding 3: 4/22 rejections were substantiated rewrites lost this way.)
+            new_content = action_item.get("new_content") or action_item.get("content", "")
+            new_summary = action_item.get("new_summary") or action_item.get("summary", "")
             if not new_content:
                 stats["rejected"] += 1
                 stats["details"].append(f"  REJECTED rewrite {mid[:8]}: no new_content")
