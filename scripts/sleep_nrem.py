@@ -534,26 +534,23 @@ def write_results(db, results: list[dict], processed_ids: list[str],
             _skip_low_conf += 1
             continue
 
-        # Duplicate handling — link (leaf) or collapse (summary / --legacy-merge)
+        # Duplicate handling — link (default) or collapse (--legacy-merge only)
         if edge_type == "duplicate":
-            # link_duplicates (default since 2026-07-04, H3 Result 4) applies to
-            # LEAF (detail) duplicates ONLY: keep both memories, record the
-            # duplication as a contextless link edge instead of deleting the loser.
-            # Contextless => PPR's context gate does not skip it and it traverses at
-            # full weight, with no linking_embedding required. Measured on detail
-            # memories, where linking strictly dominates destructive merge.
+            # link_duplicates (default since 2026-07-04, H3 Result 4): keep BOTH
+            # memories and record the duplication as a contextless link edge instead
+            # of deleting the loser. Contextless => PPR's context gate does not skip
+            # it and it traverses at full weight, with no linking_embedding required.
+            # Measured on detail memories (linking strictly dominates destructive
+            # merge); applied to ALL layers because it is non-destructive.
             #
-            # SUMMARY duplicates are deliberately NOT linked: the summary layer is
-            # the deduplicated abstraction and shouldn't hold two copies of the same
-            # summary, so a summary-involving duplicate falls through to the collapse
-            # path below (verbatim supersede-to-winner). The BETTER treatment is a
-            # genuine LLM *rewrite* that synthesizes the duplicate summaries into one
-            # -- that belongs in consolidate (which already has the rewrite/merge_into
-            # machinery), not NREM's cheap classifier. TODO: route summary duplicates
-            # to consolidate rather than verbatim-collapsing them here.
-            both_leaf = (source_mem["layer"] == "detail"
-                         and target_mem["layer"] == "detail")
-            if link_duplicates and both_leaf:
+            # This includes SUMMARY / gestalt duplicates: NREM links them rather than
+            # collapsing, leaving the pair intact for CONSOLIDATE to synthesize into
+            # one canonical summary via its rewrite/merge_into machinery -- the
+            # duplicate edge is the signal. Verbatim-collapsing a summary here would
+            # destroy the loser before consolidate could rewrite it. (Alexis, 07-04:
+            # option (b) -- link + defer to consolidate.) TODO: wire consolidate to
+            # rewrite duplicate-edged summary/gestalt pairs into one canonical node.
+            if link_duplicates:
                 link_id = _create_edge(
                     db, source_id, target_id,
                     linking_context="",          # contextless => PPR-visible at weight 1.0
@@ -569,8 +566,8 @@ def write_results(db, results: list[dict], processed_ids: list[str],
                     _skip_edge_exists += 1
                 continue
 
-            # Collapse (legacy destructive path): summaries always land here; leaf
-            # pairs only under --legacy-merge. Supersede the weaker/older one.
+            # Legacy destructive collapse (--legacy-merge only): supersede the
+            # weaker/older one.
             # Pick winner: higher priority wins; if tied, newer wins
             if source_mem["base_priority"] > target_mem["base_priority"]:
                 winner, loser = source_mem, target_mem

@@ -156,15 +156,19 @@ duplicate-merge doesn't touch supersession-of-stale-facts.
 `duplicate` **default**, flipped in `write_results` so the orchestrated `sleep.py` cycle
 inherits it; `--legacy-merge` restores the destructive path for research/ablation.
 
-**Scoped to LEAF (detail) duplicates only.** The H3 result was measured on detail memories (the
-store had zero summaries — REM is inert on LoCoMo, see `findings-phase0.md`). Summary/gestalt
-memories are the *deduplicated abstraction* layer — they should not hold two copies of the same
-summary — so a summary-involving duplicate falls through to verbatim collapse rather than
-linking. The better treatment is a genuine LLM **rewrite** that synthesizes duplicate summaries
-into one; that belongs in **consolidate** (which already has the `rewrite`/`merge_into`
-machinery), not NREM's cheap classifier. Left as a TODO. The one case the benchmark doesn't
-stress — high-multiplicity *exact* re-ingested detail duplicates crowding a single result — is a
-**retrieval-time** concern (MMR / result-level near-dup dedup), still non-destructive.
+**Applies to all layers (link is non-destructive); summary rewrite deferred to consolidate.**
+The H3 result was measured on detail memories only (the benchmark store had zero summaries — REM
+is inert on LoCoMo, see `findings-phase0.md`), but NREM's `gather()` has no layer filter, so on
+the live store summary/gestalt duplicates flow through this branch too. NREM **links** them
+rather than collapsing (Alexis, 07-04, option (b)): linking is non-destructive, so it leaves the
+duplicate pair intact for **consolidate** to synthesize into one canonical summary via its
+`rewrite`/`merge_into` machinery — the `duplicate` edge is the signal. Verbatim-collapsing a
+summary in NREM would destroy the loser before consolidate could rewrite it. **TODO: wire
+consolidate to rewrite duplicate-edged summary/gestalt pairs into one canonical node** — until
+then duplicate summaries stay linked (harmless) rather than deduplicated. The one case the
+benchmark doesn't stress — high-multiplicity *exact* re-ingested detail duplicates crowding a
+single result — is a **retrieval-time** concern (MMR / result-level near-dup dedup), still
+non-destructive.
 
 ## Verdict
 
