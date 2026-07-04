@@ -453,8 +453,14 @@ def classify_batch(batch: list[dict], mode: str = "standard") -> list[dict]:
 
 def write_results(db, results: list[dict], processed_ids: list[str],
                    shadow_updates: dict = None,
-                   classify_memory_ids: set = None) -> dict:
-    """Write classification results as edges and handle side effects."""
+                   classify_memory_ids: set = None,
+                   no_merge: bool = False) -> dict:
+    """Write classification results as edges and handle side effects.
+
+    no_merge (opt-in, default False): on a 'duplicate' pair, add a contextless
+    duplicate link edge and keep BOTH memories active, instead of the default
+    supersede-and-delete. Non-destructive; the sleep-bench NREM link-vs-delete arm.
+    """
     now = datetime.now(timezone.utc).isoformat()
 
     edges_created = 0
@@ -462,6 +468,7 @@ def write_results(db, results: list[dict], processed_ids: list[str],
     contradictions_flagged = 0
     temporal_evolutions = 0
     duplicates_merged = 0
+    duplicates_linked = 0
     merge_details = []
     per_memory_changes = {}
 
@@ -524,6 +531,27 @@ def write_results(db, results: list[dict], processed_ids: list[str],
 
         # Duplicate merge — supersede the weaker/older one
         if edge_type == "duplicate":
+            # no_merge (opt-in): keep both memories; record the duplication as a
+            # contextless link edge instead of deleting the loser. Contextless =>
+            # PPR's context gate does not skip it and it traverses at full weight,
+            # with no linking_embedding required (deliberately avoiding the
+            # embedding dependency). Isolates the delete-vs-link contrast.
+            if no_merge:
+                link_id = _create_edge(
+                    db, source_id, target_id,
+                    linking_context="",          # contextless => PPR-visible at weight 1.0
+                    flags=["duplicate"],         # structural dedup on (pair, "duplicate")
+                    created_by="sleep",
+                )
+                if link_id:
+                    edges_created += 1
+                    duplicates_linked += 1
+                    successfully_processed.add(source_id)
+                    successfully_processed.add(target_id)
+                else:
+                    _skip_edge_exists += 1
+                continue
+
             # Pick winner: higher priority wins; if tied, newer wins
             if source_mem["base_priority"] > target_mem["base_priority"]:
                 winner, loser = source_mem, target_mem
@@ -719,6 +747,7 @@ def write_results(db, results: list[dict], processed_ids: list[str],
         "contradictions_flagged": contradictions_flagged,
         "temporal_evolutions": temporal_evolutions,
         "duplicates_merged": duplicates_merged,
+        "duplicates_linked": duplicates_linked,
         "merge_details": merge_details,
         "per_memory_changes": per_memory_changes,
         "shadow_updates": shadow_count,
@@ -924,6 +953,13 @@ def main():
     parser.add_argument("mode", nargs="?", default="standard", choices=["standard", "deep"])
     parser.add_argument("--limit", type=int, default=0,
                         help="Cap number of memories to gather (0 = no limit)")
+    parser.add_argument("--no-merge", action="store_true",
+                        help="EXPERIMENTAL (opt-in, default off): on a 'duplicate' pair, add a "
+                             "contextless duplicate link edge instead of superseding+deleting the "
+                             "loser. Non-destructive -- both memories stay active and retrievable, "
+                             "and the link is PPR-traversable at full weight (no embedding needed). "
+                             "Isolates the delete-vs-link contrast for the sleep-bench NREM arm. "
+                             "Default preserves the current supersede-and-delete behavior exactly.")
     args = parser.parse_args()
     mode = args.mode
     mem_limit = args.limit
@@ -1031,7 +1067,8 @@ def main():
 
     # Step 4: Write results
     write_stats = write_results(db, all_results, processed_ids, shadow_updates,
-                                classify_memory_ids=classify_memory_ids)
+                                classify_memory_ids=classify_memory_ids,
+                                no_merge=args.no_merge)
 
     # Step 4b: Decay rate correction
     decay_stats = correct_decay_rates(db)
@@ -1052,6 +1089,7 @@ def main():
         f"- Memories processed: {memories_count}",
         f"- Relationships found: {write_stats['edges_created']}",
         f"- Duplicates merged: {write_stats['duplicates_merged']}",
+        f"- Duplicates linked (no-merge): {write_stats.get('duplicates_linked', 0)}",
         f"- Fast-path pairs: {len(fast_path_pairs)}",
         f"- Priority boosts: {write_stats['priority_boosts']}",
         f"- Contradictions flagged: {write_stats['contradictions_flagged']}",
