@@ -105,9 +105,11 @@ def setup_isolated_db(conv_dir: Path):
         pass
     # Point MODEL_PATH at the real model location (not the benchmark dir).
     # Must patch both constants and reranker since reranker imports at module load.
-    real_model = Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.pkl"
+    # V6+ ships as LightGBM native .txt; a stale .pkl next to it must NOT shadow it
+    # (the .txt-native loader rejects the pickle and silently drops to formula).
+    real_model = Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.txt"
     if not real_model.exists():
-        real_model = Path.home() / ".claude" / "data" / "tuning_studies" / "reranker_model.pkl"
+        real_model = Path.home() / ".claude" / "data" / "tuning_studies" / "reranker_model.txt"
     if real_model.exists():
         memory.constants.MODEL_PATH = real_model
         memory.reranker.MODEL_PATH = real_model

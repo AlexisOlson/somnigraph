@@ -1191,10 +1191,12 @@ def eval_production(
                 os.environ["OPENAI_API_KEY"] = key_path.read_text().strip()
                 break
 
-    # Point MODEL_PATH at real model location (not benchmark dir)
+    # Point MODEL_PATH at real model location (not benchmark dir).
+    # V6+ ships as LightGBM native .txt; a stale .pkl next to it must NOT shadow it
+    # (the .txt-native loader rejects the pickle and silently drops to formula).
     for model_path in [
-        Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.pkl",
-        Path.home() / ".claude" / "data" / "tuning_studies" / "reranker_model.pkl",
+        Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.txt",
+        Path.home() / ".claude" / "data" / "tuning_studies" / "reranker_model.txt",
     ]:
         if model_path.exists():
             memory.constants.MODEL_PATH = model_path
