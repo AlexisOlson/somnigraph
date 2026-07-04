@@ -1,10 +1,24 @@
 # Sleep Pipeline Optimization via Benchmark Corpora
 
-**Status: DRAFT for review (2026-07-04). Not started. No code written.** This is the
-wire-it-up plan for measuring and then optimizing each sleep stage on a controllable
+**Status: DRAFT, in progress (2026-07-04). Phase 0 done (gate PASS), Stage A rig built.** This
+is the wire-it-up plan for measuring and then optimizing each sleep stage on a controllable
 accumulation regime (a benchmark corpus), as the complement to the one-shot ~2026-07-15
 abstinence fork on the live store. Predictions are pre-registered; what can't be settled
 on a benchmark is flagged as such.
+
+**Correction (2026-07-04, post-Phase-0 — supersedes the original V6-primary instrument bet).**
+This draft was written with the **deployed V6 reranker as the primary scorer** (the §0 and §3.4
+argument below, preserved for the record). Phase 0 plus a closer look overturned that: V6's
+learned weights are calibrated to the *live* store's joint feature distribution, and on a
+benchmark store its dominant features (`session_recency`, the `fb_*` feedback family) stay
+**dead or out-of-distribution even post-sleep** — no real recall history, and probe feedback is
+synthetic and sparse. So V6 is a degraded formula plus learned noise, **not a valid sleep
+instrument**. The principled instrument is **rerank-free**, a two-level decomposition (§3.4):
+`rrf` (raw `rrf_fuse`, graph-blind) vs `formula` (RRF + PPR, graph-aware via `memory_edges`);
+**Δ(formula − rrf)** isolates sleep's edge contribution with no learned-weight transfer. V6 is
+demoted to an OOD reference. This correction is already reflected in the shipped rig (the `rrf`
+scorer; V6 dropped from the default). See also [`experiments/sleep-bench/findings-phase0.md`](../../experiments/sleep-bench/findings-phase0.md)
+for the other Phase-0 corrections (REM inert on the token floor; consolidate schema-recovery).
 
 ---
 
@@ -46,7 +60,7 @@ lever the measurement exposes.** Six phases; each gates the next.
 Phase 0  Harness + born-saturation precheck        (1 session)   [BLOCKS everything]
    |     Does a fresh ingest give sleep real work? If no, fix ingest density.
    v
-Phase 1  Frozen-vs-slept baseline, V6 + formula     (1 session)   [the headline delta]
+Phase 1  Frozen-vs-slept baseline, rrf + formula    (1 session)   [the headline delta]
    |     Full sleep cycle vs no-sleep on the corpus. Is there ANY effect to decompose?
    v
 Phase 2  Per-stage decomposition (add-one-in arms)  (1-2 sessions)[which stage matters]
@@ -82,9 +96,11 @@ Phase 5  End-to-end QA confirmation (optional)      (1-2 sessions)[does retrieva
   **no consolidate**) and the extended manual pipeline that adds consolidate.
 
 **How this feeds the ~07-15 abstinence fork.** Phase 1-3 hand the fork three things it needs and
-currently lacks: (1) a **validated V6-scoring rig** for slept stores (including the MODEL_PATH
-`.pkl`→`.txt` fix, §3.4, which would otherwise silently fall back to formula on the live fork
-too); (2) a **per-stage arm design** already debugged (add-one-in vs strip, §3.5), so the fork's
+currently lacks: (1) a **validated rerank-free scoring rig** for slept stores — the `rrf`/`formula`
+decomposition (§3.4), plus the MODEL_PATH `.pkl`→`.txt` fix that would otherwise silently fall back
+to formula on the live fork too, and the **H10 warning that the fork must not assume its deployed
+reranker transfers across slept/frozen arms**; (2) a **per-stage arm design** already debugged
+(add-one-in vs strip, §3.5), so the fork's
 single shot is spent on the arms that showed signal, not on re-discovering the decomposition; and
 (3) a **coverage-scoring method for sleep-created summaries** (§3.6) — without which the fork
 would score every REM summary as GT-irrelevant and systematically under-credit consolidation, the
@@ -194,10 +210,16 @@ byte-identical fork of the frozen post-ingest state — reproducible by construc
 gets its own fork; no arm shares mutable state. This is strictly better here than the live-store
 `cp`-of-one-file recipe because the benchmark store is self-contained under one `DATA_DIR`.
 
-### 3.4 V6 scoring — the load-bearing fix **[do before Phase 1]**
+### 3.4 Scoring instrument — the rerank-free decomposition **[corrected 2026-07-04; see §0 correction]**
+
+*Original framing (preserved): "V6 scoring — the load-bearing fix." The two blockers below were
+real and are fixed; the conclusion they served (V6 as primary scorer) is superseded by the corrected
+scorer set at the end of this section.*
 
 Two concrete blockers to scoring these runs with V6 (both found in the code, both would otherwise
-silently degrade to formula — the exact failure mode that hid the 2026-04-07 outage):
+silently degrade to formula — the exact failure mode that hid the 2026-04-07 outage). **Blocker 1 is
+fixed and shipped (`d798810`); both are retained here for the record even though V6 is no longer the
+primary instrument:**
 
 1. **Both benchmark eval paths resolve the wrong model file.** `eval_retrieval.py:1194-1202`
    (and the identical bug in `run.py:106-113`) override `MODEL_PATH` to search **only** for
@@ -217,17 +239,34 @@ silently degrade to formula — the exact failure mode that hid the 2026-04-07 o
    the pre-sleep state. Just confirm the reranker doesn't NaN-crash on all-null feature rows on the
    frozen arm (the NaN-encoding block from the restore should cover this; verify on the precheck DB).
 
-**Scorer set (three, ranked):**
-- **Primary — V6 production reranker (31 features).** The only scorer that reads sleep's NREM edges
-  and probe feedback. Copy the deployed `reranker_model.txt` + `reranker_features.json` into each
-  fork's `tuning_studies/`. This is *the* new measurement vs the sleep-fork.
-- **Secondary — hand-tuned formula.** Continuity with the sleep-fork (sleep-vs-formula), and a
-  guard: if V6 and formula disagree on the sign of a stage's effect, that itself is a finding about
-  which features sleep feeds.
-- **Context only — L5b LoCoMo 15-feature reranker (Config K).** Note explicitly: its graph features
+**Scorer set — CORRECTED (2026-07-04, supersedes the V6-primary ranking below).** The MODEL_PATH
+`.pkl`→`.txt` fix shipped (`d798810`), so V6 *can* now load on these stores — but the instrument
+correction (§0) demoted it. The rig's actual scorer set:
+
+- **Primary — the rerank-free decomposition (`rrf` + `formula`), both wired.** Neither carries
+  learned weights transferred from the live store, so neither has V6's OOD problem, and both are
+  fixed across arms.
+  - **`rrf`** = `impl_recall(expand=False)`: raw `rrf_fuse` (vec+FTS+theme fusion) only, **no
+    Hebbian, no PPR**. Blind to `memory_edges`. Isolates sleep's **content/index** effect — merges,
+    rewrites, dormancy, re-embedding — i.e. what changed about the searchable text itself.
+  - **`formula`** = the legacy `rrf_fuse → apply_hebbian → expand_via_ppr` path (`expand=True`). On
+    benchmark data Hebbian is inert (no feedback history), so this is effectively **RRF + PPR**, and
+    PPR traverses `memory_edges` — so it **sees NREM's edges**. Adds sleep's **graph/edge** effect.
+  - **The decomposition: Δ(formula − rrf)** on a given arm isolates the graph/edge contribution;
+    Δ(rrf_slept − rrf_frozen) isolates the content contribution. Validated 2026-07-04: on the frozen
+    arm (0 edges) `rrf` and `formula` are **bit-identical across all metrics** — the clean-baseline
+    prediction (nothing for the graph layer to do ⇒ no divergence), confirming the two scorers only
+    diverge where sleep actually built structure.
+- **Reference only — V6 production reranker (31 features).** Kept behind `--scorers v6` but **dropped
+  from the default and explicitly not a valid sleep instrument**: its `session_recency` / `fb_*`
+  features are dead-or-OOD on a benchmark store even post-sleep (§0). Use only to answer "what would
+  the *deployed* reranker see," never as the measurement of sleep's effect. (This is also exactly the
+  `R_pre` naive-deploy cell of the 2×2 in §4.6.)
+- **Context only — L5b LoCoMo 15-feature reranker (Config K).** Its graph features
   (`graph_synthetic_score`, `graph_coref_hits`) read the **v6-extraction synthetic graph
   (`build_graph.py`), NOT sleep's `memory_edges`.** So L5b does *not* isolate sleep — use it only as
-  the QA-retrieval reference in Phase 5, never as a sleep-ablation scorer.
+  the QA-retrieval reference in Phase 5, never as a sleep-ablation scorer. (Registered-but-stubbed in
+  the rig; wiring it would couple the rig to the eval-harness machinery it exists to avoid.)
 
 ### 3.5 Staged predict / retrieve / judge separation **[steal 1: highest-leverage]**
 
@@ -342,13 +381,17 @@ for interaction terms). Increment notation from §1.
 - **What it does:** classifies memory pairs (Sonnet) into typed edges, supersedes duplicates, boosts
   `base_priority`/`confidence`, computes shadow load, links entities. Builds the graph the rest of the
   pipeline (and V6's graph features) depends on.
-- **Hypothesis:** NREM edges **raise NDCG@5k under V6 but are ~null under the formula**, because
-  edges feed V6 features (`edge_count`, `hebbian_pmi`, `betweenness`, `diversity_score`) that the
-  formula barely uses. This is the cleanest test of *"does the graph sleep builds carry retrieval
-  signal"* — and it's the divergence the sleep-fork couldn't see (formula both sides). Prediction:
-  V6 Δ positive and CI-clear; formula Δ null. Deep > standard (more pairs classified).
-- **Instrument:** `Δ_NREM = A_{nrem} − A_0` for both standard and deep; V6 vs formula side-by-side is
-  the key contrast. NDCG@5k primary.
+- **Hypothesis (reframed 2026-07-04 to the corrected instrument):** NREM edges **raise retrieval
+  under `formula` (RRF+PPR, graph-aware) but are ~null under `rrf` (raw fusion, graph-blind)**,
+  because PPR traverses the new `memory_edges` while raw fusion cannot see them. This is the cleanest
+  test of *"does the graph sleep builds carry retrieval signal"* — and **Δ(formula − rrf) on the
+  slept arm is the edge contribution, isolated with no learned weights** (the divergence the
+  sleep-fork couldn't see, since it ran formula-only both sides — and which V6 would only muddy with
+  OOD noise). Prediction: `formula` Δ positive and CI-clear; `rrf` Δ near-null (edge-blind, moves only
+  via NREM's dup-merge changing the index); deep > standard (more pairs classified).
+- **Instrument:** `Δ_NREM = A_{nrem} − A_0` for both standard and deep; **`rrf` vs `formula`
+  side-by-side is the key contrast**, and Δ(formula−rrf) the headline decomposition. NDCG@5k primary.
+  (V6 optional as an OOD-reference line only.)
 - **Isolation:** `sleep_nrem.py standard` / `sleep_nrem.py deep` on separate forks from frozen.
 - **Lever if null:** the candidate gate is conservative (`vec_distance > 0.5` skip; only top-3
   related; `MAX_EDGES_PER_CYCLE = 5`). **A/B a denser graph:** loosen the distance gate (0.5→0.65),
@@ -417,6 +460,58 @@ for interaction terms). Increment notation from §1.
   dormancy store-change as a diagnostic; give it its own strip arm only if H2 shows REM helping and
   we need to attribute how much is summaries-add vs details-remove.**
 
+### 4.6 The pre/post-sleep reranker 2×2 **[EV: HIGH — but gated; a scoring-policy experiment, not a sleep stage]**
+
+The §3.4 decomposition asks "does sleep make content more *retrievable* (rerank-free)?" This asks the
+complementary question: **does sleep's value require a reranker that learned sleep's structure?** It
+is a factorial over two axes — **store** (frozen vs slept) × **reranker** (fit on unslept vs slept
+data) — and it is the principled way to handle "V6 isn't the right instrument for a separate corpus":
+instead of transferring live weights, *fit the instrument on the corpus, under hold-out hygiene*.
+
+| | Store: frozen | Store: slept |
+|---|---|---|
+| **Reranker R_pre** (fit on unslept forks) | ① baseline | ② **naive deploy** (old reranker meets slept store) |
+| **Reranker R_post** (fit on slept forks) | ③ counterfactual | ④ aligned |
+
+**What the contrasts buy:**
+- **Substrate value (rerank-free-adjacent):** ②−① and ④−③ — does sleep make content more retrievable
+  holding the reranker fixed? (The rerank-free `rrf`/`formula` decomposition is the *learning-free*
+  version of this row; this is its reranked echo.)
+- **Sleep-aware-scoring value:** ③−① and ④−② — does a reranker that learned sleep's features score
+  better, holding the store fixed?
+- **The interaction (the interesting term):** (④−②) − (③−①). **Positive ⇒ sleep's edges/summaries
+  are only exploitable by a reranker that learned them** — substrate and policy are complementary,
+  not additive.
+- **Cell ② is the operational money shot:** you sleep the store but keep the deployed reranker. If
+  **② < ①**, sleep *hurts* retrieval under the reranker you actually ship (the OOD-on-summaries
+  problem, the same shape as V6 here). The finding then becomes **"sleep requires reranker retraining
+  to pay off"** — a genuinely useful negative-if-true result, and a direct warning for the ~07-15
+  live fork (which will *not* retrain its reranker between arms).
+
+**Hygiene that makes it valid** (else it measures leakage, not sleep):
+- Both rerankers fit on **held-out conversations** (train on convs ≠ the eval conv; LoCoMo has 10 —
+  k-fold or train 1–9 / eval 0). Never fit the instrument to the eval arm.
+- R_pre trained on **frozen** held-out forks, R_post on **slept** held-out forks — **same features,
+  same hyperparameters, same coverage labels (§3.6); only the training store-state varies** (the one
+  controlled variable). Freeze both; apply unchanged to both store columns.
+- **Feature set must read `memory_edges`** (production-style betweenness/diversity from
+  `_load_memory_meta`), **not** L5b's synthetic-extraction graph — otherwise R_post is structurally
+  blind to sleep's edges and the whole experiment is null by construction. This is a real fork from
+  the existing L5b model (`train_reranker.py`'s extractor, re-pointed at sleep's graph).
+
+**Gating (why it is not the next session):**
+1. Needs the **coverage judge** (§3.6, unbuilt) — without it R_post can't be credited for valuing
+   sleep-created summaries/rewrites, so evidence-turn-only labels blind it to exactly what it's
+   supposed to learn.
+2. The **summary half** of the interaction needs REM actually producing summaries — currently gated
+   by `SUMMARY_MIN_DETAIL_TOKENS = 2000` (Phase-0 Finding 1; the floor sweep, H7). Until that lands,
+   only a **"2×2-lite"** is possible: R_post learns NREM edges + consolidation changes but not
+   summaries, evidence-turn labels only. Real, but measures the NREM/consolidate half only.
+
+**Sequencing:** Step 1 (H3, NREM/graph, rerank-free) already delivers the substrate row's
+learning-free version today. The full 2×2 comes after H7 (REM floor) + the coverage judge — it is the
+capstone that says whether sleep + a sleep-aware reranker beat either alone. Tracked as **H10** (§6).
+
 ---
 
 ## 5. Where the improvement levers are (the optimization surface)
@@ -452,13 +547,14 @@ expected retrieval payoff, each with its A/B.
 | H0 | precheck | Fresh ingest gives sleep real work | NREM edges >100 AND consolidate proposes >0 merges | run all stages once, count | — | store deltas |
 | H1 | full cycle | Full sleep beats no-sleep on the corpus | NDCG@5k Δ > 0, CI-clear (unlike saturated live store) | `A_full − A_0` | V6, formula | NDCG@5k |
 | H2 | REM | Summaries raise multi-hop R@10 (vocab-gap logic) | multi-hop R@10 ≥ +3pp, coverage-credited | `A_{nrem+rem} − A_{nrem}` | V6, formula | multi-hop R@10 |
-| H3 | NREM | Edges help V6 but not formula (feature-fed) | V6 Δ>0 CI-clear; formula Δ null; deep>standard | `A_{nrem} − A_0` (std, deep) | V6 vs formula | NDCG@5k |
+| H3 | NREM | Edges help `formula` (PPR-graph) but not `rrf` (graph-blind) | formula Δ>0 CI-clear; rrf Δ~null; deep>standard | `A_{nrem} − A_0` (std, deep) | **rrf vs formula**; Δ(formula−rrf) | NDCG@5k |
 | H4 | probe | Off the live store, probe effect shrinks/nulls (no circularity) | Δ_probe ≤ live's +0.0009, plausibly null | `A_full − A_{full−probe}` (add-in + strip) | V6, formula | NDCG@5k, R@10 |
 | H5 | consolidate | Merge/archive is retrieval-neutral-to-slightly-positive | |Δ| small; not net-harmful | `A_{nrem+rem+consol} − A_{nrem+rem}` | V6 + coverage | R@10, NDCG@5k |
 | H6 | dormancy | Fires (age gate met via 2023 backdating), retrieval-neutral | >0 details dormant-ed; R@10 neutral | within-REM strip (un-dormant fork) | V6 | store change, R@10 |
 | H7 | lever/REM | Lower token floor + entity-scoping raises multi-hop | monotone R@10 gain vs floor; entity ≥ topic | A/B floor {2000,800,400}; scope {topic,entity} | V6 + coverage | multi-hop R@10 |
 | H8 | lever/NREM | Denser graph raises V6 NDCG | monotone up to a point | A/B dist-gate {0.5,0.65}, cap {5,15} | V6 | NDCG@5k |
 | H9 | lever/probe | Feedback plateaus by ~30-60 probes | plateau visible | A/B `--probes {10,30,60}` | V6 | NDCG@5k |
+| H10 | reranker 2×2 | Sleep pays off only with a sleep-aware reranker (interaction >0); naive-deploy cell ② may regress | (④−②)−(③−①) > 0; watch ②<① | store{frozen,slept} × reranker{R_pre,R_post}, held-out fit (§4.6) | R_pre, R_post (coverage labels) | R@10, NDCG@5k |
 
 ---
 
