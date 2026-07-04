@@ -88,6 +88,48 @@ def resolve_full_ids(data_dir: Path, short_ids: list[str]) -> dict[str, str]:
         conn.close()
 
 
+def edge_embedding_health(data_dir: Path) -> dict:
+    """Count edges whose linking_context has no linking_embedding.
+
+    This is the exact silent-failure the 2026-07-04 conv0-nrem run hit: NREM
+    commits its edges, then embeds their linking_context in a SEPARATE pass
+    that fails soft (nullable column) if credentials are missing. PPR's
+    context-relevance gate (src/memory/scoring.py: `if has_context and not
+    edge["linking_embedding"]: continue`) then SKIPS every such edge -- so a
+    formula/expand score of that store reads as if it had zero edges, a FALSE
+    NULL on exactly the graph hypothesis this rig tests. A store in that state
+    must never be scored with an expansion scorer; the caller hard-fails on it.
+
+    Returns counts, not a verdict -- retrieve.py decides warn-vs-raise based on
+    whether any requested scorer actually traverses the graph.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(str(Path(data_dir) / "memory.db"))
+    try:
+        def scalar(q: str) -> int:
+            return conn.execute(q).fetchone()[0]
+
+        total = scalar("SELECT COUNT(*) FROM memory_edges")
+        contextful = scalar(
+            "SELECT COUNT(*) FROM memory_edges "
+            "WHERE linking_context IS NOT NULL AND linking_context != ''"
+        )
+        blind = scalar(
+            "SELECT COUNT(*) FROM memory_edges "
+            "WHERE linking_context IS NOT NULL AND linking_context != '' "
+            "AND linking_embedding IS NULL"
+        )
+        return {
+            "total_edges": total,
+            "contextful_edges": contextful,
+            "blind_edges": blind,  # contextful but unembedded -> invisible to PPR
+            "blind_frac": (blind / contextful) if contextful else 0.0,
+        }
+    finally:
+        conn.close()
+
+
 def load_token_map(data_dir: Path) -> dict[str, int]:
     """id -> token_count, for currently-active memories only.
 

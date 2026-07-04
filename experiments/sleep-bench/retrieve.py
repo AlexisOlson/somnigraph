@@ -222,6 +222,39 @@ def main() -> None:
 
     store.point_at_store(data_dir)
 
+    # Edge-embedding health guard: a store whose contextful edges lack
+    # linking_embedding is INVISIBLE to PPR (scoring.py's context gate skips
+    # them), so scoring it under an expansion scorer yields a FALSE NULL on the
+    # graph hypothesis -- the exact 2026-07-04 conv0-nrem credential failure.
+    # Hard-fail before writing a single misleading row when any requested
+    # scorer traverses the graph; the raw-RRF floor doesn't, so it only warns.
+    wants_graph = any(scorers.wants_expansion(s) for s in args.scorers)
+    edge_health = store.edge_embedding_health(data_dir)
+    if edge_health["blind_edges"] > 0:
+        msg = (
+            f"[stage-a] EDGE-EMBEDDING HEALTH: {edge_health['blind_edges']} of "
+            f"{edge_health['contextful_edges']} contextful edges "
+            f"({edge_health['blind_frac']:.1%}) have NO linking_embedding -- "
+            f"PPR will SKIP them (they are invisible to the graph)."
+        )
+        # Tolerate a stray soft-fail; block the systemic-outage shape (e.g. the
+        # 329/329 credential failure) that would silently null the graph signal.
+        if wants_graph and edge_health["blind_frac"] > 0.02:
+            raise SystemExit(
+                msg + "\n[stage-a] REFUSING to score an expansion scorer against "
+                "this store: the result would be a false null on the graph "
+                "hypothesis. Fix: set OPENAI_API_KEY (or put openai_api_key in "
+                "the store dir) and re-run the NREM pass so edges embed, then "
+                "re-fork+re-score. See docs/proposals/sleep-pipeline-"
+                "optimization.md and store.edge_embedding_health()."
+            )
+        print(msg + ("  (only rrf requested -- rrf ignores edges, proceeding.)"
+                     if not wants_graph else "  (below block threshold, proceeding.)"))
+    elif edge_health["total_edges"]:
+        print(f"[stage-a] edge-embedding health OK: "
+              f"{edge_health['contextful_edges']} contextful edges all embedded "
+              f"({edge_health['total_edges']} total).")
+
     print(f"[stage-a] run_id={run_id} label={args.label} conv={args.conv} data_dir={data_dir}")
     print(f"[stage-a] building GT from {args.locomo_data}")
     queries = gt_mod.build_query_set(Path(args.locomo_data), data_dir, args.conv)
