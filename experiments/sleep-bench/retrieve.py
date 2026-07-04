@@ -80,10 +80,13 @@ def build_parser() -> argparse.ArgumentParser:
                          "(freeform -- this rig is state-agnostic; the label is just a name)")
     p.add_argument("--conv", type=int, required=True,
                     help="LoCoMo conversation index this store was ingested from")
-    p.add_argument("--scorers", nargs="+", default=["formula", "v6"],
+    p.add_argument("--scorers", nargs="+", default=["rrf", "formula"],
                     choices=list(scorers.SCORER_NAMES),
-                    help="formula and v6 are wired; l5b is a registered-but-stubbed axis "
-                         "(raises NotImplementedError with a diagnostic -- see scorers.py)")
+                    help="Default is the sleep decomposition pair: rrf (raw rrf_fuse, "
+                         "content/index effect) + formula (RRF+PPR, adds graph/edge effect). "
+                         "v6 is the OOD production reranker (feedback features dead on "
+                         "benchmark data -- not a valid sleep instrument, kept only as a "
+                         "reference); l5b is a registered-but-stubbed axis (see scorers.py).")
     p.add_argument("--recall-limit", type=int, default=20,
                     help="rank cutoff passed to impl_recall (also the MRR cutoff)")
     p.add_argument("--recall-budget", type=int, default=5000,
@@ -131,12 +134,14 @@ def score_one_query(
     recall_budget: int,
     recall_limit: int,
     session_k: int,
+    expand: bool = True,
 ) -> dict:
     """Run the real retrieval path for one GT query and score it. Returns
     the full JSONL row (minus run_id/condition/scorer, added by the caller)."""
     ranked_short, scores_short, _top_score = capture.recall_with_scores(
         query=q["question"], context=q["question"],
         budget=recall_budget, limit=recall_limit,
+        expand=expand,
     )
     full_map = store.resolve_full_ids(data_dir, ranked_short)
     retrieved_full = [full_map[s] for s in ranked_short if s in full_map]
@@ -231,7 +236,8 @@ def main() -> None:
     for scorer_name in args.scorers:
         print(f"\n[stage-a] === scorer={scorer_name} ===")
         status = scorers.apply_scorer(scorer_name)  # raises loud on failure -- no silent fallback
-        print(f"[stage-a] scorer_status: {status}")
+        expand = scorers.wants_expansion(scorer_name)
+        print(f"[stage-a] scorer_status: {status}  (expand={expand})")
 
         jsonl_path = out_dir / f"{args.label}__{scorer_name}.jsonl"
         summary_path = out_dir / f"{args.label}__{scorer_name}.summary.json"
@@ -252,6 +258,7 @@ def main() -> None:
                 row = score_one_query(
                     q, data_dir, token_map, session_map,
                     args.recall_budget, args.recall_limit, args.session_k,
+                    expand=expand,
                 )
                 row = {"run_id": run_id, "condition": args.label, "scorer": scorer_name, **row}
                 f.write(json.dumps(row) + "\n")

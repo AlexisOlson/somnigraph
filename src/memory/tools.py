@@ -484,6 +484,7 @@ def impl_recall(
     boost_themes: str = "[]",
     min_priority: int = 0,
     internal: bool = False,
+    expand: bool = True,
 ) -> str:
     db = get_db()
     try:
@@ -736,9 +737,18 @@ def impl_recall(
             rrf_scores, feedback_map, themes_map = rrf_fuse(
                 db, vec_ranked, fts_ranked, all_ids, boost_themes_list,
                 theme_ranked=theme_ranked)
-            apply_hebbian(db, rrf_scores)
-            expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit = expand_via_ppr(
-                db, rrf_scores, query_embedding, query, exclude_set)
+            # expand=False isolates raw RRF fusion: skip the Hebbian co-occurrence
+            # boost and the PPR graph-expansion so the ranking reflects only the
+            # vec/FTS/theme index, blind to memory_edges. Used by the sleep-bench
+            # rig's `rrf` scorer to decompose sleep's content-index effect from its
+            # graph/edge effect (measured by the default expand=True path, which
+            # PPR-traverses NREM's edges). expansion_* keep their 0/False defaults
+            # from the pre-try init, so recall_meta logging is unaffected. Default
+            # True -> live recall is byte-identical.
+            if expand:
+                apply_hebbian(db, rrf_scores)
+                expansion_new, expansion_boosted, per_seed_cap_hits, total_cap_hit = expand_via_ppr(
+                    db, rrf_scores, query_embedding, query, exclude_set)
             sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
             top_score = rrf_scores[sorted_ids[0]] if sorted_ids else 0.0
 
