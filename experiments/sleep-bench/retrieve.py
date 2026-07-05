@@ -222,34 +222,28 @@ def main() -> None:
 
     store.point_at_store(data_dir)
 
-    # Edge-embedding health guard: a store whose contextful edges lack
-    # linking_embedding is INVISIBLE to PPR (scoring.py's context gate skips
-    # them), so scoring it under an expansion scorer yields a FALSE NULL on the
-    # graph hypothesis -- the exact 2026-07-04 conv0-nrem credential failure.
-    # Hard-fail before writing a single misleading row when any requested
-    # scorer traverses the graph; the raw-RRF floor doesn't, so it only warns.
-    wants_graph = any(scorers.wants_expansion(s) for s in args.scorers)
+    # Edge-embedding health: INFORMATIONAL ONLY (corrected 2026-07-04). The
+    # earlier version hard-refused expansion scoring when contextful edges
+    # lacked a linking_embedding, on the belief that PPR's context gate skips
+    # them (a false null). That gate exists ONLY in
+    # scoring._expand_adjacency_legacy, which nothing in src/ calls. The real
+    # expansion path -- impl_recall(expand=True) -> scoring.expand_via_ppr --
+    # SELECTs only (source_id, target_id, weight, flags) and traverses every
+    # non-contradiction edge by WEIGHT; it never reads linking_embedding
+    # (verified: scoring.py:316-320 + full fn to 395; tools.py:748-751). So
+    # unembedded (REM-created) edges are NOT invisible and do NOT null the graph
+    # signal. We report the blind count as a REM/NREM edge-hygiene note -- REM
+    # creates contextful edges without embedding them, NREM embeds -- and
+    # proceed. This is a cosmetic asymmetry, not a scoring hazard.
     edge_health = store.edge_embedding_health(data_dir)
     if edge_health["blind_edges"] > 0:
-        msg = (
-            f"[stage-a] EDGE-EMBEDDING HEALTH: {edge_health['blind_edges']} of "
+        print(
+            f"[stage-a] edge-embedding note: {edge_health['blind_edges']} of "
             f"{edge_health['contextful_edges']} contextful edges "
-            f"({edge_health['blind_frac']:.1%}) have NO linking_embedding -- "
-            f"PPR will SKIP them (they are invisible to the graph)."
+            f"({edge_health['blind_frac']:.1%}) have no linking_embedding "
+            f"(REM does not embed its edges). Harmless: expand_via_ppr "
+            f"traverses by weight, not embedding -- proceeding."
         )
-        # Tolerate a stray soft-fail; block the systemic-outage shape (e.g. the
-        # 329/329 credential failure) that would silently null the graph signal.
-        if wants_graph and edge_health["blind_frac"] > 0.02:
-            raise SystemExit(
-                msg + "\n[stage-a] REFUSING to score an expansion scorer against "
-                "this store: the result would be a false null on the graph "
-                "hypothesis. Fix: set OPENAI_API_KEY (or put openai_api_key in "
-                "the store dir) and re-run the NREM pass so edges embed, then "
-                "re-fork+re-score. See docs/proposals/sleep-pipeline-"
-                "optimization.md and store.edge_embedding_health()."
-            )
-        print(msg + ("  (only rrf requested -- rrf ignores edges, proceeding.)"
-                     if not wants_graph else "  (below block threshold, proceeding.)"))
     elif edge_health["total_edges"]:
         print(f"[stage-a] edge-embedding health OK: "
               f"{edge_health['contextful_edges']} contextful edges all embedded "
