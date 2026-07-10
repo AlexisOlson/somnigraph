@@ -64,6 +64,7 @@ import argparse
 import gc
 import hashlib
 import json
+import pickle
 import random
 import re
 import sys
@@ -313,7 +314,10 @@ def make_noise_columns(n_rows: int, names: list[str]) -> dict[str, "np.ndarray"]
     cols = {}
     for name in names:
         k = int(NOISE_RE.match(name).group(1))
-        cols[name] = np.random.default_rng(9999 + k).standard_normal(n_rows)
+        # float32: column_stack must not upcast the real columns to float64,
+        # which would silently break anchor byte-parity on noise-bearing runs.
+        cols[name] = (np.random.default_rng(9999 + k)
+                      .standard_normal(n_rows).astype(np.float32))
     return cols
 
 
@@ -403,6 +407,9 @@ def main() -> None:
                          "and/or noiseK synthetic columns; repeatable.")
     ap.add_argument("--ignore-anchor-mismatch", action="store_true",
                     help="do not abort if the full-scale all-on anchor gate FAILs")
+    ap.add_argument("--no-matrix-cache", action="store_true",
+                    help="skip the extracted-matrix disk cache (force a fresh "
+                         "load_tuning_data + extract)")
     args = ap.parse_args()
 
     store = Path(args.store).expanduser().resolve()
@@ -442,12 +449,33 @@ def main() -> None:
         print("[sweep] nothing to do.")
         return
 
-    # ---- Load data ONCE ----
+    # ---- Load data ONCE (disk-cached across invocations) ----
     gt_used = t2._maybe_truncate_gt(gt_path, args.max_queries, SCRATCH)
     print(f"[sweep] store={store}")
-    print(f"[sweep] loading data once (this is the expensive step)...")
     tune_gt = t2._point_and_reload(store, key_file)
-    full = t2._extract_matrix(tune_gt, gt_used, list(SCHEMA_24))
+
+    # The extracted matrix depends only on (store, gt bytes, max_queries, schema)
+    # -- all stores here are frozen snapshots, so a disk cache turns the ~60-90 s
+    # search+extract startup into a ~2 s pickle load for every batch after the
+    # first. Keyed so a different store/gt/truncation can never collide.
+    cache_key = hashlib.sha1((
+        str(store) + "|" + hashlib.sha1(gt_used.read_bytes()).hexdigest()
+        + f"|mq={args.max_queries}|" + "|".join(SCHEMA_24)
+    ).encode("utf-8")).hexdigest()[:16]
+    cache_file = out_path.parent / f"matrix_cache_{cache_key}.pkl"
+    if cache_file.exists() and not args.no_matrix_cache:
+        print(f"[sweep] matrix cache HIT: {cache_file.name}")
+        with cache_file.open("rb") as cf:
+            full = pickle.load(cf)
+    else:
+        print(f"[sweep] loading data once (this is the expensive step)...")
+        full = t2._extract_matrix(tune_gt, gt_used, list(SCHEMA_24))
+        if not args.no_matrix_cache:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with cache_file.open("wb") as cf:
+                pickle.dump(full, cf, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"[sweep] matrix cache saved: {cache_file.name} "
+                  f"({cache_file.stat().st_size / 1e6:.0f} MB)")
     n_q = len(full["queries"])
     print(f"[sweep] loaded: {len(full['y'])} rows, {full['X'].shape[1]} cols, {n_q} queries")
 
