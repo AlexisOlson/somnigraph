@@ -58,8 +58,14 @@ Results: [`experiments/sleep-bench/findings-wp6-feature-structure.md`](../../exp
 - Most single-feature effects live inside the ±0.003–0.004 confound zone and are only
   bounded, not measured.
 - These labels can't price redundancy suppression (h12_out ≈ all_on ≠ "H12 useless").
-- **N4 remains open**: core_only_post conv0 cell (does core recalibration alone capture
-  ≥80% of the ④−② judged gap?) — registered, needs a training run + explicit go.
+- **N4 ran same day (GO given post-exhaustion): CONFIRMED at ~95%.** A 12-core-feature
+  model retrained on c2 scores judged NDCG 0.5925 on the conv0 cells vs full R_post's
+  0.5957 (+0.0032, null) — the R_post dividend is core-channel *recalibration* to the
+  slept distribution, and H10's "retrain after sleep" guidance does not require sleep
+  features in the schema. Post-hoc: sleep features look like train-time routers
+  (frozen-store transfer: full 0.5043 > core 0.4433 despite all-zero sleep columns).
+  My registered frozen-sanity expectation was mis-specified (transfer effects); noted
+  honestly in the prereg.
 
 ## Files touched
 
@@ -74,7 +80,6 @@ Results: [`experiments/sleep-bench/findings-wp6-feature-structure.md`](../../exp
 
 ## What's next
 
-- N4 on Alexis's go (the one remaining conv0-touching test).
 - Deployment prune (schema22) available whenever the bench schema is next touched.
 - Pre-fork production sleep-path review booked ~07-14; live fork ~07-15 (sleep, then
   retrain reranker per H10 guidance).

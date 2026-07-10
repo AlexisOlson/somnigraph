@@ -137,12 +137,30 @@ everywhere (vs 5–8 on c2).
   the study's raison d'être, now demonstrated three ways (vec_rank, theme_rank, query
   constants).
 
+## N4 — the conv0 answer (ran 2026-07-10, after exhaustion)
+
+**Confirmed at ~95%: the R_post dividend is core-channel recalibration, not sleep-feature
+signal.** `R_core_post` (12 core features, c2-trained, CV 0.5512) scored on the conv0
+cells: judged NDCG **0.5925** vs the full R_post's ④ 0.5957 — the 12 sleep features add
++0.0032 [−0.0247, +0.0295], a null; the core model is nominally *better* on judged R@10
+(0.7598 vs 0.7432). Captured fraction of the ④−② gap ≈ 95% (pre-registered bar: ≥80%).
+
+Deployment implication: **"retrain the reranker after sleep" (H10's guidance) does not
+require sleep features in the schema** — retraining any reasonable core schema on the
+slept distribution captures ~95% of the gain. What changed after sleep is the *core
+feature distribution* (active pool 6,271 → 541, vec-distance mix, summary-heavy
+candidates), and retraining recalibrates to it.
+
+Post-hoc observation (not registered): on the *frozen* store the c2-trained full model
+(0.5043) beats the c2-trained core model (0.4433) by 0.06 even though sleep features are
+all-zero there — consistent with sleep features acting as train-time **routers** (their
+splits separate summary rows from detail rows, keeping detail calibration clean) rather
+than eval-time scorers. The registered sanity expectation ("core-on-frozen ≈ ①") was
+mis-specified — ① is frozen-trained, so transfer effects apply. Data: `analyze_n4.json`
+(cell slots reused; see prereg N4 verdict for the mapping).
+
 ## Open / out of scope
 
-- **N4 (registered, not run):** does a core-only-12 model trained on c2 capture ≥80% of
-  the ④−② judged conv0 gap? The one remaining conv0-touching test; needs its own training
-  run + explicit go. If yes, the R_post dividend is mostly core recalibration and the
-  sleep features are gravy; if no, the toggleable cluster earns its headline credit.
 - Raw-vs-normalized score structure: below power here; would need a bigger label set.
 - All numbers are one corpus (LoCoMo whole-store c2), one recipe (V6-parity pointwise
   LightGBM), coverage+evidence labels. Effect sizes travel, rankings may not.

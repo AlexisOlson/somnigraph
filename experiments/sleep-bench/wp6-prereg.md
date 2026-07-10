@@ -284,6 +284,30 @@ understated. Secondary read: R@10/MRR same direction. Also score the core model 
 frozen store as a sanity reference (expect ≈ ① — core-only ≈ full schema on frozen since
 sleep features are all-zero there).
 
+**N4 VERDICT (2026-07-10, ran same day): CONFIRMED at ~95% — the R_post dividend is
+core-channel recalibration.** R_core_post (12 core features, c2-trained, CV 0.5512)
+scored on the conv0 cells (`analyze_n4.json`; note the JSON's cell slots are REUSED:
+"slept_Rpre"/"frozen_Rpre" there hold the CORE model's cells, so the "(4)-(2)" contrast
+= full-R_post minus core-R_post on the slept store):
+- Core on slept, judged: **NDCG 0.5925 / R@10 0.7598 / MRR 0.5385** vs ④ 0.5957 / 0.7432
+  / 0.5361 — the 12 sleep features add **+0.0032 [−0.0247, +0.0295] judged NDCG (null)**;
+  core is nominally BETTER on R@10 (−0.0166 ns) and tied on MRR.
+- Captured fraction of the ④−② judged NDCG gap: (0.5925−0.535)/(0.5957−0.535) ≈ **95%**
+  (bar: ≥80%). Sleep features at conv0 judged eval = gravy, exactly as WP6's +0.006
+  rich-core CV lift predicted.
+- **Sanity expectation as registered was MIS-SPECIFIED** ("expect ≈ ①"): ① is trained on
+  frozen; R_core_post is trained on c2, so distribution transfer applies. Actual core-on-
+  frozen judged 0.4433 vs ① 0.516 and vs full-R_post-on-frozen ③ 0.5043. The full model
+  transfers to frozen 0.06 better than the core model despite sleep features being
+  all-zero there — consistent with sleep features acting as train-time ROUTERS (separating
+  summary rows from detail rows so detail calibration stays clean) rather than eval-time
+  scorers. This is a post-hoc read, not registered.
+- Deployment implication: H10's "retrain the reranker after sleep" guidance does NOT
+  depend on extending the schema with sleep features — a core-only retrain on the slept
+  distribution captures ~95% of the gain. The dividend is distribution recalibration
+  (pool size 6,271→541 active, vec-distance mix, summary-heavy candidates), not new
+  feature signal.
+
 **EXHAUSTION DECLARED (2026-07-10, after batch 4).** Every registered narrative is now
 tested or bounded: channel structure mapped (vec −0.20 / fts −0.017 / scores −0.0045 /
 constants bookkeeping), toggleable structure mapped (token workhorse 60%, pool/graph dual
