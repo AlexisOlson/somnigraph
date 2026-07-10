@@ -38,4 +38,5 @@ research/clones/
 
 # Sleep-bench experiment outputs (rig writes JSONL/summaries here)
 experiments/sleep-bench/results/
+experiments/sleep-bench/results-full/
 experiments/sleep-bench/precheck_results*.json

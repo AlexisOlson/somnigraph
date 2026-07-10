@@ -117,12 +117,23 @@ def main() -> None:
               f"{len(arm_ctx[lab]['token_map'])} active tokens")
 
     if judged is not None:
-        all_sids = set().union(*(c["is_summary"] for c in arm_ctx.values()))
         judged_sids = {s for cov in judged.values() for s in cov}
-        missing = all_sids - judged_sids
+        # Only credit-eligible summaries (generated_from intersects >=1 query's
+        # evidence) can appear in the judge's pair list, so require exactly
+        # those. Demanding ALL arm summaries breaks on corpus-scale stores
+        # where most summaries touch no GT evidence (H11: 28/28 eligible;
+        # whole-corpus: ~33/396).
+        ev_rows = load_rows(rdir, args.labels[0], args.scorers[0])
+        eligible = set()
+        for row in ev_rows.values():
+            ev = set(row["evidence_ids"])
+            for ctx in arm_ctx.values():
+                eligible.update(sid for sid, gf in ctx["genfrom"].items() if gf & ev)
+        missing = eligible - judged_sids
         if missing:
-            sys.exit(f"[impute-h11] judged coverage missing {len(missing)}/{len(all_sids)} "
-                     f"H11 summary ids -- re-run judge_summary_coverage.py on an H11 arm.")
+            sys.exit(f"[impute-h11] judged coverage missing {len(missing)}/{len(eligible)} "
+                     f"credit-eligible summary ids -- re-run judge_summary_coverage.py "
+                     f"on this chain's superset arm.")
 
     print(f"[impute-h11] mode={mode}; baseline={args.baseline}; "
           f"n_boot={args.n_boot}, seed={args.seed}\n")
