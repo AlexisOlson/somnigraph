@@ -202,6 +202,81 @@ fm_all_noise4 quantifies.
    core-only (−0.005), the damage is generic split displacement; if less, weak-signal
    models are the vulnerable ones.
 
+**Batch-3 verdicts (2026-07-10):**
+1. **CONFIRMED, emphatically** — fm_no_vec_channel 0.3544 (−0.2006 vs all_on), by far the
+   largest drop in the study; fm_no_fts_channel 0.5377 (−0.0173), modest as predicted.
+   Vec is the channel; FTS is a ~0.017 assist. Note no_vec (0.3544) > fts_alone (0.3198):
+   toggleables + query features are worth ~+0.035 on the starved core.
+2. **CONFIRMED** — fm_ranks_plus_tog 0.5459 = ranks_only (0.5336) + 0.0123: toggleables
+   are worth ~2× more on the minimal core than on the rich core (+0.006). Sleep-feature
+   signal is real-but-masked by core redundancy. Motivates batch 4's decomposition.
+3. **CONFIRMED** — fm_schema22 0.5560 ≥ all_on (0.5550). Dropping proximity + theme_rank
+   costs nothing (within noise, sign positive). Deployment prune validated.
+4. **CONFIRMED** — fm_no_query_constants 0.5534 (−0.0016, sub-threshold): the ~1,400
+   combined gain of the per-query constants is bookkeeping, generalizing the
+   candidate_pool_size read.
+5. **REFUTED on magnitude** — fm_no_scores 0.5505 (−0.0045, predicted > 0.008): all four
+   score magnitudes together are worth only ~0.0045 over ranks. TENSION with batch 2's
+   no_norms/no_raw (each −0.004): dropping one representation ≈ dropping both —
+   sub-additive, so the raw-vs-norm split is NOT resolvable at this power; the honest read
+   is "scores as a group ≈ 0.004–0.005, internal structure unknown."
+6. **Calibration** — fm_all_noise4 0.5503 (−0.0047) vs core+noise4's −0.0051 on core_only:
+   noise damage is GENERIC split displacement (~0.0012/junk col), not weak-signal
+   vulnerability. Confirms the reading rule: cross-width deltas ≲0.004 are unreadable.
+
+## Batch 4 — locating the masked toggleable signal + deployment schema — registered 2026-07-10
+
+Rationale: batch 3's fm_ranks_plus_tog showed toggleables carry 2× more signal on a
+minimal core (+0.0123) than the rich core lets them show (+0.006). C1 (rich core) said the
+CV dividend is pool-led; H10 importances said graph-led. The minimal-core platform can
+discriminate at higher effect size. Plus one practical deliverable: the pruned schema.
+Likely the LAST c2 batch — remaining after this: N4 (conv0, Alexis's go) + findings doc.
+
+**Masks + predictions (all c2, wp6_sweep.jsonl):**
+1. `fm_lean19` = 24 minus {proximity, theme_rank, query_idf_var, query_length,
+   candidate_pool_size} — the combined prune of everything individually dead. Predict
+   ≥ 0.5530 (≈ all_on); if holds, this is the recommended deployment schema.
+2. `fm_ranks_plus_token` = {fts_rank, vec_rank, theme_rank, token_count}. Predict captures
+   ≥ 60% of the +0.0123 ranks_plus_tog lift (≥ 0.541) — token_count is the workhorse.
+3. `fm_ranks_plus_pool` = ranks + {priority, token_count, theme_count, member_count,
+   is_summary}. Predict ≈ ranks_plus_tog (0.5459) — the pool carries nearly everything
+   (pool-led generalizes to the minimal core).
+4. `fm_ranks_plus_graph` = ranks + {edge_count, betweenness, diversity_score, ppr_score}.
+   Predict < ranks_plus_token — graph features are alternate encodings, not independent
+   signal, even on the starved core. If INSTEAD ranks_plus_graph ≥ ranks_plus_pool, the
+   H10 graph-led importance story gets its first CV-metric support and the pool-led read
+   was rich-core-specific.
+
+Widths 4–8 cols — same-width-ish ordering comparisons; the anchor gap (ranks_only 0.5336,
+ranks_plus_tog 0.5459) is 3× the confound. Decision rules: ordering of masks 2–4 read
+directly; lean19 read vs all_on at the >0.004 threshold.
+
+**Batch-4 verdicts (2026-07-10):**
+1. `fm_lean19` 0.5515 — prediction NARROWLY MISSED (< 0.5530), but Δ vs all_on = −0.0035
+   is sub-threshold → bounded-by-noise. schema22 (+0.0010) stays the validated prune;
+   lean19's extra 3-constant drop costs a little more than additivity suggested. Read:
+   prune proximity + theme_rank confidently; the query constants are droppable but not
+   provably free.
+2. `fm_ranks_plus_token` 0.5410 — CONFIRMED at the exact boundary: +0.0074 = 60% of the
+   +0.0123 toggle lift from one feature.
+3. `fm_ranks_plus_pool` 0.5437 — ≈confirmed: +0.0101 = 82% of the lift, −0.0022
+   (sub-threshold) short of ranks_plus_tog.
+4. `fm_ranks_plus_graph` 0.5432 — **REFUTED**: graph (78% of lift) > token (60%) and
+   statistically TIED with pool (Δ 0.0005). The registered alternative fires: the sleep
+   signal is DOUBLY ENCODED — pool and graph each independently recover ~80% of the full
+   toggleable lift on the minimal core. Neither "pool-led" (C1, rich core) nor "graph-led"
+   (H10 importances) is the structure; both are projections of one redundant synthesis-row
+   signal cluster.
+
+**EXHAUSTION DECLARED (2026-07-10, after batch 4).** Every registered narrative is now
+tested or bounded: channel structure mapped (vec −0.20 / fts −0.017 / scores −0.0045 /
+constants bookkeeping), toggleable structure mapped (token workhorse 60%, pool/graph dual
+~80% encodings, capacity dead, orphaned-flags real), store contrast done (frozen token
+−0.0126 generic content signal; theme_rank collapse = composition). Remaining questions
+are below instrument power (raw/norm split, lean19 residual) or out of scope for train-side
+CV (N4 core_only_post — conv0, runs only on explicit go). Results →
+`findings-wp6-feature-structure.md`.
+
 ## Outcome interpretation guardrails
 
 - CV metrics here rank *feature sets*, not the headline claim — no Stage-A/B/C number
