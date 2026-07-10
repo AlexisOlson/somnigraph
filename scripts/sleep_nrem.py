@@ -25,6 +25,8 @@ import random
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -131,6 +133,23 @@ Themes: {source_themes}"""
 # Empty MCP config — no servers needed for pure classification
 EMPTY_MCP_CONFIG = json.dumps({"mcpServers": {}})
 
+# Minimum gap between claude -p launches when running batches in parallel.
+# A burst of simultaneous spawns can hit the Windows commit limit before the
+# pagefile has a chance to expand; spacing the launches removes the spike.
+_LAUNCH_STAGGER_RANGE = (3.0, 5.0)
+_launch_lock = threading.Lock()
+_last_launch = 0.0
+
+
+def _stagger_launch():
+    """Block until at least a stagger interval has passed since the last launch."""
+    global _last_launch
+    with _launch_lock:
+        wait = _last_launch + random.uniform(*_LAUNCH_STAGGER_RANGE) - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_launch = time.monotonic()
+
 # Isolated workspace for claude -p subprocesses. A fake git repo boundary
 # prevents CLAUDE.md discovery via directory traversal, and --setting-sources
 # "local" excludes user/project settings (hooks, memory instructions, etc.).
@@ -184,6 +203,11 @@ def gather(db, mode: str, limit: int = 0) -> dict:
     pair_index = 0
 
     skipped_stable = 0
+    # KNN is roughly symmetric, so A->B and B->A both land in the pair list
+    # without this (measured 17.4% of classify pairs on a dense 5.9k-memory
+    # corpus, 2026-07-09). One classification per unordered pair is enough.
+    seen_pairs: set[frozenset] = set()
+    skipped_symmetric = 0
     for mem in memories:
         processed_ids.append(mem["id"])
         related = _find_related_memories(db, mem["id"], mem["content"], limit=5)
@@ -219,6 +243,7 @@ def gather(db, mode: str, limit: int = 0) -> dict:
                 "target_id": fast_target,
                 "note": "Schema-consistent (fast path)",
             })
+            seen_pairs.add(frozenset((mem["id"], fast_target)))
             continue
 
         themes = json.loads(mem["themes"]) if mem["themes"] else []
@@ -239,6 +264,13 @@ def gather(db, mode: str, limit: int = 0) -> dict:
             ).fetchone()
             if existing_edge:
                 continue
+
+            # Pre-filter: skip the reverse ordering of a pair already queued
+            pair_key = frozenset((mem["id"], rel_row["id"]))
+            if pair_key in seen_pairs:
+                skipped_symmetric += 1
+                continue
+            seen_pairs.add(pair_key)
 
             rel_themes = json.loads(rel_row["themes"]) if rel_row["themes"] else []
             classify_pairs.append({
@@ -274,6 +306,7 @@ def gather(db, mode: str, limit: int = 0) -> dict:
         "shadow_updates": shadow_updates,
         "classify_memory_ids": classify_memory_ids,
         "skipped_stable": skipped_stable,
+        "skipped_symmetric": skipped_symmetric,
     }
 
 
@@ -400,6 +433,7 @@ def classify_batch(batch: list[dict], mode: str = "standard") -> list[dict]:
         kwargs["creationflags"] = CREATE_NO_WINDOW
 
     claude_bin = shutil.which("claude") or "claude"
+    _stagger_launch()
     try:
         result = subprocess.run(
             [
@@ -426,7 +460,7 @@ def classify_batch(batch: list[dict], mode: str = "standard") -> list[dict]:
             **kwargs,
         )
     except subprocess.TimeoutExpired:
-        print("  WARNING: classification timed out (180s)", file=sys.stderr)
+        print("  WARNING: classification timed out (600s)", file=sys.stderr)
         return []
     except FileNotFoundError:
         print("  ERROR: 'claude' CLI not found on PATH", file=sys.stderr)
@@ -1007,10 +1041,12 @@ def main():
     classify_memory_ids = gather_data.get("classify_memory_ids", set())
 
     skipped_stable = gather_data.get("skipped_stable", 0)
+    skipped_symmetric = gather_data.get("skipped_symmetric", 0)
     log(f"Gathered {memories_count} memories, "
         f"{len(classify_pairs)} pairs to classify, "
         f"{len(fast_path_pairs)} fast-path"
-        + (f", {skipped_stable} skipped (stable)" if skipped_stable else ""))
+        + (f", {skipped_stable} skipped (stable)" if skipped_stable else "")
+        + (f", {skipped_symmetric} deduped (symmetric)" if skipped_symmetric else ""))
 
     # Step 2: Fast-path results
     all_results = []
@@ -1030,9 +1066,15 @@ def main():
         batches = build_batches(classify_pairs, mode)
         log(f"Classification: {len(classify_pairs)} pairs in {len(batches)} batch(es)")
 
-        # Each claude -p subprocess reserves ~13 GB virtual memory (Bun/JSC heap).
-        # Parallel launches exhaust the Windows paging file and crash (0xC0000409).
-        MAX_PARALLEL = 1
+        # Each claude -p worker commits ~0.5 GB (measured 2026-07-09: five
+        # workers on one run, peaks 473-516 MB, no growth over the batch).
+        # The old hard-coded 1 encoded a commit-limit crash (0xC0000409) on a
+        # box running near its commit ceiling (32 GB RAM + small fixed
+        # pagefile): the hazard is TOTAL system commit charge, not this
+        # process. Default 2 fits ~2 GB of headroom; raise via env only with
+        # commit headroom to match (roughly 0.5 GB per extra worker). Launches
+        # are staggered (_stagger_launch) so a spawn burst never lands at once.
+        MAX_PARALLEL = max(1, int(os.environ.get("SOMNIGRAPH_NREM_PARALLEL", "2")))
         from math import ceil, sqrt
         waves = ceil(len(batches) / MAX_PARALLEL)
         est_min = waves * 3.0
