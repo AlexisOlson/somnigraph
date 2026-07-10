@@ -61,6 +61,7 @@ Usage:
 """
 
 import argparse
+import gc
 import hashlib
 import json
 import random
@@ -299,6 +300,17 @@ def cv_one_mask(tune_gt, full, folds, feats, col_idx):
             "val_q": len(set(groups[val_idx].tolist())),
             "best_iter": int(model.best_iteration_ or t2.LGB_PARAMS["n_estimators"]),
         })
+        # Free the booster's C++ memory before the next fold. 130 masks x 5 folds
+        # = 650 booster/dataset constructions in one process; without this the
+        # native heap creeps until LGBM_DatasetCreateFromMat throws bad_alloc
+        # (observed at mask 119/130 on the 8 GB-pagefile box, 2026-07-10).
+        del model
+        gc.collect()
+
+    # Drop this mask's ~100 MB column-slice copy of the full matrix eagerly
+    # rather than waiting for the next mask's reassignment.
+    del X
+    gc.collect()
 
     keys = ["ndcg_5k", "recall_10", "mrr", "graded_recall_5k", "rmse", "best_iter"]
     mean = {k: float(np.mean([f[k] for f in per_fold])) for k in keys}
