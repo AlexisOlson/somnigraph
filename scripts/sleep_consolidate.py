@@ -15,7 +15,19 @@ Sleep Consolidate — thematic cluster consolidation.
 
 Detects clusters of memories about the same underlying insight via taxonomy +
 weight-filtered edge BFS, sends each cluster to an LLM for judgment, and
-consolidates based on the LLM's decisions (keep/archive/merge/rewrite).
+consolidates based on the LLM's decisions.
+
+Default (since 2026-07-09, H12): redundancy is handled by a synthesized
+CONSOLIDATION NODE — a new memory carrying the cluster's de-duplicated,
+temporally normalized core facts — inserted with `generated_from` provenance
+and `consolidated_from` edges to its members. Members STAY ACTIVE and indexed
+(H3: deletion was 100% of destructive merge's measured cost; H11: per-pass
+archival eroded the active set 419→360 and raw retrieval damage tracked it
+exactly) and receive a one-time conservative priority downweight instead.
+Per-memory keep/rewrite/annotate and PROTECTED semantics are unchanged.
+
+The pre-H12 destructive semantics (archive/merge_into: supersede + hard-remove
+from vec/FTS) remain available behind --legacy-archive for research/ablation.
 
 Pipeline position:
     uv run sleep_nrem.py deep       # edges exist
@@ -24,11 +36,12 @@ Pipeline position:
     uv run probe_recall.py          # feedback for consolidated memories
 
 Usage:
-    uv run scripts/sleep_consolidate.py [--limit N] [--dry-run]
+    uv run scripts/sleep_consolidate.py [--limit N] [--dry-run] [--legacy-archive]
 """
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -47,8 +60,10 @@ from memory import (
     get_db,
     count_tokens,
     embed_text,
+    build_enriched_text,
     serialize_f32,
     _create_edge,
+    _insert_memory,
     update_fts,
 )
 
@@ -99,9 +114,29 @@ _SUBPROCESS_CWD = DATA_DIR / "subprocess_workspace"
 EDGE_WEIGHT_THRESHOLD = 0.4
 MIN_CLUSTER_SIZE = 3
 CROSS_TOPIC_EDGE_MIN = 2
-MAX_ARCHIVES_PER_CLUSTER = 10
+MAX_ARCHIVES_PER_CLUSTER = 10  # legacy (--legacy-archive) destructive budget per cluster
 MAX_CLUSTER_TOKENS = 50_000
 MAX_CLUSTER_SIZE = 20  # Don't merge beyond this — LLM can't judge 93 memories well
+
+# --- Consolidation-node member downweight (H12, sleep-bench 2026-07-09) -----
+# When a consolidation node is created its members STAY ACTIVE and indexed;
+# they yield rank instead of leaving the index, via a one-time reduction of
+# base_priority by this factor (floored at 1), marked idempotent with the
+# CONSOLIDATED_MEMBER_FLAG so iterated passes never compound it. Priority
+# reaches live scoring through the reranker's base_priority feature and
+# effective_priority(); raw RRF and the rrf_fuse formula are rank-based and
+# never read priority, so the downweight is invisible there by construction
+# (known instrument property — measure via reranker/formula arms, not rrf).
+# v1 is a fixed conservative factor; coverage-proportional (judge-verified)
+# downweight is planned v2 after the H12 bench sweep finds the knee.
+CONSOLIDATED_MEMBER_WEIGHT = float(os.environ.get(
+    "SOMNIGRAPH_CONSOLIDATED_MEMBER_WEIGHT", "0.8"))
+CONSOLIDATED_MEMBER_FLAG = "consolidated_member"
+# Downweight budget per cluster (the MAX_ARCHIVES_PER_CLUSTER analog for the
+# non-destructive path). Provenance edges are NOT capped — every member the
+# synthesis drew from gets its consolidated_from edge; only the downweight is
+# budgeted, because it is the sole action here with any retrieval cost.
+MAX_CONSOLIDATED_PER_CLUSTER = 10
 
 
 def _ensure_subprocess_workspace():
@@ -416,6 +451,83 @@ You are a memory consolidation agent. You receive a cluster of thematically
 related memories and decide which are genuinely distinct vs redundant.
 
 REDUNDANCY TYPES:
+1. True paraphrases: same info in different words — consolidate them
+2. Journal digests mentioning an insight captured standalone elsewhere — consolidate
+3. Multiple versions of an evolving understanding — consolidate around the latest
+4. Narrative arcs (temporal sequences like ordering→shipping→arrival): NOT redundant.
+   Each step has unique texture. Use "annotate" to link them into an arc.
+5. Incident + codified pattern: if the incident ONLY matters as an instance of the
+   pattern, consolidate them. If it has its own texture/story, annotate it into the arc.
+
+ACTIONS (per memory):
+- "keep": distinct and valuable, no changes
+- "rewrite": this memory's own content needs updating in place (stale phrasing,
+  factual correction); provide new content + summary
+- "annotate": for narrative arcs/sequences — append arc context to this memory showing where it sits in the sequence (prev/next memories, brief arc summary). Use this when memories form a temporal arc where each step has unique texture worth preserving. Provide arc_context (text to append).
+
+CONSOLIDATION (cluster-level, at most one per response):
+Where you find a redundancy group, return a "consolidation" object — a NEW
+memory that synthesizes the de-duplicated core facts of those members, written
+for factual lookup. Nothing is deleted: the members stay active and searchable;
+the consolidation node becomes the focused canonical entry point and the
+members are gently downweighted. List every member the synthesis draws from in
+member_ids (2 or more). A memory listed in member_ids should usually also get
+a "keep" action (it is kept — the consolidation is additive).
+
+SYNTHESIS CONSTRAINTS (violating any of these loses a fact from lookup):
+- Preserve EVERY number, exact count, date, name, and speaker/actor attribution.
+- Preserve incidental objects and specifics, not just the narrative spine.
+- Temporally normalize: rewrite every relative time expression ("yesterday",
+  "next month", "last week") using that member's own anchor — its Created date
+  and any session-N theme shown in its header. No relative time expression may
+  survive unanchored in the synthesized content.
+- De-duplicate: a fact shared by several members appears once. Do not append
+  member texts verbatim — synthesize.
+
+FORMATION:
+If the cluster core represents a formative pattern (learned through experience, shaped
+subsequent behavior), mark it formation=true on the representative memory.
+
+SAFETY:
+- Nothing you do here removes a memory from recall. Consolidation adds; it never deletes.
+- When unsure whether facts are redundant, keep them distinct (no consolidation).
+- source="correction" memories should almost always be kept
+- PROTECTED memories (marked below) may appear in member_ids — they are not
+  modified or downweighted, only linked
+- Prefer keeping 2-3 strong memories over forcing one consolidation
+
+Respond with a JSON object. No markdown fences, no commentary — JSON only.
+
+Output schema:
+{
+  "reasoning": "Brief cluster analysis",
+  "consolidation": {
+    "member_ids": ["full-uuid", "full-uuid"],
+    "content": "de-duplicated, temporally normalized core facts (REQUIRED)",
+    "summary": "one-line summary of the consolidation node (REQUIRED)"
+  },
+  "actions": [
+    {
+      "memory_id": "full-uuid",
+      "action": "keep|rewrite|annotate",
+      "new_content": "full rewritten content (REQUIRED for rewrite)",
+      "new_summary": "new summary (REQUIRED for rewrite)",
+      "arc_context": "arc position text to append (REQUIRED for annotate)",
+      "formation": false
+    }
+  ]
+}
+Omit "consolidation" (or set it to null) when the cluster has no redundancy group."""
+
+
+# Pre-H12 destructive prompt, kept verbatim for --legacy-archive (research/
+# ablation only). archive/merge_into supersede + hard-remove the loser from
+# vec/FTS — the exact per-pass erosion H11 measured against.
+CONSOLIDATION_SYSTEM_LEGACY = """\
+You are a memory consolidation agent. You receive a cluster of thematically
+related memories and decide which are genuinely distinct vs redundant.
+
+REDUNDANCY TYPES:
 1. True paraphrases: same info in different words — archive the weaker version
 2. Journal digests mentioning an insight captured standalone elsewhere — archive digest
 3. Multiple versions of an evolving understanding — keep latest, archive earlier
@@ -483,7 +595,7 @@ def _is_protected(mem) -> bool:
     return False
 
 
-def prepare_prompt(db, cluster: dict) -> tuple[str, dict]:
+def prepare_prompt(db, cluster: dict, legacy_archive: bool = False) -> tuple[str, dict]:
     """Format cluster for LLM with rich context.
 
     Includes: cluster memories, internal edges, summary-layer memories
@@ -615,8 +727,13 @@ def prepare_prompt(db, cluster: dict) -> tuple[str, dict]:
         lines.append("")
 
     lines.append("OUTPUT: Respond with ONLY a JSON object. No prose, no markdown fences, no commentary.")
-    lines.append("Use FULL memory UUIDs (not 8-char prefixes) in memory_id, superseded_by, and target_id fields.")
-    lines.append('{"reasoning": "...", "actions": [{"memory_id": "full-uuid", "action": "keep|archive|merge_into|rewrite|annotate", ...}, ...]}')
+    if legacy_archive:
+        lines.append("Use FULL memory UUIDs (not 8-char prefixes) in memory_id, superseded_by, and target_id fields.")
+        lines.append('{"reasoning": "...", "actions": [{"memory_id": "full-uuid", "action": "keep|archive|merge_into|rewrite|annotate", ...}, ...]}')
+    else:
+        lines.append("Use FULL memory UUIDs (not 8-char prefixes) in memory_id and member_ids fields.")
+        lines.append('{"reasoning": "...", "consolidation": {"member_ids": ["full-uuid", ...], "content": "...", "summary": "..."} or null, '
+                     '"actions": [{"memory_id": "full-uuid", "action": "keep|rewrite|annotate", ...}, ...]}')
 
     return "\n".join(lines), prompt_stats
 
@@ -656,9 +773,9 @@ def _format_memory(mem) -> str:
 # LLM judgment
 # ---------------------------------------------------------------------------
 
-def judge_cluster(db, cluster: dict) -> dict | None:
+def judge_cluster(db, cluster: dict, legacy_archive: bool = False) -> dict | None:
     """Send cluster to LLM for consolidation judgment. Returns parsed actions or None."""
-    prompt, pstats = prepare_prompt(db, cluster)
+    prompt, pstats = prepare_prompt(db, cluster, legacy_archive=legacy_archive)
 
     trunc = f", {pstats['siblings_truncated']} truncated" if pstats['siblings_truncated'] else ""
     log(f"  Prompt: ~{pstats['cluster_tokens']}t cluster, "
@@ -666,7 +783,8 @@ def judge_cluster(db, cluster: dict) -> dict | None:
         f"~{pstats['sibling_tokens']}t siblings ({pstats['siblings_count']}{trunc})")
     log_detail(f"PROMPT for cluster ({len(cluster['memories'])} mems):\n{prompt}")
 
-    raw = call_llm(prompt, system_prompt=CONSOLIDATION_SYSTEM, timeout=600)
+    system = CONSOLIDATION_SYSTEM_LEGACY if legacy_archive else CONSOLIDATION_SYSTEM
+    raw = call_llm(prompt, system_prompt=system, timeout=600)
     if not raw:
         return None
 
@@ -751,12 +869,192 @@ def tag_formation(db, memory_id: str):
         update_fts(db, memory_id)
 
 
+_SESSION_THEME_RE = re.compile(r"^session[-_]\d+$", re.IGNORECASE)
+
+
+def _is_session_theme(theme: str) -> bool:
+    """Session anchor themes (session-N) are NOT inherited by consolidation
+    nodes: the node spans sessions, and its content carries normalized absolute
+    dates instead (H12 plan point 5)."""
+    return bool(_SESSION_THEME_RE.match(theme.strip()))
+
+
+def create_consolidation_node(db, members: list, content: str, summary_text: str) -> str:
+    """Insert the synthesized consolidation node + provenance. Returns node id.
+
+    Mirrors the REM leaf-summary writer (sleep_rem.generate_summaries) exactly
+    on the provenance schema: `generated_from` = the full member-id list on a
+    layer='summary' row, which is precisely what the credit tooling
+    (impute_rescore.leaf_genfrom, reused by impute_iterated and
+    judge_summary_coverage) reads — so consolidation nodes enter the
+    judged/provenance credit bracket with no tooling changes. Differences from
+    a REM summary, all deliberate:
+    - source='consolidate' (the distinguishing marker; also escapes REM's
+      one-time layer='summary' AND source='sleep' migration delete)
+    - topic_id stays NULL (keeps the node out of REM's topic-summary refresh,
+      which would rewrite it as a dense topic summary)
+    - edges are edge_type='consolidated_from', NOT 'derived_from': REM's
+      process_dormancy treats derived_from targets of active summaries as
+      dormancy candidates, and consolidation members must never become
+      dead-for-retrieval through their own provenance edges.
+    """
+    node_id = str(uuid.uuid4())
+    member_ids = [m["id"] for m in members]
+
+    # Category: majority among members (ties broken by first occurrence)
+    cat_counts = {}
+    for m in members:
+        cat_counts[m["category"]] = cat_counts.get(m["category"], 0) + 1
+    category = max(cat_counts, key=cat_counts.get)
+
+    # Themes: union of member themes minus session anchors, capped at 8
+    # (matching REM's cap), order-preserving
+    themes = []
+    for m in members:
+        for t in (json.loads(m["themes"]) if m["themes"] else []):
+            if t not in themes and not _is_session_theme(str(t)):
+                themes.append(t)
+    themes = themes[:8]
+
+    # Priority: the cluster's factual core ranks at its strongest member's
+    # level (pre-downweight), clamped to the 1-10 scale
+    priority = max(1, min(10, max((m["base_priority"] or 5) for m in members)))
+
+    enriched = build_enriched_text(content, category, themes, summary_text)
+    embedding = embed_text(enriched)
+
+    _insert_memory(
+        db, node_id, content, summary_text, category,
+        json.dumps(themes), priority, "consolidate", "active", embedding,
+        layer="summary", generated_from=member_ids,
+    )
+    for mid in member_ids:
+        _create_edge(
+            db, node_id, mid,
+            linking_context="consolidated_from",
+            flags=["derivation"],
+            created_by="consolidate",
+            edge_type="consolidated_from",
+        )
+    return node_id
+
+
+def downweight_member(db, memory_id: str) -> bool:
+    """One-time conservative priority downweight for a consolidation member.
+
+    Re-fetches the live row (cluster rows are pass-start snapshots; a memory
+    can sit in two clusters of the same run) so the CONSOLIDATED_MEMBER_FLAG
+    guard is read fresh and the downweight can never compound. Returns True if
+    applied; False if skipped (protected or already downweighted)."""
+    mem = db.execute(
+        "SELECT * FROM memories WHERE id = ? AND status = 'active'", (memory_id,)
+    ).fetchone()
+    if not mem:
+        return False
+    if _is_protected(mem):
+        return False
+    try:
+        flags_raw = mem["flags"]
+    except (IndexError, KeyError):
+        flags_raw = None
+    flags = json.loads(flags_raw) if flags_raw else []
+    if CONSOLIDATED_MEMBER_FLAG in flags:
+        return False
+    new_priority = max(1, int(round((mem["base_priority"] or 5) * CONSOLIDATED_MEMBER_WEIGHT)))
+    flags.append(CONSOLIDATED_MEMBER_FLAG)
+    db.execute(
+        "UPDATE memories SET base_priority = ?, flags = ? WHERE id = ?",
+        (new_priority, json.dumps(flags), memory_id),
+    )
+    return True
+
+
+def execute_consolidation(db, judgment: dict, mem_by_id: dict, resolve_id,
+                          stats: dict, dry_run: bool = False,
+                          verbose: bool = False) -> None:
+    """Validate and apply the cluster-level consolidation object (H12 default)."""
+    consolidation = judgment.get("consolidation")
+    if isinstance(consolidation, list):
+        # Defensive: schema says one object; take the first if the LLM lists
+        consolidation = consolidation[0] if consolidation and isinstance(consolidation[0], dict) else None
+    if not consolidation or not isinstance(consolidation, dict):
+        return
+
+    content = (consolidation.get("content") or "").strip()
+    summary_text = (consolidation.get("summary") or "").strip()
+    raw_ids = consolidation.get("member_ids") or []
+    if not isinstance(raw_ids, list):
+        raw_ids = []
+
+    member_ids = []
+    for rid in raw_ids:
+        resolved = resolve_id(str(rid))
+        if resolved and resolved in mem_by_id and resolved not in member_ids:
+            member_ids.append(resolved)
+
+    if not content:
+        stats["rejected"] += 1
+        stats["details"].append("  REJECTED consolidation: no content")
+        return
+    if len(member_ids) < 2:
+        stats["rejected"] += 1
+        stats["details"].append(
+            f"  REJECTED consolidation: {len(member_ids)} valid member_ids (need 2+)")
+        return
+    if not summary_text:
+        # Content is the load-bearing field; degrade gracefully like
+        # _insert_memory's auto-summary rather than dropping the synthesis
+        summary_text = content.split(".")[0][:80] if "." in content else content[:80]
+
+    members = [mem_by_id[mid] for mid in member_ids]
+
+    # Verify members are still active (mirrors the per-action liveness check)
+    live_ids = set()
+    for mid in member_ids:
+        live = db.execute(
+            "SELECT id FROM memories WHERE id = ? AND status = 'active'", (mid,)
+        ).fetchone()
+        if live:
+            live_ids.add(mid)
+    if len(live_ids) < 2:
+        stats["blocked"] += 1
+        stats["details"].append("  BLOCKED consolidation: fewer than 2 members still active")
+        return
+    members = [m for m in members if m["id"] in live_ids]
+
+    stats["details"].append(
+        f"  CONSOLIDATE {len(members)} members -> node: {summary_text[:80]}")
+    if verbose:
+        preview = content[:300].replace("\n", " ")
+        stats["details"].append(f"       content: {preview}...")
+
+    node_id = None
+    downweighted = 0
+    if not dry_run:
+        node_id = create_consolidation_node(db, members, content, summary_text)
+        for m in members[:MAX_CONSOLIDATED_PER_CLUSTER]:
+            if downweight_member(db, m["id"]):
+                downweighted += 1
+        if len(members) > MAX_CONSOLIDATED_PER_CLUSTER:
+            stats["details"].append(
+                f"       downweight budget hit: {len(members) - MAX_CONSOLIDATED_PER_CLUSTER} "
+                f"members linked but not downweighted")
+        stats["details"].append(
+            f"       node {node_id[:8]}: {len(members)} consolidated_from edges, "
+            f"{downweighted} members downweighted (x{CONSOLIDATED_MEMBER_WEIGHT})")
+
+    stats["consolidated"] += 1
+    stats["downweighted"] += downweighted
+
+
 def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
-                    verbose: bool = False) -> dict:
-    """Apply keep/archive/merge_into/rewrite/annotate per memory.
-    Returns stats {archived, merged, rewritten, annotated, formations, kept,
-    rejected, blocked, details}."""
-    stats = {"archived": 0, "merged": 0, "rewritten": 0, "annotated": 0,
+                    verbose: bool = False, legacy_archive: bool = False) -> dict:
+    """Apply the LLM judgment. Default: consolidation node + keep/rewrite/annotate;
+    archive/merge_into execute only under --legacy-archive (destructive).
+    Returns stats {consolidated, downweighted, archived, merged, rewritten,
+    annotated, formations, kept, rejected, blocked, details}."""
+    stats = {"consolidated": 0, "downweighted": 0,
+             "archived": 0, "merged": 0, "rewritten": 0, "annotated": 0,
              "formations": 0, "kept": 0, "rejected": 0, "blocked": 0, "details": []}
 
     mem_by_id = {m["id"]: m for m in cluster["memories"]}
@@ -771,6 +1069,11 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
         if not raw_id:
             return ""
         return prefix_to_full.get(raw_id, prefix_to_full.get(raw_id[:8], ""))
+
+    # Cluster-level consolidation node (default mode only)
+    if not legacy_archive:
+        execute_consolidation(db, judgment, mem_by_id, resolve_id, stats,
+                              dry_run=dry_run, verbose=verbose)
 
     actions = judgment.get("actions", [])
     archive_count = 0
@@ -810,6 +1113,14 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
                 stats["details"].append(f"  FORMATION {mid[:8]}: {(mem['summary'] or '')[:60]}")
 
         elif action == "archive":
+            if not legacy_archive:
+                # Non-destructive default: the prompt no longer offers archive,
+                # but never execute a stray destructive action outside
+                # --legacy-archive.
+                stats["blocked"] += 1
+                stats["details"].append(
+                    f"  BLOCKED archive {mid[:8]}: destructive action requires --legacy-archive")
+                continue
             superseded_by = resolve_id(action_item.get("superseded_by", ""))
             # Fallback: LLM sometimes puts the target ID in "reason" text instead
             if not superseded_by or superseded_by not in mem_by_id:
@@ -845,6 +1156,11 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
             archive_count += 1
 
         elif action == "merge_into":
+            if not legacy_archive:
+                stats["blocked"] += 1
+                stats["details"].append(
+                    f"  BLOCKED merge {mid[:8]}: destructive action requires --legacy-archive")
+                continue
             target_id = resolve_id(action_item.get("target_id", ""))
             merge_content = action_item.get("merge_content", "")
             # The judge often reads "merge A into B" as "fold A's existing content
@@ -1031,6 +1347,16 @@ def main():
                         help="Print actions without executing")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Show detailed per-action output (reasons, content previews)")
+    parser.add_argument("--legacy-archive", action="store_true",
+                        help="Restore the pre-2026-07-09 destructive behavior: the LLM rules "
+                             "archive/merge_into and losers are superseded + hard-removed from "
+                             "vec/FTS. The default now synthesizes a CONSOLIDATION NODE and keeps "
+                             "every member active and indexed with a conservative priority "
+                             "downweight -- the H11 archive-loss audit showed the raw retrieval "
+                             "damage of the destructive path was entirely scorer blindness + "
+                             "ranking failures of carriers that had left the index "
+                             "(experiments/sleep-bench/findings-h11-archive-loss-audit.md). Use "
+                             "this flag only for research/ablation.")
     args = parser.parse_args()
 
     started_at = datetime.now(timezone.utc).isoformat()
@@ -1039,6 +1365,8 @@ def main():
     log(f"Log file: {log_path}")
     if args.dry_run:
         log("MODE: dry-run (no changes will be made)")
+    if args.legacy_archive:
+        log("MODE: legacy-archive (destructive archive/merge_into semantics)")
 
     db = get_db()
 
@@ -1061,7 +1389,8 @@ def main():
         log(f"Limited to {len(clusters)} clusters")
 
     # Step 2: Process each cluster
-    totals = {"archived": 0, "merged": 0, "rewritten": 0, "annotated": 0,
+    totals = {"consolidated": 0, "downweighted": 0,
+              "archived": 0, "merged": 0, "rewritten": 0, "annotated": 0,
               "formations": 0, "kept": 0, "rejected": 0, "blocked": 0, "failed": 0}
     all_details = []
 
@@ -1070,7 +1399,7 @@ def main():
         log(f"\nCluster {i+1}/{len(clusters)} "
             f"({len(cluster['memory_ids'])} members, topics={cluster['topic_ids']})...")
 
-        judgment = judge_cluster(db, cluster)
+        judgment = judge_cluster(db, cluster, legacy_archive=args.legacy_archive)
         if judgment is None:
             log(f"  FAILED: no judgment returned")
             totals["failed"] += 1
@@ -1081,16 +1410,20 @@ def main():
             log(f"  Reasoning: {reasoning[:120]}")
 
         stats = execute_actions(db, cluster, judgment, dry_run=args.dry_run,
-                                verbose=args.verbose)
+                                verbose=args.verbose,
+                                legacy_archive=args.legacy_archive)
 
-        for key in ("archived", "merged", "rewritten", "annotated", "formations", "kept", "rejected", "blocked"):
+        for key in ("consolidated", "downweighted", "archived", "merged",
+                    "rewritten", "annotated", "formations", "kept", "rejected", "blocked"):
             totals[key] += stats[key]
 
         for detail in stats["details"]:
             log(detail)
             all_details.append(detail)
 
-        log(f"  Result: {stats['archived']} archived, {stats['merged']} merged, "
+        log(f"  Result: {stats['consolidated']} consolidation nodes "
+            f"({stats['downweighted']} members downweighted), "
+            f"{stats['archived']} archived, {stats['merged']} merged, "
             f"{stats['rewritten']} rewritten, {stats.get('annotated', 0)} annotated, "
             f"{stats['kept']} kept, {stats['formations']} formations")
 
@@ -1116,11 +1449,14 @@ def main():
                 log(f"  {w}")
 
     # Step 4: Log sleep cycle
-    if not args.dry_run and (totals["archived"] or totals["merged"] or totals["rewritten"]):
+    if not args.dry_run and (totals["consolidated"] or totals["archived"]
+                             or totals["merged"] or totals["rewritten"]):
         now = datetime.now(timezone.utc).isoformat()
         log_id = str(uuid.uuid4())
         report = (
             f"Consolidate: {len(clusters)} clusters, "
+            f"{totals['consolidated']} consolidation nodes "
+            f"({totals['downweighted']} members downweighted), "
             f"{totals['archived']} archived, {totals['merged']} merged, "
             f"{totals['rewritten']} rewritten, {totals['formations']} formations"
         )
@@ -1143,6 +1479,8 @@ def main():
     # Step 5: Report
     log(f"\n## Consolidation Report")
     log(f"- Clusters processed: {len(clusters)}")
+    log(f"- Consolidation nodes: {totals['consolidated']}")
+    log(f"- Members downweighted: {totals['downweighted']}")
     log(f"- Archived: {totals['archived']}")
     log(f"- Merged: {totals['merged']}")
     log(f"- Rewritten: {totals['rewritten']}")
