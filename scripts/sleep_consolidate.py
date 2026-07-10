@@ -916,9 +916,14 @@ def create_consolidation_node(db, members: list, content: str, summary_text: str
                 themes.append(t)
     themes = themes[:8]
 
-    # Priority: the cluster's factual core ranks at its strongest member's
-    # level (pre-downweight), clamped to the 1-10 scale
-    priority = max(1, min(10, max((m["base_priority"] or 5) for m in members)))
+    # Priority: floor 6, else the strongest member's level (pre-downweight),
+    # capped at 9. This slots consolidation nodes into the priority ladder as
+    # their own band: 4 (consolidated member) < 5 (untouched detail) <
+    # 6 (consolidation node) < 7-9 (REM summary) -- the node outranks the
+    # details it condenses but stays below the abstraction band. On stores
+    # with high-priority members (e.g. p7 corrections) the max-member rule
+    # still wins so a node never ranks below its own strongest member.
+    priority = min(9, max(6, max((m["base_priority"] or 5) for m in members)))
 
     enriched = build_enriched_text(content, category, themes, summary_text)
     embedding = embed_text(enriched)
