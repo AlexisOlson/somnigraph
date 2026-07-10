@@ -112,6 +112,7 @@ def load_rows(results_dir: Path, stem: str) -> dict:
             f"missing Stage-A output: {path}\n"
             f"  score_model_arm.py must have written {stem}.jsonl first."
         )
+    _assert_stem_matches_store(results_dir, stem)
     out = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -120,6 +121,29 @@ def load_rows(results_dir: Path, stem: str) -> dict:
                 r = json.loads(line)
                 out[r["query_id"]] = r
     return out
+
+
+def _assert_stem_matches_store(results_dir: Path, stem: str) -> None:
+    """Guard against a mislabeled cell: score_model_arm stamps the actual
+    --data-dir into {stem}.summary.json, while this analyzer derives each
+    cell's store purely from the filename stem. If an operator paired
+    --label c2 with the frozen store, raw metrics and judged imputation
+    would silently disagree — one corrupted cell, wrong interaction."""
+    summary_path = results_dir / f"{stem}.summary.json"
+    if not summary_path.exists():
+        return
+    data_dir = json.loads(summary_path.read_text()).get("data_dir")
+    if not data_dir:
+        return  # retrieve.py summaries don't stamp data_dir; nothing to check
+    actual = Path(data_dir).name          # e.g. conv0-c2
+    expected_label = store_label(stem)    # e.g. c2
+    if actual.split("-", 1)[-1] != expected_label:
+        sys.exit(
+            f"ERROR: cell stem {stem!r} implies store label {expected_label!r} "
+            f"but {summary_path.name} says it was scored on {actual!r} "
+            f"(data_dir={data_dir}).\n  The --label/--data-dir pairing of the "
+            f"score_model_arm run was wrong; re-score that cell."
+        )
 
 
 def build_store_ctx(arms: Path, conv: int, label: str) -> dict:
