@@ -1074,7 +1074,7 @@ def main():
         # process. Default 2 fits ~2 GB of headroom; raise via env only with
         # commit headroom to match (roughly 0.5 GB per extra worker). Launches
         # are staggered (_stagger_launch) so a spawn burst never lands at once.
-        MAX_PARALLEL = max(1, int(os.environ.get("SOMNIGRAPH_NREM_PARALLEL", "2")))
+        MAX_PARALLEL = max(1, int(os.environ.get("SOMNIGRAPH_NREM_PARALLEL", "").strip() or "2"))
         from math import ceil, sqrt
         waves = ceil(len(batches) / MAX_PARALLEL)
         est_min = waves * 3.0

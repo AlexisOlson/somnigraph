@@ -268,6 +268,22 @@ directly; lean19 read vs all_on at the >0.004 threshold.
    (H10 importances) is the structure; both are projections of one redundant synthesis-row
    signal cluster.
 
+## N4 — GO given (2026-07-10, after batch 4)
+
+Alexis greenlit the registered N4 test. Spec, stated before training: train `R_core_post`
+(the 12 core features only, `results-full/core12_mask.json`) on the c2 store with the same
+gt_2x2.json labels / recipe / folds / seed as R_post, then score it as an additional conv0
+cell on the c2 store (same eval protocol + opus credit table as cells ①–④).
+**Prediction (unchanged from registration): the core-only model captures ≥80% of the
+④−② judged NDCG gap** — ② (R_pre on slept) = 0.535, ④ (R_post on slept) = 0.596, gap
++0.061, so the bar is core_post cell ≥ ~0.584 judged NDCG. If met: the R_post dividend is
+mostly core-channel recalibration to the slept distribution, and the sleep features are
+marginal gravy (consistent with WP6's +0.006 rich-core toggle lift). If clearly missed
+(≤50%): the doubly-encoded toggleable cluster earns real headline credit that CV
+understated. Secondary read: R@10/MRR same direction. Also score the core model on the
+frozen store as a sanity reference (expect ≈ ① — core-only ≈ full schema on frozen since
+sleep features are all-zero there).
+
 **EXHAUSTION DECLARED (2026-07-10, after batch 4).** Every registered narrative is now
 tested or bounded: channel structure mapped (vec −0.20 / fts −0.017 / scores −0.0045 /
 constants bookkeeping), toggleable structure mapped (token workhorse 60%, pool/graph dual

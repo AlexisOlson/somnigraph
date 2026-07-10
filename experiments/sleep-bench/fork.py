@@ -23,6 +23,7 @@ fork) are what actually exercise this.
 
 import argparse
 import shutil
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -30,7 +31,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precheck import assert_isolated_data_dir  # reuse the guard, don't duplicate it
 
 
-def fork_store(src_dir: Path, dst_dir: Path) -> Path:
+def scrub_access_counts(data_dir: Path) -> None:
+    """Reset retrieval-access state so sleep sees an honest never-recalled store.
+
+    Scoring passes call the recall path against arm stores, which bumps
+    recall_count and last_accessed as a side effect. REM's dormancy criteria
+    read exactly those columns (recall_count + reflect_count < threshold, plus
+    last_accessed age), so a previously-scored fork looks "recently used" and
+    dormancy silently under-fires (H11's 7% vs the honest 97.5% on a fresh
+    whole-corpus store, 2026-07-10). last_accessed resets to created_at — the
+    same convention REM applies when last_accessed is missing.
+    """
+    assert_isolated_data_dir(data_dir)
+    db_path = data_dir / "memory.db"
+    if not db_path.exists():
+        raise FileNotFoundError(f"no memory.db under {data_dir}")
+    db = sqlite3.connect(db_path)
+    try:
+        cur = db.execute(
+            "UPDATE memories SET recall_count = 0, reflect_count = 0, "
+            "startup_count = 0, access_count = 0, use_count = 0, "
+            "last_accessed = created_at"
+        )
+        db.commit()
+        print(f"[scrub] reset access counters on {cur.rowcount} rows in {db_path}")
+    finally:
+        db.close()
+
+
+def fork_store(src_dir: Path, dst_dir: Path, scrub: bool = False) -> Path:
     """copytree an isolated data dir into a fresh one. Returns dst_dir."""
     src_dir = src_dir.resolve()
     dst_dir = dst_dir.resolve()
@@ -45,6 +74,8 @@ def fork_store(src_dir: Path, dst_dir: Path) -> Path:
         )
     shutil.copytree(src_dir, dst_dir)
     print(f"[fork] {src_dir} -> {dst_dir}")
+    if scrub:
+        scrub_access_counts(dst_dir)
     return dst_dir
 
 
@@ -68,13 +99,22 @@ def main() -> None:
     p_fork = sub.add_parser("fork", help="copytree src -> dst (both must be isolated)")
     p_fork.add_argument("src", type=str)
     p_fork.add_argument("dst", type=str)
+    p_fork.add_argument(
+        "--scrub-access-counts", action="store_true",
+        help="after copying, zero recall/reflect/access counters and reset "
+             "last_accessed to created_at on the DESTINATION, so a previously "
+             "scored source doesn't shield rows from REM dormancy",
+    )
 
     p_reset = sub.add_parser("reset", help="rmtree an isolated store dir")
     p_reset.add_argument("data_dir", type=str)
 
     args = parser.parse_args()
     if args.cmd == "fork":
-        fork_store(Path(args.src).expanduser(), Path(args.dst).expanduser())
+        fork_store(
+            Path(args.src).expanduser(), Path(args.dst).expanduser(),
+            scrub=args.scrub_access_counts,
+        )
     elif args.cmd == "reset":
         reset_store(Path(args.data_dir).expanduser())
 
