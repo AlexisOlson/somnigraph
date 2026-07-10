@@ -158,6 +158,50 @@ frozen mini-sweep (N1a/N5; separate out-file `wp6_sweep_frozen.jsonl`,
 `--ignore-anchor-mismatch` because the gate compares to R_post; manual anchor = R_pre
 mean NDCG 0.4534).
 
+## Batch 3 — channel structure + schema pruning — registered 2026-07-10
+
+**Batch-2 verdicts (before this registration):** N7 capacity DEAD (core+noise4 0.5439 /
+core+noise12 0.5462, both < core_only ≈ 0.5490 — junk columns cost, don't lift). N8:
+no_vec_rank −0.0106 only — the #1-gain feature is 1-point-replaceable (vec_dist/norm
+rebuild it); redundancy, not irrelevance, explains the flat landscape. N9: proximity
+(0.5551) and theme_rank (0.5556 > all_on!) DEAD on c2 — drop candidates;
+candidate_pool_size −0.0012 bookkeeping-confirmed; query_coverage −0.0033 earns its keep.
+N10: ranks_only 0.5336 (high floor); vec-alone 0.5224 vs fts-alone 0.3198 (vec is THE
+channel); no_norms/no_raw each −0.004 — raw and normalized scores NOT redundant
+(prediction wrong). N2 SUPPORTED (no_size_no_flags −0.0018 ≈ pool_out vs token-knockout
+−0.0044: orphaned flags mislead). N1b SUPPORTED (is_summary_only 0.5498 < token_only
+0.5519). Frozen mini-sweep (N1a/N5) still outstanding.
+
+**Frozen mini-sweep verdicts (2026-07-10):** manual anchor EXACT (all_on frozen = R_pre
+CV per-fold to the digit; gate FAIL vs R_post reference is the documented artifact).
+**N1a DEAD** — knockout_token_count on frozen costs −0.0126 (predicted ~0): token_count
+is a genuine detail-content signal (3× its c2 effect), not a summary detector. token_only
+recovers +0.0077 of the +0.0108 frozen toggle lift. **N5 SUPPORTED** — theme_rank gain
+109–141 across all frozen masks (vs ~5–8 on c2): the R_pre→R_post collapse is store
+composition. **NEW INSTRUMENT CAVEAT:** all_on vs token_only on frozen differ only by 11
+all-constant columns yet score 0.0031 apart — constant/junk columns dilute
+colsample_bytree draws, so cross-mask deltas at different column counts carry a ~±0.003
+composition confound. Reading rule: trust only deltas > ~0.004 or same-width comparisons;
+fm_all_noise4 quantifies.
+
+**Batch-3 masks + predictions:**
+1. `fm_no_vec_channel` (drop vec_rank+vec_dist+vec_dist_norm): predict the largest drop
+   in the study (> 0.011); `fm_no_fts_channel` (drop fts_rank+fts_bm25+fts_bm25_norm):
+   predict modest (vec carries the corpus).
+2. `fm_ranks_plus_tog` (fts_rank,vec_rank,theme_rank + all 12 toggleables): if
+   toggleables lift the minimal core by ≫ +0.006 (their lift on the rich core), their
+   signal is real-but-masked by core redundancy. Predict visible extra lift over
+   ranks_only (0.5336).
+3. `fm_schema22` (24 minus proximity, theme_rank): deployment prune. Predict ≥ all_on.
+4. `fm_no_query_constants` (24 minus query_idf_var, query_length, candidate_pool_size —
+   per-query constants, combined gain ~1,400): predict ≈ all_on ("gain is bookkeeping"
+   generalizes).
+5. `fm_no_scores` (24 minus fts_bm25, vec_dist, fts_bm25_norm, vec_dist_norm): predict
+   drop > 0.008 (score magnitudes matter beyond rank orderings).
+6. `fm_all_noise4` (24 + noise1–4): if noise hurts the rich model ≈ as much as it hurt
+   core-only (−0.005), the damage is generic split displacement; if less, weak-signal
+   models are the vulnerable ones.
+
 ## Outcome interpretation guardrails
 
 - CV metrics here rank *feature sets*, not the headline claim — no Stage-A/B/C number
