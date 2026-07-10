@@ -77,7 +77,13 @@ def load_sweep(path: Path) -> list[dict]:
         if r["mask_id"] not in seen:
             seen.add(r["mask_id"])
             out.append(r)
-    return out
+    # Full masks (core-inclusive / noise-column runs, `full_features` present)
+    # violate the core-always-on assumption every statistic here relies on --
+    # exclude them from the structure readout; read them directly instead.
+    n_full = sum(1 for r in out if "full_features" in r)
+    if n_full:
+        print(f"[analyze_wp6] excluding {n_full} full masks from toggleable stats")
+    return [r for r in out if "full_features" not in r]
 
 
 def _on(rec, feat) -> bool:

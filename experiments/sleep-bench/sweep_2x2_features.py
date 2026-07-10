@@ -65,6 +65,7 @@ import gc
 import hashlib
 import json
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -143,7 +144,7 @@ def feature_list_for(toggleables_on) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def build_mask_sequence(n_masks: int, seed: int, extra_masks) -> list[dict]:
+def build_mask_sequence(n_masks: int, seed: int, extra_masks, full_masks=None) -> list[dict]:
     """Deterministic ordered list of masks. Each item:
         {label, toggleables_on (sorted list), mask_id}
     Order: all_on anchor, core_only anchor, n_masks random masks (p=0.5 per
@@ -184,6 +185,23 @@ def build_mask_sequence(n_masks: int, seed: int, extra_masks) -> list[dict]:
     # Stage-C extra masks (appended after the random block; dedup against all).
     for name, toggs in extra_masks:
         add(name, toggs)
+
+    # Full masks (any SCHEMA_24 subset + noiseK columns; core NOT implied).
+    # Distinct id-space ("full|" prefix) so a full mask can never collide with
+    # a core+toggle mask; records carry `full_features` so analyze_wp6 can
+    # exclude them from the toggleable marginal statistics.
+    for name, feats in (full_masks or []):
+        ordered = canonical_full_order(feats)
+        mid = hashlib.sha1(("full|" + "|".join(ordered)).encode("utf-8")).hexdigest()[:12]
+        if mid in seen:
+            continue
+        seen.add(mid)
+        seq.append({
+            "label": name,
+            "toggleables_on": sorted(set(ordered) & set(TOGGLEABLE)),
+            "full_features": ordered,
+            "mask_id": mid,
+        })
 
     return seq
 
@@ -257,6 +275,46 @@ def parse_extra_mask(spec: str) -> tuple[str, list[str]]:
     if unknown:
         raise ValueError(f"--extra-mask {name}: names not toggleable: {unknown}")
     return name, feats
+
+
+NOISE_RE = re.compile(r"^noise(\d+)$")
+
+
+def parse_full_mask(spec: str) -> tuple[str, list[str]]:
+    """`name=feat1,feat2,...` -> (name, [feat,...]). Feats may be ANY SCHEMA_24
+    column (core included) and/or synthetic `noiseK` columns (seeded N(0,1),
+    the capacity-artifact control). Bypasses the core-always-on composition."""
+    if "=" not in spec:
+        raise ValueError(f"--full-mask must be name=feat,feat -- got {spec!r}")
+    name, csv = spec.split("=", 1)
+    name = name.strip()
+    feats = [f.strip() for f in csv.split(",") if f.strip()]
+    unknown = [f for f in feats if f not in SCHEMA_24 and not NOISE_RE.match(f)]
+    if unknown:
+        raise ValueError(f"--full-mask {name}: not in SCHEMA_24 nor noiseK: {unknown}")
+    if not feats:
+        raise ValueError(f"--full-mask {name}: empty feature list")
+    return name, feats
+
+
+def canonical_full_order(feats) -> list[str]:
+    """SCHEMA_24 canonical order first, then noiseK ascending. Column order is
+    load-bearing for reproducibility (colsample_bytree is order-dependent)."""
+    fs = set(feats)
+    reals = [f for f in SCHEMA_24 if f in fs]
+    noises = sorted((f for f in fs if NOISE_RE.match(f)),
+                    key=lambda s: int(NOISE_RE.match(s).group(1)))
+    return reals + noises
+
+
+def make_noise_columns(n_rows: int, names: list[str]) -> dict[str, "np.ndarray"]:
+    """Deterministic per-name standard-normal columns. Seed = 9999 + K so
+    noise3 is the same column in every run regardless of which masks request it."""
+    cols = {}
+    for name in names:
+        k = int(NOISE_RE.match(name).group(1))
+        cols[name] = np.random.default_rng(9999 + k).standard_normal(n_rows)
+    return cols
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +398,9 @@ def main() -> None:
     ap.add_argument("--key-file", default=str(DEFAULT_KEY_FILE))
     ap.add_argument("--extra-mask", action="append", default=[], metavar="name=feat,feat",
                     help="Stage-C targeted mask; repeatable. Feats are toggleables.")
+    ap.add_argument("--full-mask", action="append", default=[], metavar="name=feat,feat",
+                    help="exact feature set: any SCHEMA_24 column (core included) "
+                         "and/or noiseK synthetic columns; repeatable.")
     ap.add_argument("--ignore-anchor-mismatch", action="store_true",
                     help="do not abort if the full-scale all-on anchor gate FAILs")
     args = ap.parse_args()
@@ -355,10 +416,11 @@ def main() -> None:
         raise SystemExit(f"[sweep] refusing store outside {sentinel}: {store}")
 
     extra = [parse_extra_mask(s) for s in args.extra_mask]
-    seq = build_mask_sequence(args.n_masks, args.seed, extra)
+    fulls = [parse_full_mask(s) for s in args.full_mask]
+    seq = build_mask_sequence(args.n_masks, args.seed, extra, fulls)
     print(f"[sweep] mask sequence: {len(seq)} masks "
-          f"(2 anchors + {args.n_masks} random + {len(extra)} extra, "
-          f"post-dedup {len(seq)})")
+          f"(2 anchors + {args.n_masks} random + {len(extra)} extra + "
+          f"{len(fulls)} full, post-dedup {len(seq)})")
 
     # Resume: read any already-completed mask_ids from the output file.
     done: set[str] = set()
@@ -399,6 +461,20 @@ def main() -> None:
 
     schema_idx = {n: i for i, n in enumerate(SCHEMA_24)}
 
+    # Synthetic noise columns (capacity-artifact control): appended to the
+    # matrix once, deterministic per name regardless of run or mask set.
+    noise_names = sorted(
+        {f for m in seq for f in m.get("full_features", []) if NOISE_RE.match(f)},
+        key=lambda s: int(NOISE_RE.match(s).group(1)),
+    )
+    if noise_names:
+        noise_cols = make_noise_columns(len(full["y"]), noise_names)
+        full["X"] = np.column_stack([full["X"]] + [noise_cols[n] for n in noise_names])
+        for j, n in enumerate(noise_names):
+            schema_idx[n] = len(SCHEMA_24) + j
+        print(f"[sweep] appended {len(noise_names)} seeded noise columns: "
+              f"{', '.join(noise_names)}")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     total = len(seq)
     first_elapsed = None
@@ -406,7 +482,7 @@ def main() -> None:
         for mi, m in enumerate(seq):
             if m["mask_id"] in done:
                 continue
-            feats = feature_list_for(m["toggleables_on"])
+            feats = m.get("full_features") or feature_list_for(m["toggleables_on"])
             col_idx = [schema_idx[f] for f in feats]
 
             t0 = time.time()
@@ -425,6 +501,8 @@ def main() -> None:
                 "importances_gain": importances,
                 "elapsed_s": round(elapsed, 2),
             }
+            if "full_features" in m:
+                rec["full_features"] = m["full_features"]
             fh.write(json.dumps(rec) + "\n")
             fh.flush()
             done.add(m["mask_id"])
