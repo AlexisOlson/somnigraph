@@ -18,6 +18,11 @@ Reuses only pure data-loading helpers (`locomo_bench.ingest.
 Usage:
     uv run experiments/sleep-bench/ingest_baseline.py --conv 1 \
         --data-dir ~/.somnigraph/benchmark/sleepbench-rig-validate/conv1
+
+Whole-corpus store (all conversations in ONE combined store, for corpus-scale
+sleep experiments; dia_map keys are conv-scoped so the merged map stays exact):
+    uv run experiments/sleep-bench/ingest_baseline.py --convs all \
+        --data-dir ~/.somnigraph/benchmark/sleepbench-full/frozen
 """
 
 import argparse
@@ -60,13 +65,32 @@ def _point_at_fresh_store(data_dir: Path) -> None:
     }
 
 
+def _parse_convs(spec: str) -> list[int]:
+    """'0,2,5' or '0-9' (inclusive) -> sorted unique conversation indices."""
+    ids: set[int] = set()
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            ids.update(range(int(lo), int(hi) + 1))
+        elif part:
+            ids.add(int(part))
+    if not ids:
+        sys.exit(f"[ingest-baseline] empty --convs spec: {spec!r}")
+    return sorted(ids)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--conv", type=int, required=True, help="LoCoMo conversation index")
+    ap.add_argument("--conv", type=int, help="single LoCoMo conversation index")
+    ap.add_argument("--convs", help='multiple conversations into ONE combined store: "all", "0-9", or "0,2,5"')
     ap.add_argument("--data-dir", required=True, help="isolated store to create (must not exist yet)")
     ap.add_argument("--locomo-data", default=str(DEFAULT_LOCOMO_DATA))
     ap.add_argument("--embed-cache", default=str(DEFAULT_EMBED_CACHE))
     args = ap.parse_args()
+
+    if (args.conv is None) == (args.convs is None):
+        sys.exit("[ingest-baseline] pass exactly one of --conv or --convs")
 
     data_dir = Path(args.data_dir).expanduser().resolve()
     assert_isolated_data_dir(data_dir)
@@ -83,18 +107,30 @@ def main() -> None:
 
     conversations = load_locomo(Path(args.locomo_data))
     all_turns = extract_turns(conversations)
-    conv_turns = [t for t in all_turns if t["conv_id"] == args.conv]
-    if not conv_turns:
-        sys.exit(f"[ingest-baseline] no turns found for conversation {args.conv}")
 
-    print(f"[ingest-baseline] conversation {args.conv}: {len(conv_turns)} turns -> {data_dir}")
-    dia_map = ingest_conversation(
-        conv_turns, embed_cache_path=Path(args.embed_cache), enrich=False
-    )
-    print(f"[ingest-baseline] {len(dia_map)} memories inserted")
+    if args.convs is not None:
+        if args.convs.strip().lower() == "all":
+            conv_ids = sorted({t["conv_id"] for t in all_turns})
+        else:
+            conv_ids = _parse_convs(args.convs)
+    else:
+        conv_ids = [args.conv]
 
+    merged_map: dict = {}
+    for cid in conv_ids:
+        conv_turns = [t for t in all_turns if t["conv_id"] == cid]
+        if not conv_turns:
+            sys.exit(f"[ingest-baseline] no turns found for conversation {cid}")
+        print(f"[ingest-baseline] conversation {cid}: {len(conv_turns)} turns -> {data_dir}")
+        dia_map = ingest_conversation(
+            conv_turns, embed_cache_path=Path(args.embed_cache), enrich=False
+        )
+        merged_map.update(dia_map)
+        print(f"[ingest-baseline] conversation {cid}: {len(dia_map)} memories inserted")
+
+    print(f"[ingest-baseline] total: {len(merged_map)} memories across {len(conv_ids)} conversation(s)")
     dia_map_path = data_dir / "dia_map.json"
-    dia_map_path.write_text(json.dumps({f"{k[0]}:{k[1]}": v for k, v in dia_map.items()}))
+    dia_map_path.write_text(json.dumps({f"{k[0]}:{k[1]}": v for k, v in merged_map.items()}))
     print(f"[ingest-baseline] wrote {dia_map_path}")
 
 

@@ -89,19 +89,24 @@ def resolve_full_ids(data_dir: Path, short_ids: list[str]) -> dict[str, str]:
 
 
 def edge_embedding_health(data_dir: Path) -> dict:
-    """Count edges whose linking_context has no linking_embedding.
+    """Count contextful edges that have no linking_embedding.
 
-    This is the exact silent-failure the 2026-07-04 conv0-nrem run hit: NREM
-    commits its edges, then embeds their linking_context in a SEPARATE pass
-    that fails soft (nullable column) if credentials are missing. PPR's
-    context-relevance gate (src/memory/scoring.py: `if has_context and not
-    edge["linking_embedding"]: continue`) then SKIPS every such edge -- so a
-    formula/expand score of that store reads as if it had zero edges, a FALSE
-    NULL on exactly the graph hypothesis this rig tests. A store in that state
-    must never be scored with an expansion scorer; the caller hard-fails on it.
+    NOTE (corrected 2026-07-04): this is an edge-HYGIENE signal, NOT a
+    scoring-validity gate. It was originally believed that unembedded contextful
+    edges are invisible to PPR via a context-relevance gate
+    (`if has_context and not edge["linking_embedding"]: continue`), so a store
+    full of them would read as zero-edge -- a false null. That gate exists ONLY
+    in scoring._expand_adjacency_legacy, which NOTHING in src/ calls. The actual
+    live + bench expansion path -- impl_recall(expand=True) -> scoring.
+    expand_via_ppr -- SELECTs only (source_id, target_id, weight, flags) and
+    traverses every non-contradiction edge by WEIGHT; it never reads
+    linking_embedding (verified: scoring.py:316-320 + full fn to 395;
+    tools.py:748-751). So an unembedded edge still contributes to PPR -- there
+    is no false null. REM (sleep_rem.py) creates contextful edges without
+    embedding them; NREM (sleep_nrem.py) embeds. The blind count reflects that
+    REM/NREM asymmetry, a cosmetic inconsistency, not a scoring hazard.
 
-    Returns counts, not a verdict -- retrieve.py decides warn-vs-raise based on
-    whether any requested scorer actually traverses the graph.
+    Returns counts, not a verdict.
     """
     import sqlite3
 
