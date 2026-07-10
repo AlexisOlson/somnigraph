@@ -40,6 +40,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 RESULTS_DIR = HERE / "results"
 BATCH_SIZE = 10
+DEFAULT_LOCOMO = Path.home() / ".claude" / "repos" / "locomo" / "data" / "locomo10.json"
 DEFAULT_MODEL = "opus"  # Alexis: the load-bearing measurement runs on the gold judge
 CATEGORIES = {1: "single-hop", 2: "temporal", 3: "multi-hop",
               4: "open-domain", 5: "adversarial"}
@@ -119,6 +120,35 @@ def load_queries(results_dir: Path) -> dict:
                 "answer": str(r.get("gt_answer", "")),
                 "category": r.get("category", 0),
                 "evidence_ids": r["evidence_ids"],
+            }
+    return out
+
+
+def load_queries_from_gt(locomo_data: Path, rem_dir: Path, convs_spec: str) -> dict:
+    """query_id -> {question, answer, category, evidence_ids}, sourced directly
+    from gt.build_query_set per conv (no Stage-A JSONL needed).
+
+    Mirrors cross_judge_audit.py's sourcing exactly so the eligible-query and
+    (query,summary)-pair counts match that audit. Evidence ids resolve against
+    rem_dir's dia_map (the slept store's persisted map is exact for ingest-time
+    identities -- gt.resolve_dia_map is status-agnostic by design). Imports are
+    lazy so backward-compatible (non --from-gt) invocations never touch the
+    gt/ingest_baseline modules.
+    """
+    for p in (str(HERE), str(HERE.parent.parent / "src"), str(HERE.parent.parent / "scripts")):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    import gt as gt_mod
+    from ingest_baseline import _parse_convs
+
+    out = {}
+    for conv in _parse_convs(convs_spec):
+        for row in gt_mod.build_query_set(Path(locomo_data), rem_dir, conv):
+            out[row["query_id"]] = {
+                "question": row["question"],
+                "answer": str(row["gt_answer"]),
+                "category": row["category"],
+                "evidence_ids": row["evidence_ids"],
             }
     return out
 
@@ -222,15 +252,28 @@ def main() -> None:
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="count pairs, no LLM")
+    ap.add_argument("--from-gt", action="store_true",
+                    help="source queries from gt.build_query_set per conv (train-conv "
+                         "coverage judging) instead of the Stage-A sweep JSONL")
+    ap.add_argument("--convs", default="1-9",
+                    help="conversations for --from-gt sourcing (e.g. '1-9', '0,2,5')")
+    ap.add_argument("--locomo-data", default=str(DEFAULT_LOCOMO),
+                    help="LoCoMo dataset json (only used with --from-gt)")
+    ap.add_argument("--out", default=None,
+                    help="output json path (default: <results-dir>/summary_coverage.json)")
     args = ap.parse_args()
 
     rem = Path(args.rem_dir).expanduser().resolve()
     rdir = Path(args.results_dir).expanduser()
     rdir.mkdir(parents=True, exist_ok=True)
-    out_path = rdir / "summary_coverage.json"
+    out_path = Path(args.out).expanduser() if args.out else rdir / "summary_coverage.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     content, genfrom = load_store(rem)
-    queries = load_queries(rdir)
+    if args.from_gt:
+        queries = load_queries_from_gt(Path(args.locomo_data).expanduser(), rem, args.convs)
+    else:
+        queries = load_queries(rdir)
     print(f"[judge] {len(genfrom)} leaf summaries, {len(queries)} queries, model={args.model}")
 
     results = {}
