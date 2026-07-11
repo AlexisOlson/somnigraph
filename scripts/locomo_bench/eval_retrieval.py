@@ -1165,6 +1165,7 @@ def eval_production(
     db_path: Path,
     recall_limit: int,
     recall_budget: int,
+    model_path: Path | None = None,
 ) -> list[dict]:
     """Run production GT eval with the given scoring config."""
     import memory.constants
@@ -1194,13 +1195,26 @@ def eval_production(
     # Point MODEL_PATH at real model location (not benchmark dir).
     # V6+ ships as LightGBM native .txt; a stale .pkl next to it must NOT shadow it
     # (the .txt-native loader rejects the pickle and silently drops to formula).
-    for model_path in [
-        Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.txt",
-        Path.home() / ".claude" / "data" / "tuning_studies" / "reranker_model.txt",
-    ]:
-        if model_path.exists():
-            memory.constants.MODEL_PATH = model_path
-            memory.reranker.MODEL_PATH = model_path
+    # An explicit --model-path (fork arm-local retrain) wins over the deployed
+    # search order and must exist — a missing arm model must not silently score
+    # the cell with the deployed model.
+    if model_path is not None:
+        if not model_path.exists():
+            logger.error("--model-path does not exist: %s", model_path)
+            sys.exit(1)
+        candidate_paths = [model_path]
+    else:
+        candidate_paths = [
+            Path.home() / ".somnigraph" / "tuning_studies" / "reranker_model.txt",
+            Path.home() / ".claude" / "data" / "tuning_studies" / "reranker_model.txt",
+        ]
+    for mp in candidate_paths:
+        if mp.exists():
+            memory.constants.MODEL_PATH = mp
+            memory.reranker.MODEL_PATH = mp
+            features_path = mp.parent / "reranker_features.json"
+            memory.constants.MODEL_FEATURES_PATH = features_path
+            memory.reranker.MODEL_FEATURES_PATH = features_path
             break
 
     # Reset module state
@@ -1209,6 +1223,25 @@ def eval_production(
 
     # Apply scoring config
     apply_scoring_config(config_name)
+
+    # Fail loud on scorer identity: a reranker cell that silently scores with
+    # the formula is the April-July 2026 outage shape. No warn-and-continue.
+    model_sha256 = None
+    resolved_model_path = None
+    if CONFIGS[config_name].get("reranker", False):
+        cache = memory.reranker._cache
+        if not cache["loaded"] or cache["failed"] or cache["model"] is None:
+            logger.error(
+                "Config %r requires the reranker but no model loaded "
+                "(MODEL_PATH=%s). Refusing to fall back to formula scoring.",
+                config_name, memory.reranker.MODEL_PATH)
+            sys.exit(1)
+        import hashlib
+        resolved_model_path = str(memory.reranker.MODEL_PATH)
+        model_sha256 = hashlib.sha256(
+            Path(resolved_model_path).read_bytes()).hexdigest()
+        logger.info("Scorer identity: %s (sha256=%s...)",
+                    resolved_model_path, model_sha256[:16])
 
     # Build token map for NDCG computation
     from memory.db import get_db
@@ -1252,6 +1285,8 @@ def eval_production(
             "relevant_count": sum(1 for s in gt_scores.values() if s >= 0.5),
             "recall_budget": recall_budget,  # sleep-fork: NDCG budget provenance
             "recall_limit": recall_limit,    # sleep-fork: rank cutoff provenance
+            "model_path": resolved_model_path,   # sleep-fork: scorer identity
+            "model_sha256": model_sha256,        # (None for non-reranker configs)
         })
 
         if (qi + 1) % 20 == 0:
@@ -1560,6 +1595,11 @@ def main():
                         help="Path to ground truth JSON")
     parser.add_argument("--snapshot", action="store_true",
                         help="Snapshot production DB before eval")
+    parser.add_argument("--model-path", type=str, default=None,
+                        help="Explicit reranker model .txt for this eval (e.g. an arm-local "
+                             "retrain in a fork cell). Repoints the features .json beside it. "
+                             "Default: deployed-model search order (~/.somnigraph then "
+                             "~/.claude/data).")
 
     # Shared options
     parser.add_argument("--recall-limit", type=int, default=20,
@@ -1690,6 +1730,7 @@ def main():
                 records = eval_production(
                     config_name, Path(args.gt_path), db_path,
                     limit, args.recall_budget,
+                    model_path=Path(args.model_path) if args.model_path else None,
                 )
                 all_records.extend(records)
                 for r in records:

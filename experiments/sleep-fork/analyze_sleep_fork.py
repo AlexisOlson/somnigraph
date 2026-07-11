@@ -29,6 +29,7 @@ import argparse
 import json
 import math
 import sqlite3
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -161,12 +162,41 @@ def main():
     ap.add_argument("--seed", type=int, default=1729)
     ap.add_argument("--n-boot", type=int, default=10000)
     ap.add_argument("--reranker-loaded", action="store_true",
-                    help="set only if the learned reranker actually loaded (it did not)")
+                    help="manual override; normally derived from the records' "
+                         "model_sha256 stamps (eval_retrieval.py writes them)")
     args = ap.parse_args()
 
     base = load_records(args.baseline, args.config)
     slept = load_records(args.slept, args.config)
     gt = json.loads(Path(args.gt).read_text())
+
+    if not base or not slept:
+        sys.exit(
+            f"ERROR: no records matched config={args.config!r} "
+            f"(baseline: {len(base)}, slept: {len(slept)}). "
+            "The eval was probably run with a different --configs value; "
+            "pass the matching --config here.")
+
+    # Scorer identity comes from the records themselves (eval_retrieval.py
+    # stamps model_path/model_sha256 per record; None = non-reranker config).
+    def model_identity(recs):
+        shas = {r.get("model_sha256") for r in recs.values()}
+        paths = {r.get("model_path") for r in recs.values()}
+        if len(shas) > 1:
+            sys.exit(f"ERROR: mixed model_sha256 within one side: {shas}")
+        return {"model_path": next(iter(paths)), "model_sha256": next(iter(shas))}
+
+    ident_base = model_identity(base)
+    ident_slept = model_identity(slept)
+    if ident_base["model_sha256"] or ident_slept["model_sha256"]:
+        scorer_note = (
+            f"config={args.config}; baseline model: {ident_base['model_path']} "
+            f"(sha256={ident_base['model_sha256']}); slept model: "
+            f"{ident_slept['model_path']} (sha256={ident_slept['model_sha256']})")
+    else:
+        scorer_note = (
+            f"config={args.config}; no reranker model recorded on either side "
+            "(formula/rrf-class scoring, or records predate scorer-identity stamping)")
 
     queries = [q for q in base if q in slept and q in gt]
     missing_base = [q for q in gt if q not in base]
@@ -209,10 +239,12 @@ def main():
 
     results = {
         "config": args.config,
-        "reranker_loaded": bool(args.reranker_loaded),
-        "scorer_note": (
-            "FORMULA scoring on BOTH sides (reranker_model.txt absent since "
-            "2026-04-07). This is a sleep-vs-formula delta, not sleep-vs-reranker."),
+        "reranker_loaded": bool(
+            args.reranker_loaded
+            or ident_base["model_sha256"] or ident_slept["model_sha256"]),
+        "scorer_note": scorer_note,
+        "baseline_model": ident_base,
+        "slept_model": ident_slept,
         "gt_file": args.gt,
         "n_queries_joined": len(queries),
         "n_gt_queries": len(gt),
@@ -249,7 +281,8 @@ def main():
 
     print("=" * 72)
     print(f"SLEEP FORK — paired delta (slept − frozen), config={args.config}")
-    print(f"  scorer: FORMULA on both sides (reranker fallback); joined {len(queries)} queries")
+    print(f"  scorer: {scorer_note}")
+    print(f"  joined {len(queries)} queries")
     print("-" * 72)
     for m, label in [("ndcg@5k", "NDCG@5k"), ("r@10", "R@10"), ("mrr", "MRR")]:
         b = results["baseline"][m]["mean"]

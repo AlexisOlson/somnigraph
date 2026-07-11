@@ -130,7 +130,7 @@ MAX_CLUSTER_SIZE = 20  # Don't merge beyond this — LLM can't judge 93 memories
 # v1 is a fixed conservative factor; coverage-proportional (judge-verified)
 # downweight is planned v2 after the H12 bench sweep finds the knee.
 CONSOLIDATED_MEMBER_WEIGHT = float(os.environ.get(
-    "SOMNIGRAPH_CONSOLIDATED_MEMBER_WEIGHT", "0.8"))
+    "SOMNIGRAPH_CONSOLIDATED_MEMBER_WEIGHT", "").strip() or "0.8")
 CONSOLIDATED_MEMBER_FLAG = "consolidated_member"
 # Downweight budget per cluster (the MAX_ARCHIVES_PER_CLUSTER analog for the
 # non-destructive path). Provenance edges are NOT capped — every member the
@@ -413,6 +413,7 @@ def gather_clusters(db) -> list[dict]:
     # Filter out clusters where all members are already consolidated and unchanged
     fresh_clusters = []
     skipped_stable = 0
+    skipped_consolidated = 0
     for c in clusters:
         needs_work = False
         for m in c["memories"]:
@@ -428,6 +429,25 @@ def gather_clusters(db) -> list[dict]:
             if m["last_sleep_processed"] and m["last_sleep_processed"] > lc:
                 needs_work = True
                 break
+        # Majority-consolidated clusters are skipped even when "fresh": every
+        # NREM run re-stamps last_sleep_processed, which would otherwise re-arm
+        # each already-consolidated cluster every cycle — and since the prior
+        # consolidation node (topic_id NULL) is invisible to the judgment
+        # prompt, each pass would synthesize a duplicate node. A cluster
+        # re-enters consolidation only once genuinely-new members (never
+        # stamped, or created after their stamp) outnumber the already-
+        # consolidated ones. Keyed on last_consolidated, NOT the
+        # consolidated_member flag: the flag only lands on downweighted
+        # members, and protected members (common on live stores) are never
+        # downweighted — the stamp covers every member unconditionally.
+        if needs_work:
+            already = sum(
+                1 for m in c["memories"]
+                if m["last_consolidated"]
+                and m["created_at"] <= m["last_consolidated"])
+            if already * 2 > len(c["memories"]):
+                skipped_consolidated += 1
+                continue
         if needs_work:
             fresh_clusters.append(c)
         else:
@@ -435,6 +455,9 @@ def gather_clusters(db) -> list[dict]:
 
     if skipped_stable:
         log(f"  Skipped {skipped_stable} stable clusters (already consolidated)")
+    if skipped_consolidated:
+        log(f"  Skipped {skipped_consolidated} majority-consolidated clusters "
+            f"(prior node exists; awaiting new-member majority)")
 
     # Sort by size descending
     fresh_clusters.sort(key=lambda c: len(c["memory_ids"]), reverse=True)
@@ -579,17 +602,22 @@ Output schema:
 }"""
 
 
+def _parse_flags(mem) -> list:
+    """Parse a memory row's flags JSON, tolerating missing column/NULL."""
+    try:
+        flags_raw = mem["flags"]
+    except (IndexError, KeyError):
+        flags_raw = None
+    return json.loads(flags_raw) if flags_raw else []
+
+
 def _is_protected(mem) -> bool:
     """Check if a memory is protected from archival."""
     if mem["decay_rate"] is not None and mem["decay_rate"] == 0:
         return True
     if mem["source"] == "correction":
         return True
-    try:
-        flags_raw = mem["flags"]
-    except (IndexError, KeyError):
-        flags_raw = None
-    flags = json.loads(flags_raw) if flags_raw else []
+    flags = _parse_flags(mem)
     if "pinned" in flags or "keep" in flags:
         return True
     return False
@@ -1090,6 +1118,9 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
 
         if mid not in mem_by_id:
             stats["rejected"] += 1
+            stats["details"].append(
+                f"  REJECTED action {action!r}: unknown memory_id "
+                f"{action_item.get('memory_id', '')!r} (not in cluster)")
             continue
 
         mem = mem_by_id[mid]
@@ -1301,6 +1332,15 @@ def execute_actions(db, cluster: dict, judgment: dict, dry_run: bool = False,
                 tag_formation(db, mid)
                 stats["formations"] += 1
                 stats["details"].append(f"  FORMATION {mid[:8]}")
+
+        else:
+            # Unrecognized action strings must not vanish silently — the LLM
+            # sometimes invents verbs the prompt talks about ("consolidate",
+            # "downweight"). Count and log so the rejection-rate instrument
+            # sees schema drift instead of a flatteringly clean run.
+            stats["rejected"] += 1
+            stats["details"].append(
+                f"  REJECTED {mid[:8]}: unrecognized action {action!r}")
 
     return stats
 

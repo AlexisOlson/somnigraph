@@ -1096,12 +1096,29 @@ def main():
                         help="Number of unique memories to probe in Phase 3 (default 10). "
                              "Each memory gets 3 queries (one per mode) in mixed mode, so "
                              "default = 30 total queries. Set to 0 to skip the probe.")
+    parser.add_argument("--allow-live", action="store_true",
+                        help="Explicitly allow sleeping the live production store "
+                             "(~/.claude/data). Refused otherwise, so an inherited "
+                             "SOMNIGRAPH_DATA_DIR can't silently sleep the live store "
+                             "during an experiment. The production wrapper passes this.")
     args = parser.parse_args()
     nrem_mode = "deep" if args.deep else "standard"
+
+    live_data_dir = (Path.home() / ".claude" / "data").resolve()
+    target_dir = DATA_DIR.resolve()
+    if target_dir == live_data_dir and not args.allow_live:
+        print(
+            f"REFUSING to run: SOMNIGRAPH_DATA_DIR resolves to the live "
+            f"production store ({target_dir}).\n"
+            f"Pass --allow-live if this is really intended.",
+            file=sys.stderr)
+        sys.exit(2)
 
     print(f"{'═' * 60}")
     print(f"  SLEEP CYCLE ({nrem_mode} NREM + REM)")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  data dir: {target_dir}")
+    print(f"  db:       {DB_PATH}")
     print(f"{'═' * 60}\n")
 
     total_start = time.time()

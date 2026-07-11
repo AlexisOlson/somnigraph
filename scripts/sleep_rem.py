@@ -1161,7 +1161,7 @@ SUMMARY_AUDIT_THRESHOLD = 100  # Trigger LLM audit when active summaries exceed 
 # summary-count -> retrieval and set the shipped multiple from evidence.
 RECALL_LIMIT_REF = 5  # impl_recall default `limit` (memory.tools) -- the "one recall" unit
 SUMMARY_MIN_MEMBERS = int(os.environ.get(
-    "SOMNIGRAPH_SUMMARY_MIN_MEMBERS", str(RECALL_LIMIT_REF)))
+    "SOMNIGRAPH_SUMMARY_MIN_MEMBERS", "").strip() or str(RECALL_LIMIT_REF))
 SUMMARY_MIN_DETAIL_TOKENS = 2000  # DEPRECATED as the leaf floor (replaced by
 # SUMMARY_MIN_MEMBERS above); still gates parent-summary creation (~line 1023)
 # until H7's granularity A/B revisits the summary-of-summaries floor.

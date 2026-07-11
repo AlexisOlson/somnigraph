@@ -105,7 +105,8 @@ Be conservative:
 - "supports" requires genuine evidential reinforcement, not just topical overlap
 - "duplicate" means truly redundant — if one adds meaningful detail the other lacks, use "supports" instead
 
-Downstream effects: duplicate deletes the lower-priority memory, hard/soft contradiction penalizes
+Downstream effects: duplicate links the pair non-destructively (both stay active; a later
+consolidation pass reconciles them), hard/soft contradiction penalizes
 the older memory's confidence, temporal_evolution marks it time-bounded, supports boosts both.
 Contextual and none/related create no penalties or boosts. Confidence scores below 0.3 (after
 source-quality adjustment) are discarded — calibrate accordingly.
@@ -460,23 +461,22 @@ def classify_batch(batch: list[dict], mode: str = "standard") -> list[dict]:
             **kwargs,
         )
     except subprocess.TimeoutExpired:
-        print("  WARNING: classification timed out (600s)", file=sys.stderr)
+        log("  WARNING: classification timed out (600s)")
         return []
     except FileNotFoundError:
-        print("  ERROR: 'claude' CLI not found on PATH", file=sys.stderr)
+        log("  ERROR: 'claude' CLI not found on PATH")
         return []
 
     if result.returncode != 0:
         stderr_preview = (result.stderr or "")[:200]
-        print(f"  WARNING: claude -p returned {result.returncode}: {stderr_preview}", file=sys.stderr)
+        log(f"  WARNING: claude -p returned {result.returncode}: {stderr_preview}")
         return []
 
     raw = result.stdout
     classifications = parse_json_response(raw)
     if not classifications:
         preview = raw[:500] if raw else "(empty)"
-        print(f"  WARNING: failed to parse JSON from Sonnet response: {preview}",
-              file=sys.stderr)
+        log(f"  WARNING: failed to parse JSON from Sonnet response: {preview}")
 
     return classifications
 
@@ -1060,6 +1060,8 @@ def main():
         })
 
     # Step 3: Classify via claude -p (parallel batches)
+    failed_batches = 0
+    total_batches = 0
     if classify_pairs:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -1088,6 +1090,7 @@ def main():
 
         import time as _time
         _t_classify_start = _time.monotonic()
+        total_batches = len(batches)
         with ThreadPoolExecutor(max_workers=MAX_PARALLEL) as executor:
             futures = {
                 executor.submit(_classify_one, i, batch): i
@@ -1099,6 +1102,11 @@ def main():
                 batch_idx, batch, classifications = future.result()
                 actionable = sum(1 for c in classifications if c.get("edge_type", "none") != "none")
                 log(f"  Batch {batch_idx + 1}/{len(batches)}: {len(batch)} pairs -> {len(classifications)} results ({actionable} actionable)")
+                if not classifications:
+                    failed_batches += 1
+                    log(f"  WARNING: Batch {batch_idx + 1} returned 0 results — "
+                        f"its {len(batch)} pairs are dropped, and their memories "
+                        f"will still be stamped processed (unrecoverable this run)")
 
                 # Map pair_index back to source/target IDs
                 pair_lookup = {p["pair_index"]: p for p in batch}
@@ -1123,6 +1131,10 @@ def main():
         _t_classify_elapsed = _time.monotonic() - _t_classify_start
         avg_per_batch = _t_classify_elapsed / len(batches)
         log(f"  Classification done: {_t_classify_elapsed:.0f}s total, {avg_per_batch:.0f}s avg/batch ({avg_per_batch/60:.1f} min/batch)")
+        log(f"  failed_batches: {failed_batches}/{len(batches)}")
+        if failed_batches:
+            log(f"  WARNING: {failed_batches} of {len(batches)} classification "
+                f"batches FAILED — this run is a partial sleep for those pairs")
 
     # Step 4: Write results
     write_stats = write_results(db, all_results, processed_ids, shadow_updates,
@@ -1156,6 +1168,7 @@ def main():
         f"- Shadow-load updates: {write_stats['shadow_updates']}",
         f"- Decay corrections: {decay_stats['slowed']} slowed, {decay_stats['accelerated']} accelerated",
         f"- Entity links: {entity_stats['edges_created']} new edges to {entity_stats['entities_found']} entities",
+        f"- Failed classification batches: {failed_batches}/{total_batches}",
     ]
     if write_stats["merge_details"]:
         report_lines.append("")
@@ -1172,6 +1185,8 @@ def main():
         "duplicates_merged": write_stats["duplicates_merged"],
         "fast_path_count": len(fast_path_pairs),
         "full_pipeline_count": len(classify_pairs),
+        "failed_batches": failed_batches,
+        "total_batches": total_batches,
         "per_memory_changes": [
             {"id": mid, **changes}
             for mid, changes in write_stats["per_memory_changes"].items()
