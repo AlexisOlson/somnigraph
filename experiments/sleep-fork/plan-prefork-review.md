@@ -22,8 +22,16 @@ configuration, with failure modes enumerated before, not after.
 
 ## Method
 
-Adversarial read per stage, checklist-driven, one review agent per stage is fine
-(code reading, not compute). Verification smokes run on a **synthetic scratch DB only**
+**Execution model (locked 2026-07-11, grilled):** one subagent per pipeline stage
+(orchestrator, NREM, REM, consolidate, fork/scoring), session model, launched in
+parallel, each briefed with **file paths + its checklist section only** — never a
+summary of the code (verifier rule). The main session does the cross-cutting
+config-parity table and adversarially synthesizes the findings. **Findings-first:**
+consolidated severity-ranked report → Alexis approves the fix list → all fixes on one
+branch → diff reviewed together. Runs in a fresh session. Smokes and any LLM-calling
+runs go to Alexis's terminal.
+
+Verification smokes run on a **synthetic scratch DB only**
 — **not** a fork of the live store. A live-store dry run would preview the experiment's
 outcome before the registered run and invite mid-flight tuning; the blindness is worth
 more than the extra confidence. (Decision point D1 below if we disagree.)
@@ -122,7 +130,7 @@ Output: findings ranked by severity → fixes on a branch → a frozen **fork ru
 | D1 | Smoke on synthetic scratch only, or allow a mechanics-only live-fork dry run? | Synthetic only — preserve blindness |
 | D2 | Probes on or off in the fork arms? | Off (`--probes 0`); V6 scoring makes the probe arm's question moot and strip_probe cost a day last time |
 | D3 | Dormancy as-shipped or disabled in the slept arm? | As-shipped — the experiment measures the production pipeline, blast radius bounded (10.4%), and H10 says ranking-layer recovery exists; disabling it changes what's being measured |
-| D4 | Add a B+retrain arm (post-sleep reranker retrain per H10/N4)? | Yes — it's the program's headline finding and the fork is the only live test of it; needs a GT/recipe decision |
+| D4 | Add a B+retrain arm (post-sleep reranker retrain per H10/N4)? | **LOCKED YES 2026-07-11** (pre-registered before any live result) — the review designs the GT/recipe and writes the amendment into the runbook |
 | D5 | Fix the H12 pass-2 dup bug before the fork? | Yes — small, held for this review, post-fork cadence hits it regardless |
 
 ## Exit criteria
