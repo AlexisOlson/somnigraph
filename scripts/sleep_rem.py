@@ -401,6 +401,7 @@ def call_llm(prompt_text: str, model: str = "sonnet", timeout: int = 300) -> str
 
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # headless: no CLAUDE.md/core.md/seed.md
 
     kwargs = {}
     if sys.platform == "win32":

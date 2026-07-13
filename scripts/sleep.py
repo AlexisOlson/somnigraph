@@ -257,6 +257,7 @@ def _call_claude_json(prompt: str, model: str = "sonnet", timeout: int = 300, la
     _ensure_subprocess_workspace()
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # headless: no CLAUDE.md/core.md/seed.md
 
     kwargs = {}
     if sys.platform == "win32":
@@ -912,6 +913,7 @@ def repair_retrieval_failures():
     _ensure_subprocess_workspace()
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # headless: no CLAUDE.md/core.md/seed.md
 
     kwargs = {}
     if sys.platform == "win32":

@@ -112,6 +112,7 @@ def judge_batch(items: list[tuple[int, dict]], model: str,
 
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # headless: no CLAUDE.md/core.md/seed.md
     claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
 
     for attempt in range(3):

@@ -405,6 +405,7 @@ def call_llm(prompt: str, model: str, system: str = "", timeout: int = 240) -> s
     _ensure_subprocess_workspace()
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # headless: no CLAUDE.md/core.md/seed.md
 
     kwargs = {}
     if sys.platform == "win32":

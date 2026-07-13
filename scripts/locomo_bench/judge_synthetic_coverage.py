@@ -203,6 +203,7 @@ def call_claude(system_prompt: str, user_prompt: str, model: str) -> str:
 
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # headless: no CLAUDE.md/core.md/seed.md
 
     claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
 
