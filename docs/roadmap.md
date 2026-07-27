@@ -316,6 +316,17 @@ Not architecture — advice. The wrong turns we can help you skip.
 
 ---
 
+## Known defects
+
+- **`shadow_load` only ever increases** (found 2026-07-27, unfixed). The NREM
+  pass writes suppression scores but never lowers or clears them, and it scores
+  only the memories it happens to process, so a stored `0.000` cannot be
+  distinguished from "never computed." 10.2% of pre-sleep memories disagree
+  with a fresh recomputation. This bears on lesson 7 below, which lists the
+  shadow penalty as an empirically useless scoring signal: if that was measured
+  against this column, it tested the instrument rather than the idea. Evidence
+  and code references: [`shadow-load-ratchet.md`](shadow-load-ratchet.md).
+
 ## Infrastructure gaps
 
 What we can't measure yet and would need to build.
